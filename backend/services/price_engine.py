@@ -18,7 +18,10 @@ import httpx
 
 from core.config import Settings
 from services.circuit_breaker import CircuitBreaker
-from services.sources import PriceResult, fetch_coingecko, fetch_pyth, fetch_chainlink
+from services.sources import (
+    PriceResult, fetch_coingecko, fetch_pyth, fetch_chainlink,
+    fetch_yahoo, fetch_finnhub,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +91,14 @@ class PriceEngine:
         if self._settings.chainlink_enabled and not self._get_breaker("chainlink").is_open:
             tasks.append(("chainlink", asyncio.create_task(
                 fetch_chainlink(symbol, self._http, self._settings.base_rpc_url)
+            )))
+        if self._settings.yahoo_enabled and not self._get_breaker("yahoo").is_open:
+            tasks.append(("yahoo", asyncio.create_task(
+                fetch_yahoo(symbol, self._http)
+            )))
+        if self._settings.finnhub_enabled and self._settings.finnhub_api_key and not self._get_breaker("finnhub").is_open:
+            tasks.append(("finnhub", asyncio.create_task(
+                fetch_finnhub(symbol, self._http, self._settings.finnhub_api_key)
             )))
 
         sources_available = len(tasks)
