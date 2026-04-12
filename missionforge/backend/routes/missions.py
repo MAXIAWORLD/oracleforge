@@ -1,19 +1,25 @@
 """MissionForge — Mission management + RAG API routes.
 
 Endpoints:
-  GET  /api/missions              — list all missions
-  GET  /api/missions/{name}       — get mission detail
-  POST /api/missions/{name}/run   — trigger manual execution
-  POST /api/missions/reload       — hot-reload YAML from disk
-  POST /api/rag/ingest            — ingest documents into RAG
-  GET  /api/rag/stats             — RAG collection stats
+  GET  /api/missions                    — list all missions
+  GET  /api/missions/{name}             — get mission detail
+  POST /api/missions/{name}/run         — trigger manual execution
+  GET  /api/missions/{name}/history     — execution history
+  GET  /api/missions/{name}/run/stream  — SSE live run with logs
+  GET  /api/missions/history/all        — global history
+  POST /api/missions/reload             — hot-reload YAML from disk
+  POST /api/rag/ingest                  — ingest documents into RAG
+  GET  /api/rag/stats                   — RAG collection stats
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
 import time
 
 from fastapi import APIRouter, HTTPException, Request
+from starlette.responses import StreamingResponse
 from pydantic import BaseModel
 
 router = APIRouter(tags=["missions"])
@@ -121,6 +127,74 @@ async def run_mission(name: str, request: Request) -> RunResponse:
         logs=log.logs,
         duration_ms=duration_ms,
     )
+
+
+@router.get("/api/missions/{name}/run/stream")
+async def run_mission_stream(name: str, request: Request):
+    """Run a mission and stream execution logs via SSE."""
+    engine = _get_engine(request)
+    if name not in engine.list_missions():
+        raise HTTPException(404, f"Mission '{name}' not found")
+
+    async def event_generator():
+        yield f"data: {json.dumps({'event': 'start', 'mission': name})}\n\n"
+        try:
+            log = await engine.run_mission(name)
+            for line in log.logs:
+                yield f"data: {json.dumps({'event': 'log', 'message': line})}\n\n"
+            duration = int((log.finished_at - log.started_at) * 1000) if log.finished_at else 0
+            yield f"data: {json.dumps({'event': 'complete', 'status': log.status, 'steps': log.steps_completed, 'total': log.total_steps, 'tokens': log.tokens_used, 'duration_ms': duration, 'error': log.error_message})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/api/missions/{name}/history")
+async def mission_history(name: str, request: Request, limit: int = 20) -> dict:
+    """Get execution history for a mission."""
+    engine = _get_engine(request)
+    runs = engine.get_run_history(mission_name=name, limit=limit)
+    return {
+        "mission": name,
+        "runs": [
+            {
+                "run_id": r.run_id,
+                "status": r.status,
+                "steps_completed": r.steps_completed,
+                "total_steps": r.total_steps,
+                "tokens_used": r.tokens_used,
+                "cost_usd": r.cost_usd,
+                "duration_ms": int((r.finished_at - r.started_at) * 1000) if r.finished_at else 0,
+                "logs": r.logs,
+                "error_message": r.error_message,
+            }
+            for r in runs
+        ],
+        "total": len(runs),
+    }
+
+
+@router.get("/api/missions/history/all")
+async def all_history(request: Request, limit: int = 50) -> dict:
+    """Get global execution history across all missions."""
+    engine = _get_engine(request)
+    runs = engine.get_run_history(limit=limit)
+    return {
+        "runs": [
+            {
+                "run_id": r.run_id,
+                "mission_name": r.mission_name,
+                "status": r.status,
+                "steps_completed": r.steps_completed,
+                "total_steps": r.total_steps,
+                "tokens_used": r.tokens_used,
+                "duration_ms": int((r.finished_at - r.started_at) * 1000) if r.finished_at else 0,
+            }
+            for r in runs
+        ],
+        "total": len(runs),
+    }
 
 
 @router.post("/api/missions/reload")

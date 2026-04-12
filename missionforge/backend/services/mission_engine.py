@@ -154,15 +154,18 @@ class MissionEngine:
         memory: Any,
         http_client: Any,
         allowed_env_vars: list[str] | None = None,
+        db_session_factory: Any = None,
     ) -> None:
         self._llm = llm_router
         self._rag = rag_service
         self._memory = memory
         self._http = http_client
         self._allowed_env_vars = set(allowed_env_vars or [])
+        self._db_factory = db_session_factory
         self._missions: dict[str, MissionDefinition] = {}
         self._running = False
         self._tasks: list[asyncio.Task] = []
+        self._run_history: list[ExecutionLog] = []  # in-memory recent runs
 
     # ── YAML loading ─────────────────────────────────────────────
 
@@ -361,7 +364,19 @@ class MissionEngine:
         log.logs = ctx.logs
         log.finished_at = time.time()
 
+        # Track in memory (last 100 runs)
+        self._run_history.append(log)
+        if len(self._run_history) > 100:
+            self._run_history = self._run_history[-100:]
+
         return log
+
+    def get_run_history(self, mission_name: str | None = None, limit: int = 20) -> list[ExecutionLog]:
+        """Return recent execution logs, optionally filtered by mission."""
+        runs = self._run_history
+        if mission_name:
+            runs = [r for r in runs if r.mission_name == mission_name]
+        return list(reversed(runs[-limit:]))
 
     # ── Scheduling (async background tasks) ──────────────────────
 
