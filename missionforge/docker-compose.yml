@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8001:8001"
+    env_file: ./backend/.env
+    volumes:
+      - ./examples/missions:/app/missions
+      - mf_chroma:/app/chroma_db
+      - mf_data:/app/data
+    environment:
+      - MISSIONS_DIR=/app/missions
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - DATABASE_URL=sqlite+aiosqlite:///./data/missionforge.db
+    restart: unless-stopped
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mf_chroma:
+  mf_data:
