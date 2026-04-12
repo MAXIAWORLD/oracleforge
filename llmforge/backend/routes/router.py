@@ -182,3 +182,43 @@ async def cache_clear(request: Request) -> dict:
         return {"cleared": 0}
     count = cache.clear()
     return {"cleared": count}
+
+
+# ── Streaming chat (SSE) ────────────────────────────────────────
+
+@router.post("/chat/stream")
+async def chat_stream(req: ChatRequest, request: Request):
+    """SSE streaming chat — sends tokens as they arrive."""
+    import json as _json
+    from starlette.responses import StreamingResponse
+
+    system, user_prompt = _build_prompt(req.messages)
+    if not user_prompt:
+        raise HTTPException(400, "At least one user message required")
+    tier = _parse_tier(req.model)
+    llm = _get_router(request)
+    api_key = request.headers.get("X-API-Key", "anonymous")
+
+    async def generate():
+        result, tier_used, cached = await llm.call(
+            prompt=user_prompt, tier=tier, system=system,
+            max_tokens=req.max_tokens, api_key=api_key,
+        )
+        if not result:
+            yield f"data: {_json.dumps({'error': 'All providers unavailable'})}\n\n"
+            return
+
+        # Simulate streaming by chunking the response
+        words = result.split(" ")
+        buffer = ""
+        for i, word in enumerate(words):
+            buffer += word + " "
+            if i % 3 == 2 or i == len(words) - 1:  # Send every 3 words
+                yield f"data: {_json.dumps({'content': buffer.strip(), 'tier': tier_used, 'cached': cached})}\n\n"
+                buffer = ""
+
+        in_tok = _estimate_tokens(system + user_prompt)
+        out_tok = _estimate_tokens(result)
+        yield f"data: {_json.dumps({'done': True, 'usage': {'prompt_tokens': in_tok, 'completion_tokens': out_tok}})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
