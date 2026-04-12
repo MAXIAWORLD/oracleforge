@@ -1,0 +1,20 @@
+name: daily-summary
+description: "Fetch recent updates and generate a daily briefing"
+schedule: "0 9 * * *"
+agent:
+  system_prompt: "You are a precise daily briefing assistant. Summarize information clearly and concisely."
+  llm_tier: fast
+steps:
+  - action: rag_retrieve
+    query: "latest product updates and announcements"
+    k: 8
+    output_var: context
+  - action: llm_call
+    prompt: "Based on this context, write a concise daily summary:\n\n{context}"
+    max_tokens: 600
+    output_var: summary
+  - action: memory_store
+    collection: decisions
+    text_template: "Daily summary {date}: {summary}"
+  - action: log
+    text_template: "Daily summary generated successfully"

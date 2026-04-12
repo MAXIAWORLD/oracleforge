@@ -1,0 +1,11 @@
+name: health-check
+description: "Check system health and log status"
+schedule: "*/5 * * * *"
+agent:
+  system_prompt: "You monitor system health and report anomalies."
+  llm_tier: local
+steps:
+  - action: log
+    text_template: "Health check started at {time}"
+  - action: log
+    text_template: "Health check completed at {time} — all systems nominal"

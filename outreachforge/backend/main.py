@@ -1,0 +1,48 @@
+"""OutreachForge — FastAPI application entry point."""
+
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from core.config import get_settings
+from core.database import close_db, init_db
+from core.models import HealthResponse
+from routes.outreach import router as outreach_router
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    settings = get_settings()
+    await init_db(settings.database_url)
+
+    from services.lead_scorer import LeadScorer
+    from services.email_personalizer import EmailPersonalizer
+
+    app.state.lead_scorer = LeadScorer()
+    app.state.personalizer = EmailPersonalizer()
+    logger.info("[startup] OutreachForge ready")
+    yield
+    await close_db()
+
+
+def create_app() -> FastAPI:
+    settings = get_settings()
+    app = FastAPI(title=settings.app_name, version=settings.version, lifespan=lifespan)
+    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
+                       allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+    app.include_router(outreach_router)
+
+    @app.get("/health", response_model=HealthResponse)
+    async def health() -> HealthResponse:
+        return HealthResponse(version=settings.version)
+    return app
+
+
+app = create_app()
