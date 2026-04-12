@@ -35,6 +35,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version=settings.version, lifespan=lifespan)
+    # Security middleware (auth + rate limit + headers)
+    from core.middleware import add_security_middleware
+    add_security_middleware(app, settings.secret_key)
+
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
                        allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
     app.include_router(outreach_router)

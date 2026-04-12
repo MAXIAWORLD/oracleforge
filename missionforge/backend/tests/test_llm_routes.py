@@ -11,13 +11,15 @@ from fastapi.testclient import TestClient
 from main import create_app
 
 
+_TEST_API_KEY = "test-secret-key-32-chars-ok!!"
+
+
 @pytest.fixture
 def client() -> TestClient:
     app = create_app()
-    # Simulate lifespan: set app.state that routes depend on
     app.state.http_client = httpx.AsyncClient(timeout=5.0)
     app.state.chroma_client = None
-    return TestClient(app)
+    return TestClient(app, headers={"X-API-Key": _TEST_API_KEY})
 
 
 class TestListModels:

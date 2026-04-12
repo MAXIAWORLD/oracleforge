@@ -48,7 +48,11 @@ class CompletionRequest(BaseModel):
 
 
 def get_llm_router(request: Request) -> LLMRouter:
-    """Build an LLMRouter from app state (http_client) and settings."""
+    """Return the shared LLMRouter from app state (preserves stats + budget)."""
+    engine = getattr(request.app.state, "mission_engine", None)
+    if engine and hasattr(engine, "_llm"):
+        return engine._llm
+    # Fallback: create new (should not happen if lifespan ran)
     settings = get_settings()
     http_client: httpx.AsyncClient = request.app.state.http_client
     return LLMRouter(settings=settings, http_client=http_client)

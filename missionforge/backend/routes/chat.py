@@ -52,9 +52,11 @@ async def chat(req: ChatRequest, request: Request) -> ChatResponse:
     """Send a message to the agent with optional RAG grounding."""
     t0 = time.monotonic()
 
-    settings = get_settings()
-    http_client: httpx.AsyncClient = request.app.state.http_client
-    llm = LLMRouter(settings=settings, http_client=http_client)
+    # Reuse shared LLMRouter from MissionEngine (preserves stats)
+    engine = getattr(request.app.state, "mission_engine", None)
+    llm = engine._llm if engine and hasattr(engine, "_llm") else LLMRouter(
+        settings=get_settings(), http_client=request.app.state.http_client
+    )
 
     # Build system prompt
     system = "You are MissionForge, a helpful AI assistant."

@@ -106,6 +106,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Security middleware (auth + rate limit + headers)
+    from core.middleware import add_security_middleware
+    add_security_middleware(app, settings.secret_key)
+
     # CORS
     app.add_middleware(
         CORSMiddleware,

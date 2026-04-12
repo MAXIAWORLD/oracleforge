@@ -70,9 +70,6 @@ _FALLBACK_CHAIN: list[Tier] = list(Tier)
 class LLMRouter:
     """Route LLM calls with caching, budget caps, and automatic fallback."""
 
-    _groq_last_call: float = 0.0
-    _GROQ_MIN_INTERVAL: float = 2.0
-
     def __init__(
         self,
         settings: Settings,
@@ -83,6 +80,8 @@ class LLMRouter:
         self._http = http_client
         self._cache = cache
         self._date = time.strftime("%Y-%m-%d")
+        self._groq_last_call: float = 0.0
+        self._groq_min_interval: float = 2.0
         self._stats: dict[str, dict] = {
             t.value: {"calls": 0, "cost": 0.0, "latency_ms_list": [], "errors": 0, "cache_hits": 0}
             for t in Tier
@@ -232,10 +231,10 @@ class LLMRouter:
         if not self._settings.groq_api_key:
             raise RuntimeError("No Groq API key")
         now = time.time()
-        elapsed = now - LLMRouter._groq_last_call
-        if elapsed < self._GROQ_MIN_INTERVAL:
-            await asyncio.sleep(self._GROQ_MIN_INTERVAL - elapsed)
-        LLMRouter._groq_last_call = time.time()
+        elapsed = now - self._groq_last_call
+        if elapsed < self._groq_min_interval:
+            await asyncio.sleep(self._groq_min_interval - elapsed)
+        self._groq_last_call = time.time()
         resp = await self._http.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {self._settings.groq_api_key}"},

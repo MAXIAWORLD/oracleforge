@@ -83,14 +83,12 @@ _FALLBACK_CHAIN: list[Tier] = [
 class LLMRouter:
     """Route LLM calls to the optimal tier with automatic fallback."""
 
-    # Groq rate limit: 30 RPM free tier → minimum 2s between calls
-    _groq_last_call: float = 0.0
-    _GROQ_MIN_INTERVAL: float = 2.0
-
     def __init__(self, settings: Settings, http_client: httpx.AsyncClient) -> None:
         self._settings = settings
         self._http = http_client
         self._date = time.strftime("%Y-%m-%d")
+        self._groq_last_call: float = 0.0
+        self._groq_min_interval: float = 2.0
         self._stats: dict[str, dict] = {
             t.value: {"calls": 0, "cost": 0.0, "last_latency_ms": 0}
             for t in Tier
@@ -227,10 +225,10 @@ class LLMRouter:
             raise RuntimeError("No Groq API key")
         # Rate limiting: 30 RPM free tier
         now = time.time()
-        elapsed = now - LLMRouter._groq_last_call
-        if elapsed < self._GROQ_MIN_INTERVAL:
-            await asyncio.sleep(self._GROQ_MIN_INTERVAL - elapsed)
-        LLMRouter._groq_last_call = time.time()
+        elapsed = now - self._groq_last_call
+        if elapsed < self._groq_min_interval:
+            await asyncio.sleep(self._groq_min_interval - elapsed)
+        self._groq_last_call = time.time()
 
         msgs = self._build_messages(system, prompt)
         resp = await self._http.post(
