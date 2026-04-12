@@ -1,80 +1,57 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
-import {
-  Activity,
-  Bot,
-  LayoutDashboard,
-  MessageSquare,
-  Rocket,
-} from "lucide-react";
+import { Bot, LayoutDashboard, MessageSquare, Rocket } from "lucide-react";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+export const metadata: Metadata = { title: "MissionForge", description: "AI Agent Framework" };
 
-export const metadata: Metadata = {
-  title: "MissionForge",
-  description: "AI Agent Framework — autonomous missions in YAML",
-};
-
-const NAV_ITEMS = [
-  { href: "/", label: "Overview", icon: LayoutDashboard },
+const NAV = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/missions", label: "Missions", icon: Rocket },
   { href: "/chat", label: "Chat", icon: MessageSquare },
 ];
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex bg-gray-50 text-gray-900">
-        {/* Sidebar */}
-        <aside className="w-56 bg-white border-r border-gray-200 flex flex-col fixed h-full">
-          <div className="p-5 border-b border-gray-200">
-            <Link href="/" className="flex items-center gap-2">
-              <Bot className="h-6 w-6 text-blue-600" />
-              <span className="font-semibold text-lg">MissionForge</span>
+    <html lang="en" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <body className="min-h-full flex overflow-hidden">
+        <ThemeProvider>
+          {/* Sidebar */}
+          <aside className="w-[72px] bg-white dark:bg-[#0d1025] border-r border-gray-200 dark:border-[#1f2340] flex flex-col items-center fixed h-full z-20 py-4">
+            {/* Logo */}
+            <Link href="/" className="mb-8">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-shadow">
+                <Bot className="h-5 w-5 text-white" />
+              </div>
             </Link>
-            <p className="text-xs text-gray-400 mt-1">AI Agent Framework</p>
-          </div>
 
-          <nav className="flex-1 p-3 space-y-1">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+            {/* Nav icons */}
+            <nav className="flex-1 flex flex-col items-center gap-2">
+              {NAV.map((item) => (
+                <Link key={item.href} href={item.href} title={item.label}
+                  className="w-11 h-11 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all duration-200 group">
+                  <item.icon className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                </Link>
+              ))}
+            </nav>
 
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <Activity className="h-3 w-3" />
-              <span>v0.1.0</span>
+            {/* Theme toggle */}
+            <div className="mt-auto">
+              <ThemeToggle />
             </div>
-          </div>
-        </aside>
+          </aside>
 
-        {/* Main content */}
-        <main className="flex-1 ml-56 p-6">{children}</main>
+          {/* Main */}
+          <main className="flex-1 ml-[72px] min-h-screen overflow-y-auto p-6 bg-[#f5f6fa] dark:bg-[#0b0e1a]">
+            {children}
+          </main>
+        </ThemeProvider>
       </body>
     </html>
   );

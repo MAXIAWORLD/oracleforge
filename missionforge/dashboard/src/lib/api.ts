@@ -78,11 +78,14 @@ export interface ObservabilitySummary {
 
 // ── Fetch helper ────────────────────────────────────────────────
 
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "";
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
       ...init?.headers,
     },
   });
