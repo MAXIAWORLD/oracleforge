@@ -126,11 +126,19 @@ class ExecutionLog:
 # ── Safe dict for interpolation ──────────────────────────────────
 
 
-class _SafeDict(dict):
-    """Dict that returns empty string for missing keys during format_map."""
+def _safe_interpolate(template: str, variables: dict[str, str]) -> str:
+    """Safe template interpolation using regex substitution.
 
-    def __missing__(self, key: str) -> str:
-        return ""
+    Only replaces {simple_name} patterns — no attribute access, no indexing.
+    Prevents SSTI via format_map (which allows {obj.__class__} etc.).
+    """
+    import re
+
+    def replacer(match: re.Match) -> str:
+        key = match.group(1)
+        return variables.get(key, "")
+
+    return re.sub(r"\{(\w+)\}", replacer, template)
 
 
 # ── Mission Engine ───────────────────────────────────────────────
@@ -194,13 +202,39 @@ class MissionEngine:
 
     # ── Interpolation ────────────────────────────────────────────
 
+    @staticmethod
+    def _validate_webhook_url(url: str) -> None:
+        """Block SSRF: reject internal/private network URLs."""
+        from urllib.parse import urlparse
+        import ipaddress
+
+        parsed = urlparse(url)
+        scheme = parsed.scheme.lower()
+        hostname = parsed.hostname or ""
+
+        if scheme not in ("http", "https"):
+            raise ValueError(f"Webhook URL must use http(s), got: {scheme}")
+
+        # Block known internal hostnames
+        blocked_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "[::]", "[::1]"}
+        if hostname.lower() in blocked_hosts:
+            raise ValueError(f"Webhook URL blocked: {hostname} is internal")
+
+        # Block private/reserved IP ranges
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                raise ValueError(f"Webhook URL blocked: {ip} is a private/reserved address")
+        except ValueError:
+            pass  # hostname is a domain, not an IP — allow
+
     def _interpolate(self, template: str | None, variables: dict[str, str]) -> str:
         """Replace {var} placeholders in a template string."""
         if not template:
             return ""
 
         # Build the variable dict with builtins
-        all_vars = _SafeDict(variables)
+        all_vars = dict(variables)
         all_vars["date"] = time.strftime("%Y-%m-%d")
         all_vars["time"] = time.strftime("%H:%M:%S")
 
@@ -212,7 +246,7 @@ class MissionEngine:
         for var_name in self._allowed_env_vars:
             all_vars[f"env.{var_name}"] = os.environ.get(var_name, "")
 
-        return template.format_map(all_vars)
+        return _safe_interpolate(template, all_vars)
 
     # ── Step execution ───────────────────────────────────────────
 
@@ -257,6 +291,7 @@ class MissionEngine:
 
         elif action == "webhook":
             url = self._interpolate(step.url or "", ctx.variables)
+            self._validate_webhook_url(url)
             method = step.method.upper()
             payload = None
             if step.payload_template:

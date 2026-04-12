@@ -151,11 +151,17 @@ class RagService:
                 pass
 
         for path, tag in sources_list:
-            if not os.path.exists(path):
+            # Path traversal protection: resolve and validate
+            try:
+                real_path = os.path.realpath(path)
+            except (ValueError, OSError):
+                errors.append(f"invalid path: {path}")
+                continue
+            if not os.path.exists(real_path):
                 errors.append(f"missing: {path}")
                 continue
             try:
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                with open(real_path, "r", encoding="utf-8", errors="replace") as f:
                     text = f.read()
             except OSError as e:
                 errors.append(f"read {path}: {e}")

@@ -139,11 +139,31 @@ async def reload_missions(request: Request) -> dict:
 # ── RAG endpoints ────────────────────────────────────────────────
 
 
+class IngestSource(BaseModel):
+    path: str
+    tag: str
+
+
 @router.post("/api/rag/ingest")
 async def ingest_docs(req: IngestRequest, request: Request) -> dict:
     """Ingest documents into the RAG knowledge base."""
+    import os
+    from core.config import get_settings
+    settings = get_settings()
+    base_dir = os.path.realpath(settings.missions_dir)
+
     rag = _get_rag(request)
-    sources = [(s["path"], s["tag"]) for s in req.sources if "path" in s and "tag" in s]
+    sources: list[tuple[str, str]] = []
+    for s in req.sources:
+        path = s.get("path", "") if isinstance(s, dict) else ""
+        tag = s.get("tag", "") if isinstance(s, dict) else ""
+        if not path or not tag:
+            continue
+        # Path traversal protection
+        real = os.path.realpath(path)
+        if not real.startswith(base_dir):
+            raise HTTPException(403, f"Path not allowed: must be under {settings.missions_dir}")
+        sources.append((real, tag))
     if not sources:
         raise HTTPException(400, "No valid sources provided")
     return rag.ingest_docs(sources, force=req.force)

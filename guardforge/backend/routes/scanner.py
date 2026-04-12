@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from core.config import get_settings
+
 router = APIRouter(prefix="/api", tags=["guard"])
+
+
+def _require_auth(authorization: str = Header(default="")) -> str:
+    """Require Bearer token matching SECRET_KEY for vault endpoints."""
+    settings = get_settings()
+    token = authorization.replace("Bearer ", "").strip()
+    if not token or token != settings.secret_key:
+        raise HTTPException(401, "Unauthorized — Bearer token required")
+    return token
 
 
 class ScanRequest(BaseModel):
@@ -63,7 +74,7 @@ async def list_policies(request: Request) -> dict:
 
 
 @router.post("/vault/store")
-async def vault_store(req: VaultStoreRequest, request: Request) -> dict:
+async def vault_store(req: VaultStoreRequest, request: Request, _: str = Depends(_require_auth)) -> dict:
     vault = request.app.state.vault
     if not vault.is_available:
         raise HTTPException(503, "Vault not available")
@@ -72,7 +83,7 @@ async def vault_store(req: VaultStoreRequest, request: Request) -> dict:
 
 
 @router.get("/vault/get/{key}")
-async def vault_get(key: str, request: Request) -> dict:
+async def vault_get(key: str, request: Request, _: str = Depends(_require_auth)) -> dict:
     vault = request.app.state.vault
     if not vault.is_available:
         raise HTTPException(503, "Vault not available")
@@ -83,13 +94,14 @@ async def vault_get(key: str, request: Request) -> dict:
 
 
 @router.delete("/vault/delete/{key}")
-async def vault_delete(key: str, request: Request) -> dict:
+async def vault_delete(key: str, request: Request, _: str = Depends(_require_auth)) -> dict:
     vault = request.app.state.vault
     existed = vault.delete_secret(key)
     return {"deleted": existed, "key": key}
 
 
 @router.get("/vault/keys")
-async def vault_keys(request: Request) -> dict:
+async def vault_keys(request: Request, _: str = Depends(_require_auth)) -> dict:
     vault = request.app.state.vault
-    return {"keys": vault.list_keys(), "count": len(vault.list_keys())}
+    keys = vault.list_keys()
+    return {"keys": keys, "count": len(keys)}
