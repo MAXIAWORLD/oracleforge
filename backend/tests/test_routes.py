@@ -21,7 +21,7 @@ def client() -> TestClient:
         settings=get_settings(),
         http_client=app.state.http_client,
     )
-    return TestClient(app)
+    return TestClient(app, headers={"X-API-Key": "test-secret-key-32-chars-ok!!"})
 
 
 class TestHealth:
