@@ -176,3 +176,65 @@ async def fetch_chainlink(
     except Exception as e:
         ms = int((time.monotonic() - t0) * 1000)
         return PriceResult(source="chainlink", latency_ms=ms, error=str(e))
+
+
+# ── Yahoo Finance (unofficial, no key needed) ────────────────────
+
+_YAHOO_SYMBOLS: dict[str, str] = {
+    "BTC": "BTC-USD", "ETH": "ETH-USD", "SOL": "SOL-USD", "BNB": "BNB-USD",
+    "XRP": "XRP-USD", "ADA": "ADA-USD", "DOGE": "DOGE-USD", "DOT": "DOT-USD",
+    "AVAX": "AVAX-USD", "LINK": "LINK-USD", "AAPL": "AAPL", "MSFT": "MSFT",
+    "GOOGL": "GOOGL", "AMZN": "AMZN", "TSLA": "TSLA", "NVDA": "NVDA",
+}
+
+
+async def fetch_yahoo(symbol: str, http: httpx.AsyncClient) -> PriceResult:
+    """Fetch price from Yahoo Finance v8 API."""
+    yf_symbol = _YAHOO_SYMBOLS.get(symbol.upper(), f"{symbol.upper()}-USD")
+    t0 = time.monotonic()
+    try:
+        resp = await http.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_symbol}",
+            params={"interval": "1d", "range": "1d"},
+            headers={"User-Agent": "OracleForge/0.1"},
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        meta = data.get("chart", {}).get("result", [{}])[0].get("meta", {})
+        price = meta.get("regularMarketPrice", 0.0)
+        ms = int((time.monotonic() - t0) * 1000)
+        if price > 0:
+            return PriceResult(price=price, source="yahoo", latency_ms=ms)
+        return PriceResult(source="yahoo", latency_ms=ms, error="No price data")
+    except Exception as e:
+        ms = int((time.monotonic() - t0) * 1000)
+        return PriceResult(source="yahoo", latency_ms=ms, error=str(e))
+
+
+# ── Finnhub (free tier: 60 calls/min) ───────────────────────────
+
+
+async def fetch_finnhub(
+    symbol: str, http: httpx.AsyncClient, api_key: str
+) -> PriceResult:
+    """Fetch stock price from Finnhub API."""
+    if not api_key:
+        return PriceResult(source="finnhub", error="No Finnhub API key")
+    t0 = time.monotonic()
+    try:
+        resp = await http.get(
+            "https://finnhub.io/api/v1/quote",
+            params={"symbol": symbol.upper(), "token": api_key},
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        price = data.get("c", 0.0)  # current price
+        ms = int((time.monotonic() - t0) * 1000)
+        if price > 0:
+            return PriceResult(price=price, source="finnhub", latency_ms=ms)
+        return PriceResult(source="finnhub", latency_ms=ms, error="No price data")
+    except Exception as e:
+        ms = int((time.monotonic() - t0) * 1000)
+        return PriceResult(source="finnhub", latency_ms=ms, error=str(e))

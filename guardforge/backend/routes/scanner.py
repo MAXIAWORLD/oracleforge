@@ -23,6 +23,7 @@ class ScanRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=100000)
     policy: str | None = None
     strategy: str = "redact"  # redact | mask | hash
+    dry_run: bool = False  # scan without anonymising
 
 
 class VaultStoreRequest(BaseModel):
@@ -37,16 +38,47 @@ class LLMWrapRequest(BaseModel):
 
 @router.post("/scan")
 async def scan_text(req: ScanRequest, request: Request) -> dict:
-    """Scan text for PII, evaluate policy, and return anonymized version."""
+    """Scan text for PII, evaluate policy, and optionally anonymize."""
+    import hashlib
+    import time as _time
+
     detector = request.app.state.pii_detector
     policy_engine = request.app.state.policy_engine
 
-    result = detector.scan_and_anonymize(req.text, strategy=req.strategy)
-    decision = policy_engine.evaluate(
-        pii_types_found=result["pii_types"],
-        pii_count=result["pii_count"],
-        policy_name=req.policy,
-    )
+    if req.dry_run:
+        # Dry run: detect only, no anonymisation
+        entities = detector.detect(req.text)
+        pii_types = list({e.type for e in entities})
+        decision = policy_engine.evaluate(pii_types, len(entities), req.policy)
+        result = {
+            "original_length": len(req.text),
+            "pii_count": len(entities),
+            "pii_types": pii_types,
+            "entities": [
+                {"type": e.type, "start": e.start, "end": e.end, "confidence": e.confidence}
+                for e in entities
+            ],
+            "anonymized_text": None,
+            "dry_run": True,
+        }
+    else:
+        result = detector.scan_and_anonymize(req.text, strategy=req.strategy)
+        decision = policy_engine.evaluate(result["pii_types"], result["pii_count"], req.policy)
+        result["dry_run"] = False
+
+    # Audit trail
+    audit_log = getattr(request.app.state, "audit_log", None)
+    if audit_log is not None:
+        audit_log.append({
+            "ts": _time.time(),
+            "input_hash": hashlib.sha256(req.text.encode()).hexdigest()[:16],
+            "pii_count": result["pii_count"],
+            "pii_types": result["pii_types"],
+            "policy": req.policy or "default",
+            "action": decision.action,
+            "dry_run": req.dry_run,
+        })
+
     return {**result, "policy_decision": {
         "allowed": decision.allowed,
         "action": decision.action,
@@ -71,6 +103,13 @@ async def llm_wrap(req: LLMWrapRequest, request: Request) -> dict:
 async def list_policies(request: Request) -> dict:
     engine = request.app.state.policy_engine
     return {"policies": engine.list_policies()}
+
+
+@router.get("/audit")
+async def get_audit_log(request: Request, limit: int = 50) -> dict:
+    """Get recent scan audit trail."""
+    audit_log = getattr(request.app.state, "audit_log", [])
+    return {"entries": list(reversed(audit_log[-limit:])), "total": len(audit_log)}
 
 
 @router.post("/vault/store")

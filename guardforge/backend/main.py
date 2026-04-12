@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.pii_detector = PIIDetector(confidence_threshold=settings.pii_confidence_threshold)
     app.state.vault = Vault(encryption_key=settings.vault_encryption_key)
     app.state.policy_engine = PolicyEngine(default_policy=settings.default_policy)
+    app.state.audit_log: list[dict] = []  # In-memory audit trail (last 1000 scans)
 
     logger.info("[startup] GuardForge ready — vault=%s, policies=%d",
                 "on" if app.state.vault.is_available else "off",
