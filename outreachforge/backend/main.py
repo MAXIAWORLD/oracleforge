@@ -24,9 +24,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     from services.lead_scorer import LeadScorer
     from services.email_personalizer import EmailPersonalizer
+    from services.email_sender import EmailSender
 
     app.state.lead_scorer = LeadScorer()
     app.state.personalizer = EmailPersonalizer()
+    app.state.email_sender = EmailSender(settings=settings)
     logger.info("[startup] OutreachForge ready")
     yield
     await close_db()

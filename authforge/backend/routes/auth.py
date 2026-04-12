@@ -129,3 +129,89 @@ async def me(request: Request, authorization: str = Header(default="")) -> dict:
         "email": payload["email"],
         "role": payload["role"],
     }
+
+
+# ── OAuth Google ─────────────────────────────────────────────────
+
+@router.get("/oauth/google/url")
+async def oauth_google_url(request: Request) -> dict:
+    """Get Google OAuth authorization URL."""
+    from urllib.parse import urlencode
+    from core.config import get_settings
+    settings = get_settings()
+    if not settings.oauth_google_client_id:
+        raise HTTPException(503, "Google OAuth not configured")
+    params = {
+        "client_id": settings.oauth_google_client_id,
+        "redirect_uri": f"{request.base_url}api/auth/oauth/google/callback",
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+    }
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    return {"url": url}
+
+
+@router.get("/oauth/google/callback")
+async def oauth_google_callback(
+    code: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Exchange Google OAuth code for tokens."""
+    import httpx as _httpx
+    from core.config import get_settings
+    settings = get_settings()
+    if not settings.oauth_google_client_id or not settings.oauth_google_client_secret:
+        raise HTTPException(503, "Google OAuth not configured")
+
+    # Exchange code for Google tokens
+    async with _httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": settings.oauth_google_client_id,
+                "client_secret": settings.oauth_google_client_secret,
+                "redirect_uri": f"{request.base_url}api/auth/oauth/google/callback",
+                "grant_type": "authorization_code",
+            },
+        )
+        if resp.status_code != 200:
+            raise HTTPException(400, "Failed to exchange OAuth code")
+        token_data = resp.json()
+
+        # Get user info
+        resp = await client.get(
+            "https://www.googleapis.com/oauth2/v2/userinfo",
+            headers={"Authorization": f"Bearer {token_data['access_token']}"},
+        )
+        if resp.status_code != 200:
+            raise HTTPException(400, "Failed to get user info")
+        user_info = resp.json()
+
+    email = user_info.get("email", "")
+    name = user_info.get("name", "")
+    if not email:
+        raise HTTPException(400, "No email from Google")
+
+    auth = _get_auth(request)
+
+    # Find or create user
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user is None:
+        user = User(
+            email=email,
+            hashed_password=auth.hash_password(f"oauth_{email}"),  # placeholder
+            display_name=name,
+            role="user",
+            is_active=True,
+            is_verified=True,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    tokens = auth.create_token_pair(user.id, user.email, user.role)
+    return TokenResponse(**tokens)

@@ -46,3 +46,33 @@ async def personalize(req: PersonalizeRequest, request: Request) -> dict:
     result = personalizer.personalize(req.template, req.prospect)
     variables = personalizer.validate_template(req.template)
     return {"personalized": result, "variables_used": variables}
+
+
+# ── Email sending ────────────────────────────────────────────────
+
+
+class SendRequest(BaseModel):
+    to_email: str
+    subject: str
+    body_html: str
+    body_text: str = ""
+
+
+@router.post("/send")
+async def send_email(req: SendRequest, request: Request) -> dict:
+    """Send a personalised email via SMTP."""
+    sender = getattr(request.app.state, "email_sender", None)
+    if sender is None:
+        raise HTTPException(503, "Email sender not initialised")
+    result = sender.send(req.to_email, req.subject, req.body_html, req.body_text)
+    if not result.success:
+        raise HTTPException(400, result.error)
+    return {"sent": True, "message_id": result.message_id}
+
+
+@router.get("/send/stats")
+async def send_stats(request: Request) -> dict:
+    sender = getattr(request.app.state, "email_sender", None)
+    if sender is None:
+        return {"configured": False}
+    return sender.stats()
