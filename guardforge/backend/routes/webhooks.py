@@ -46,7 +46,7 @@ class WebhookCreate(BaseModel):
                 {
                     "name": "Slack security alerts",
                     "url": "https://hooks.slack.com/services/T00/B00/XXX",
-                    "secret": "shared-hmac-secret",
+                    "secret": "shared-hmac-secret",  # nosec B105 — OpenAPI example placeholder, not a real secret
                     "min_risk_level": "critical",
                     "enabled": True,
                 }

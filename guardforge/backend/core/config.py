@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     # Policy
     default_policy: str = "strict"  # strict | moderate | permissive
 
+    # Rate limiting (per IP, sliding window)
+    rate_limit_max_requests: int = Field(default=60, ge=1, description="Max requests per IP per window")
+    rate_limit_window_seconds: int = Field(default=60, ge=1, description="Rate limit window duration")
+
+    # Payload hardening
+    max_payload_bytes: int = Field(default=1_000_000, ge=1024, description="Max request payload size (defense in depth)")
+    enable_hsts: bool = Field(default=True, description="Enable Strict-Transport-Security header (keep True in production)")
+    docs_enabled: bool = Field(default=True, description="Expose /docs and /openapi.json. Set False in production if not needed.")
+
 
 @lru_cache
 def get_settings() -> Settings:

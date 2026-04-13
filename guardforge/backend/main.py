@@ -156,10 +156,20 @@ def create_app() -> FastAPI:
             "url": "https://github.com/maxia-lab/guardforge/blob/main/LICENSE",
         },
         terms_of_service="https://maxialab.com/terms",
+        docs_url="/docs" if settings.docs_enabled else None,
+        redoc_url="/redoc" if settings.docs_enabled else None,
+        openapi_url="/openapi.json" if settings.docs_enabled else None,
     )
-    # Security middleware (auth + rate limit + headers)
+    # Security middleware (auth + rate limit + size limit + headers)
     from core.middleware import add_security_middleware
-    add_security_middleware(app, settings.secret_key)
+    add_security_middleware(
+        app,
+        settings.secret_key,
+        rate_limit_max_requests=settings.rate_limit_max_requests,
+        rate_limit_window_seconds=settings.rate_limit_window_seconds,
+        max_payload_bytes=settings.max_payload_bytes,
+        enable_hsts=settings.enable_hsts,
+    )
 
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
                        allow_credentials=True, allow_methods=["*"], allow_headers=["*"])

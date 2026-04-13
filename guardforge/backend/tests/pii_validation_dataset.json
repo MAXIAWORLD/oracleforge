@@ -1,0 +1,226 @@
+[
+  {
+    "lang": "en",
+    "text": "Contact John Smith at john.smith@example.com for details.",
+    "expected": [
+      {"type": "person_name", "value": "John Smith", "_note": "no title → may miss"},
+      {"type": "email", "value": "john.smith@example.com"}
+    ]
+  },
+  {
+    "lang": "en",
+    "text": "Mr Smith, please call me at +1 555 123 4567 tomorrow.",
+    "expected": [
+      {"type": "person_name", "value": "Mr Smith"},
+      {"type": "phone_international", "value": "+1 555 123 4567"}
+    ]
+  },
+  {
+    "lang": "en",
+    "text": "Patient SSN: 123-45-6789 was admitted on 14/02/1985.",
+    "expected": [
+      {"type": "ssn_us", "value": "123-45-6789"},
+      {"type": "date_of_birth", "value": "14/02/1985"}
+    ]
+  },
+  {
+    "lang": "en",
+    "text": "Charge card 4532015112830366 for $99.99 total.",
+    "expected": [
+      {"type": "credit_card", "value": "4532015112830366"}
+    ]
+  },
+  {
+    "lang": "en",
+    "text": "Dr. Alice Johnson reviewed the case, her IP is 192.168.1.42.",
+    "expected": [
+      {"type": "person_name", "value": "Dr. Alice Johnson"},
+      {"type": "ipv4", "value": "192.168.1.42"}
+    ]
+  },
+  {
+    "lang": "en",
+    "text": "Order from Mrs Brown shipped on 03/05/2024 to 10 Park Lane.",
+    "expected": [
+      {"type": "person_name", "value": "Mrs Brown"},
+      {"type": "date_of_birth", "value": "03/05/2024", "_note": "false-positive-ish: regex matches any dd/mm/yyyy"}
+    ]
+  },
+  {
+    "lang": "en",
+    "text": "The weather is nice today and everything runs smoothly.",
+    "expected": []
+  },
+  {
+    "lang": "en",
+    "text": "Send the invoice via email to billing@corp.io before Friday.",
+    "expected": [
+      {"type": "email", "value": "billing@corp.io"}
+    ]
+  },
+  {
+    "lang": "en",
+    "text": "Ms Taylor's passport AB1234567 is valid until 2030.",
+    "expected": [
+      {"type": "person_name", "value": "Ms Taylor"},
+      {"type": "passport_generic", "value": "AB1234567"}
+    ]
+  },
+  {
+    "lang": "en",
+    "text": "No sensitive information in this paragraph at all.",
+    "expected": []
+  },
+
+  {
+    "lang": "fr",
+    "text": "M. Jean Dupont a envoyé son CV par email a jean.dupont@acme.fr.",
+    "expected": [
+      {"type": "person_name", "value": "M. Jean Dupont"},
+      {"type": "email", "value": "jean.dupont@acme.fr"}
+    ]
+  },
+  {
+    "lang": "fr",
+    "text": "SIRET de l'entreprise: 73282932000074, contact au +33 1 23 45 67 89.",
+    "expected": [
+      {"type": "siret_fr", "value": "73282932000074"},
+      {"type": "phone_international", "value": "+33 1 23 45 67 89"}
+    ]
+  },
+  {
+    "lang": "fr",
+    "text": "Mme Martin a pour numero de securite sociale 2 85 04 75 115 001 85.",
+    "expected": [
+      {"type": "person_name", "value": "Mme Martin"},
+      {"type": "ssn_fr", "value": "2 85 04 75 115 001 85"}
+    ]
+  },
+  {
+    "lang": "fr",
+    "text": "Virement effectue sur IBAN FR7630006000011234567890189.",
+    "expected": [
+      {"type": "iban", "value": "FR7630006000011234567890189"}
+    ]
+  },
+  {
+    "lang": "fr",
+    "text": "Monsieur Lemoine, nous avons bien recu votre demande.",
+    "expected": [
+      {"type": "person_name", "value": "Monsieur Lemoine"}
+    ]
+  },
+  {
+    "lang": "fr",
+    "text": "Le projet avance bien, sans details sensibles a signaler.",
+    "expected": []
+  },
+  {
+    "lang": "fr",
+    "text": "Mlle Bernard est nee le 05/08/1990 a Paris.",
+    "expected": [
+      {"type": "person_name", "value": "Mlle Bernard"},
+      {"type": "date_of_birth", "value": "05/08/1990"}
+    ]
+  },
+  {
+    "lang": "fr",
+    "text": "Carte bleue 5500000000000004 utilisee pour le paiement.",
+    "expected": [
+      {"type": "credit_card", "value": "5500000000000004"}
+    ]
+  },
+  {
+    "lang": "fr",
+    "text": "Dr. Rousseau a confirme le diagnostic ce matin.",
+    "expected": [
+      {"type": "person_name", "value": "Dr. Rousseau"}
+    ]
+  },
+  {
+    "lang": "fr",
+    "text": "Aucune donnee personnelle dans ce message court.",
+    "expected": []
+  },
+
+  {
+    "lang": "de",
+    "text": "Herr Mueller arbeitet bei der Firma, seine Email ist mueller@firma.de.",
+    "expected": [
+      {"type": "person_name", "value": "Herr Mueller"},
+      {"type": "email", "value": "mueller@firma.de"}
+    ]
+  },
+  {
+    "lang": "de",
+    "text": "Frau Schmidt hat die Steuer-ID 12345678901 bestaetigt.",
+    "expected": [
+      {"type": "person_name", "value": "Frau Schmidt"},
+      {"type": "steuer_id_de", "value": "12345678901"}
+    ]
+  },
+  {
+    "lang": "de",
+    "text": "Bitte kontaktieren Sie uns unter +49 30 12345678.",
+    "expected": [
+      {"type": "phone_international", "value": "+49 30 12345678"}
+    ]
+  },
+  {
+    "lang": "de",
+    "text": "IBAN fuer Zahlungen: DE89370400440532013000 Danke.",
+    "expected": [
+      {"type": "iban", "value": "DE89370400440532013000"}
+    ]
+  },
+  {
+    "lang": "de",
+    "text": "Das Wetter ist heute ausgezeichnet und keine Daten hier.",
+    "expected": []
+  },
+
+  {
+    "lang": "es",
+    "text": "Sr. Garcia tiene DNI 12345678Z y vive en Madrid.",
+    "expected": [
+      {"type": "person_name", "value": "Sr. Garcia"},
+      {"type": "dni_es", "value": "12345678Z"}
+    ]
+  },
+  {
+    "lang": "es",
+    "text": "Sra. Lopez (email: lopez@empresa.es) firmo el contrato.",
+    "expected": [
+      {"type": "person_name", "value": "Sra. Lopez"},
+      {"type": "email", "value": "lopez@empresa.es"}
+    ]
+  },
+  {
+    "lang": "es",
+    "text": "NIE del cliente: X1234567L confirmado por el sistema.",
+    "expected": [
+      {"type": "nie_es", "value": "X1234567L"}
+    ]
+  },
+  {
+    "lang": "es",
+    "text": "Telefono de contacto: +34 612 345 678 para urgencias.",
+    "expected": [
+      {"type": "phone_international", "value": "+34 612 345 678"}
+    ]
+  },
+  {
+    "lang": "es",
+    "text": "Hoy hace buen tiempo en la ciudad sin datos sensibles.",
+    "expected": []
+  },
+
+  {
+    "lang": "it",
+    "text": "Dr. Rossi ha il Codice Fiscale RSSMRA85T10A562S valido.",
+    "expected": [
+      {"type": "person_name", "value": "Dr. Rossi"},
+      {"type": "codice_fiscale_it", "value": "RSSMRA85T10A562S"}
+    ]
+  }
+]
