@@ -1,6 +1,6 @@
 """TDD tests for services/policy_engine.py."""
 
-from services.policy_engine import PolicyEngine
+from services.policy_engine import PolicyEngine, PRESETS
 
 
 class TestPresets:
@@ -62,3 +62,51 @@ class TestStats:
         assert "gdpr" in names
         assert "hipaa" in names
         assert "pci_dss" in names
+
+
+class TestJurisdictionPresets:
+    """Verify the 13 jurisdiction-specific presets are loaded with required metadata."""
+
+    EXPECTED_JURISDICTIONS = {
+        "gdpr", "eu_ai_act", "hipaa", "ccpa", "lgpd", "pci_dss",
+        "pipeda", "appi", "pdpa_sg", "popia", "dpdp_in", "pipl_cn", "privacy_au",
+    }
+
+    def test_all_jurisdictions_loaded(self) -> None:
+        pe = PolicyEngine()
+        names = {p["name"] for p in pe.list_policies()}
+        assert self.EXPECTED_JURISDICTIONS.issubset(names)
+
+    def test_each_has_jurisdiction_field(self) -> None:
+        for name in self.EXPECTED_JURISDICTIONS:
+            preset = PRESETS[name]
+            assert "jurisdiction" in preset, f"{name} missing jurisdiction"
+            assert preset["jurisdiction"], f"{name} jurisdiction is empty"
+
+    def test_each_has_regulation_field(self) -> None:
+        for name in self.EXPECTED_JURISDICTIONS:
+            preset = PRESETS[name]
+            assert "regulation" in preset, f"{name} missing regulation"
+            assert preset["regulation"], f"{name} regulation is empty"
+
+    def test_pipl_blocks_personal_data(self) -> None:
+        """PIPL is stricter than GDPR — should block, not anonymize."""
+        pe = PolicyEngine()
+        decision = pe.evaluate(["email"], 1, policy_name="pipl_cn")
+        assert decision.action == "block"
+
+    def test_eu_ai_act_blocks_high_risk(self) -> None:
+        pe = PolicyEngine()
+        decision = pe.evaluate(["person_name", "credit_card"], 2, policy_name="eu_ai_act")
+        assert decision.action == "block"
+
+    def test_ccpa_anonymizes_consumer_data(self) -> None:
+        pe = PolicyEngine()
+        decision = pe.evaluate(["email"], 1, policy_name="ccpa")
+        assert decision.action == "anonymize"
+
+    def test_list_policies_includes_jurisdiction_metadata(self) -> None:
+        pe = PolicyEngine()
+        gdpr = next(p for p in pe.list_policies() if p["name"] == "gdpr")
+        assert gdpr["jurisdiction"] == "EU"
+        assert "Data Protection Regulation" in gdpr["regulation"]

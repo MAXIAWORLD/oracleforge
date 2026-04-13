@@ -26,47 +26,141 @@ class PolicyDecision:
 
 # ── Industry presets ─────────────────────────────────────────────
 
+# Built-in PII types used in policy presets
+_ALL_PERSONAL = ["email", "phone_international", "person_name", "date_of_birth"]
+_ALL_FINANCIAL = ["credit_card", "iban", "rib_fr"]
+_ALL_GOV_IDS = [
+    "ssn_us", "ssn_fr", "siret_fr", "siren_fr", "dni_es", "nie_es",
+    "codice_fiscale_it", "steuer_id_de", "passport_generic",
+]
+
+
 PRESETS: dict[str, dict] = {
+    # ── Generic operational presets ─────────────────────────────
     "strict": {
         "name": "strict",
-        "description": "Block all PII — maximum safety",
         "pii_action": "block",
         "blocked_types": ["email", "phone_international", "credit_card", "ssn_us", "ssn_fr", "iban"],
         "max_pii_count": 0,
     },
     "moderate": {
         "name": "moderate",
-        "description": "Anonymize PII before processing",
         "pii_action": "anonymize",
         "blocked_types": ["credit_card", "ssn_us", "ssn_fr"],
         "max_pii_count": 5,
     },
     "permissive": {
         "name": "permissive",
-        "description": "Warn on PII but allow processing",
         "pii_action": "warn",
         "blocked_types": [],
         "max_pii_count": -1,  # unlimited
     },
+
+    # ── Tier 1 jurisdictions (full mappings) ────────────────────
     "gdpr": {
         "name": "gdpr",
-        "description": "GDPR compliance — anonymize personal data",
+        "jurisdiction": "EU",
+        "regulation": "General Data Protection Regulation 2016/679",
         "pii_action": "anonymize",
-        "blocked_types": ["ssn_fr", "iban"],
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + _ALL_GOV_IDS,
+        "max_pii_count": 0,
+    },
+    "eu_ai_act": {
+        "name": "eu_ai_act",
+        "jurisdiction": "EU",
+        "regulation": "EU Artificial Intelligence Act 2024/1689",
+        "pii_action": "block",  # high-risk AI systems must minimize PII
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + _ALL_GOV_IDS,
         "max_pii_count": 0,
     },
     "hipaa": {
         "name": "hipaa",
-        "description": "HIPAA compliance — block all health-related PII",
+        "jurisdiction": "US",
+        "regulation": "Health Insurance Portability and Accountability Act",
         "pii_action": "block",
-        "blocked_types": ["email", "phone_international", "ssn_us", "date_of_birth"],
+        "blocked_types": ["email", "phone_international", "ssn_us", "date_of_birth", "person_name"],
+        "max_pii_count": 0,
+    },
+    "ccpa": {
+        "name": "ccpa",
+        "jurisdiction": "US-CA",
+        "regulation": "California Consumer Privacy Act / CPRA",
+        "pii_action": "anonymize",
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + ["ssn_us", "passport_generic"],
+        "max_pii_count": 0,
+    },
+    "lgpd": {
+        "name": "lgpd",
+        "jurisdiction": "BR",
+        "regulation": "Lei Geral de Proteção de Dados",
+        "pii_action": "anonymize",
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + _ALL_GOV_IDS,
         "max_pii_count": 0,
     },
     "pci_dss": {
         "name": "pci_dss",
-        "description": "PCI-DSS compliance — block payment data",
+        "jurisdiction": "Worldwide",
+        "regulation": "Payment Card Industry Data Security Standard v4",
         "pii_action": "block",
-        "blocked_types": ["credit_card", "iban"],
+        "blocked_types": ["credit_card", "iban", "rib_fr"],
+        "max_pii_count": 0,
+    },
+
+    # ── Tier 2 jurisdictions (stubs — same baseline as GDPR) ───
+    "pipeda": {
+        "name": "pipeda",
+        "jurisdiction": "CA",
+        "regulation": "Personal Information Protection and Electronic Documents Act",
+        "pii_action": "anonymize",
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + _ALL_GOV_IDS,
+        "max_pii_count": 0,
+    },
+    "appi": {
+        "name": "appi",
+        "jurisdiction": "JP",
+        "regulation": "Act on the Protection of Personal Information",
+        "pii_action": "anonymize",
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + _ALL_GOV_IDS,
+        "max_pii_count": 0,
+    },
+    "pdpa_sg": {
+        "name": "pdpa_sg",
+        "jurisdiction": "SG",
+        "regulation": "Personal Data Protection Act (Singapore)",
+        "pii_action": "anonymize",
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + _ALL_GOV_IDS,
+        "max_pii_count": 0,
+    },
+    "popia": {
+        "name": "popia",
+        "jurisdiction": "ZA",
+        "regulation": "Protection of Personal Information Act",
+        "pii_action": "anonymize",
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + _ALL_GOV_IDS,
+        "max_pii_count": 0,
+    },
+    "dpdp_in": {
+        "name": "dpdp_in",
+        "jurisdiction": "IN",
+        "regulation": "Digital Personal Data Protection Act 2023",
+        "pii_action": "anonymize",
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + _ALL_GOV_IDS,
+        "max_pii_count": 0,
+    },
+    "pipl_cn": {
+        "name": "pipl_cn",
+        "jurisdiction": "CN",
+        "regulation": "Personal Information Protection Law",
+        "pii_action": "block",  # PIPL is stricter than GDPR on cross-border transfers
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + _ALL_GOV_IDS,
+        "max_pii_count": 0,
+    },
+    "privacy_au": {
+        "name": "privacy_au",
+        "jurisdiction": "AU",
+        "regulation": "Privacy Act 1988",
+        "pii_action": "anonymize",
+        "blocked_types": _ALL_PERSONAL + _ALL_FINANCIAL + _ALL_GOV_IDS,
         "max_pii_count": 0,
     },
 }
@@ -95,9 +189,20 @@ class PolicyEngine:
         return self._policies.get(name, self._policies.get("strict", {}))
 
     def list_policies(self) -> list[dict]:
-        """List all available policies."""
+        """List all available policies with metadata.
+
+        Descriptions are intentionally empty here — they are translated
+        client-side via the dashboard i18n files (messages/*.json) for
+        multi-language support across 15 locales.
+        """
         return [
-            {"name": p["name"], "description": p.get("description", ""), "action": p.get("pii_action", "block")}
+            {
+                "name": p["name"],
+                "description": p.get("description", ""),
+                "action": p.get("pii_action", "block"),
+                "jurisdiction": p.get("jurisdiction", ""),
+                "regulation": p.get("regulation", ""),
+            }
             for p in self._policies.values()
         ]
 

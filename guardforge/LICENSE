@@ -1,6 +1,225 @@
-GuardForge Proprietary License
+GUARDFORGE PROPRIETARY LICENSE AGREEMENT
+
+Version 1.0 — Effective 2026
+
 Copyright (c) 2026 MAXIA Lab. All rights reserved.
-PERMITTED: Use and modify for personal or internal business purposes. One installation per license key.
-PROHIBITED: Redistribute, sublicense, resell, or provide as a competing service.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
-For licensing: contact@maxialab.com
+
+GuardForge is proprietary software. By installing, accessing, or using
+GuardForge ("the Software"), you ("Licensee") agree to be bound by this
+License Agreement. If you do not agree, you must not use the Software.
+
+================================================================================
+1. DEFINITIONS
+================================================================================
+
+"Software" means the GuardForge backend, dashboard, SDKs, scripts, documentation,
+and any updates or upgrades thereof, as distributed by MAXIA Lab.
+
+"License Key" means the unique identifier issued by MAXIA Lab upon purchase
+that authorizes use of a specific tier of the Software.
+
+"Cloud Edition" means the version of the Software hosted by MAXIA Lab and
+accessed via subscription.
+
+"Self-Hosted Edition" means the version of the Software that Licensee installs
+and runs on infrastructure under Licensee's control.
+
+"Production Use" means use of the Software in any environment that processes
+data of real users, customers, or in any commercial capacity.
+
+"Internal Business Use" means use of the Software by Licensee's employees,
+contractors, or subsidiaries solely for Licensee's own business operations.
+
+================================================================================
+2. GRANT OF LICENSE
+================================================================================
+
+Subject to payment of the applicable fees and compliance with this Agreement,
+MAXIA Lab grants Licensee a non-exclusive, non-transferable, non-sublicensable,
+revocable license to:
+
+(a) Install and run the Software for Internal Business Use.
+
+(b) Integrate the Software's APIs and SDKs into Licensee's own products and
+    services, provided that the Software itself is not redistributed.
+
+(c) Modify configuration files, environment variables, and policies as
+    documented to suit Licensee's deployment.
+
+(d) Make backup copies for disaster recovery purposes.
+
+The number of installations, users, scans per month, and other quotas are
+determined by the License Key tier purchased.
+
+================================================================================
+3. RESTRICTIONS
+================================================================================
+
+Licensee shall NOT, and shall not permit any third party to:
+
+(a) Redistribute, resell, sublicense, lease, rent, or otherwise transfer the
+    Software, in whole or in part, to any third party.
+
+(b) Provide the Software as a service to third parties (Software-as-a-Service,
+    Platform-as-a-Service, or any equivalent), where doing so would compete
+    with MAXIA Lab's Cloud Edition.
+
+(c) Reverse-engineer, decompile, disassemble, or attempt to derive the source
+    code of the Software, except as expressly permitted by applicable law that
+    cannot be waived by contract.
+
+(d) Remove, alter, or obscure any copyright notice, trademark, "GuardForge"
+    branding, "Powered by GuardForge" mention, or other proprietary notices.
+
+(e) Use the Software to develop a competing product or service.
+
+(f) Bypass, disable, or tamper with license validation, phone-home telemetry,
+    quota enforcement, or any other control mechanism in the Software.
+
+(g) Use the Software for any unlawful purpose or in violation of any applicable
+    data protection regulation (including GDPR, CCPA, HIPAA, etc.).
+
+(h) Use the Software beyond the quotas, user limits, or instance counts of the
+    purchased License Key tier.
+
+================================================================================
+4. CLOUD EDITION SPECIFIC TERMS
+================================================================================
+
+(a) The Cloud Edition is provided as a subscription service. Subscription fees
+    are billed monthly or annually as selected at purchase.
+
+(b) Subscription may be cancelled at any time. Upon cancellation, access to the
+    Cloud Edition ends at the end of the current billing period.
+
+(c) Refunds are governed by the separate Refund Policy available on MAXIA Lab's
+    website.
+
+(d) MAXIA Lab targets 99.9% uptime for paid Cloud Edition tiers but does not
+    guarantee uninterrupted service.
+
+(e) Licensee data processed via the Cloud Edition is retained according to the
+    Data Retention Policy in the Data Processing Agreement (DPA).
+
+================================================================================
+5. SELF-HOSTED EDITION SPECIFIC TERMS
+================================================================================
+
+(a) The Self-Hosted Edition is licensed by one-time payment for perpetual use,
+    limited to the number of instances specified by the purchased tier.
+
+(b) Updates and upgrades are included for the period specified at purchase
+    (typically 6, 12, or 24 months). After expiration, Licensee may continue
+    using the version installed but is not entitled to new releases.
+
+(c) The Software contains a phone-home telemetry component that periodically
+    contacts MAXIA Lab license servers to validate the License Key. This
+    telemetry transmits only license metadata (key hash, version, instance ID)
+    and does NOT transmit any user data, scan content, or PII.
+
+(d) Disabling or blocking the phone-home component is a material breach of
+    this Agreement and immediately terminates Licensee's rights.
+
+(e) Source code is NOT provided with the standard Self-Hosted Edition. Partial
+    source code access may be granted with the Enterprise Self-Hosted tier
+    under a separate Source Code Addendum.
+
+================================================================================
+6. INTELLECTUAL PROPERTY
+================================================================================
+
+The Software and all intellectual property rights therein, including but not
+limited to copyrights, patents, trademarks, trade secrets, and know-how, are
+and shall remain the exclusive property of MAXIA Lab.
+
+This Agreement does not grant Licensee any rights in MAXIA Lab's trademarks,
+service marks, or trade dress, except as necessary to comply with the branding
+attribution requirements in Section 3(d).
+
+================================================================================
+7. DATA PROTECTION AND PRIVACY
+================================================================================
+
+(a) For Cloud Edition users, data processing is governed by the Data Processing
+    Agreement (DPA) which forms part of this Agreement and is available
+    separately.
+
+(b) For Self-Hosted Edition users, Licensee is the sole data controller and
+    processor of any data processed through the Software. MAXIA Lab has no
+    access to Licensee's processed data.
+
+(c) Licensee is responsible for ensuring that its use of the Software complies
+    with all applicable data protection laws in the jurisdictions in which it
+    operates.
+
+================================================================================
+8. WARRANTY DISCLAIMER
+================================================================================
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, OR
+ACCURACY OF DATA.
+
+MAXIA LAB DOES NOT WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE, BUG-FREE,
+UNINTERRUPTED, OR THAT IT WILL DETECT ALL PERSONALLY IDENTIFIABLE INFORMATION
+IN ALL CASES. PII DETECTION IS A BEST-EFFORT FEATURE BASED ON HEURISTICS AND
+PATTERN MATCHING; LICENSEE REMAINS RESPONSIBLE FOR ITS OWN COMPLIANCE.
+
+================================================================================
+9. LIMITATION OF LIABILITY
+================================================================================
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL MAXIA LAB
+BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE
+DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, DATA, USE, GOODWILL, OR
+OTHER INTANGIBLE LOSSES, RESULTING FROM:
+
+(a) LICENSEE'S USE OR INABILITY TO USE THE SOFTWARE;
+(b) ANY UNAUTHORIZED ACCESS TO OR ALTERATION OF LICENSEE'S DATA;
+(c) ANY THIRD-PARTY CONDUCT OR CONTENT ON THE SOFTWARE;
+(d) ANY REGULATORY FINES OR PENALTIES INCURRED BY LICENSEE.
+
+MAXIA LAB'S TOTAL CUMULATIVE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED
+THE FEES PAID BY LICENSEE TO MAXIA LAB IN THE TWELVE (12) MONTHS PRECEDING THE
+EVENT GIVING RISE TO THE CLAIM.
+
+================================================================================
+10. TERMINATION
+================================================================================
+
+(a) This Agreement is effective until terminated.
+
+(b) MAXIA Lab may terminate this Agreement immediately upon any material breach
+    by Licensee, including but not limited to violation of Section 3
+    (Restrictions) or non-payment of fees.
+
+(c) Upon termination, Licensee must immediately cease all use of the Software,
+    destroy all copies in its possession, and certify such destruction in
+    writing if requested.
+
+(d) Sections 3, 6, 7, 8, 9, 10, and 11 survive termination.
+
+================================================================================
+11. GOVERNING LAW AND DISPUTE RESOLUTION
+================================================================================
+
+This Agreement is governed by the laws of France, without regard to conflict
+of laws principles. Any dispute arising out of or in connection with this
+Agreement shall be subject to the exclusive jurisdiction of the courts of
+Paris, France.
+
+================================================================================
+12. ENTIRE AGREEMENT
+================================================================================
+
+This Agreement, together with any applicable DPA, Order Form, or Source Code
+Addendum, constitutes the entire agreement between Licensee and MAXIA Lab
+regarding the Software and supersedes all prior agreements or understandings.
+
+================================================================================
+
+For licensing inquiries, enterprise pricing, or to report a license violation:
+contact@maxialab.com
+
+GuardForge is part of the Forge Suite by MAXIA Lab.

@@ -20,6 +20,7 @@ class ScanLog(Base):
     pii_types: Mapped[str] = mapped_column(Text, default="")
     policy_applied: Mapped[str] = mapped_column(String(30), default="strict")
     action_taken: Mapped[str] = mapped_column(String(30), default="anonymize")
+    risk_level: Mapped[str] = mapped_column(String(20), default="none")
     scanned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -42,6 +43,7 @@ class PIIEntity(BaseModel):
     start: int
     end: int
     confidence: float
+    risk_level: str = "medium"
 
 
 class ScanResult(BaseModel):
@@ -50,6 +52,8 @@ class ScanResult(BaseModel):
     anonymized_text: str
     pii_count: int
     policy: str
+    overall_risk: str = "none"
+    risk_distribution: dict[str, int] = {}
 
 
 class HealthResponse(BaseModel):
