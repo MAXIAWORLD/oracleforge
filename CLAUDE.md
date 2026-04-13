@@ -1,162 +1,59 @@
 # CLAUDE.md — MAXIA Lab
 
-**PREMIERE ACTION DE CHAQUE SESSION : lancer `/context-budget` AVANT tout travail.**
-**A 60% du contexte : lancer `/strategic-compact`.**
-**ROUTAGE MODELES (OBLIGATOIRE)** : tout appel au tool `Agent` DOIT passer `model:` explicitement. `haiku` pour lookups/grep/reads/fetches/status, `sonnet` pour implementation/refactor/tests/reviews, `opus` rare (archi ambigue uniquement).
+**Focus actuel : OracleForge.** Plan source de vérité : `oracleforge/docs/plan-2026-04-13.md`.
 
-## Project Overview
+Les 5 autres produits Forge sont **en pause** (description complète : `docs/maxia-lab-overview-archive.md`). GuardForge est OFFLINE (https://guardforge.maxiaworld.app → 503), code conservé sur le VPS, voir `docs/guardforge-handover-2026-04-13.md`.
 
-MAXIA Lab est la division outils de MAXIA. Suite de 6 produits developpeur vendus en SaaS (cloud mensuel) + self-hosted (one-time premium) via LemonSqueezy et RapidAPI.
+## Préférences user (Alexis) — CRITIQUES
 
-**Design doc complet** : `docs/2026-04-12-forge-suite-design.md`
-
-### Les 6 produits Forge
-
-| Produit | Fonction | Dossier |
-|---|---|---|
-| **MissionForge** | AI Agent Framework — missions YAML, LLM router, RAG, dashboard + chat | `missionforge/` |
-| **OracleForge** | Multi-Source Price Oracle — 5 sources, confidence scoring, circuit breaker | `oracleforge/` |
-| **GuardForge** | PII & AI Safety Kit — anonymisation, vault AES-256, compliance, LLM wrapper | `guardforge/` |
-| **OutreachForge** | Email Outreach Automation — scoring IA, personnalisation LLM, multi-langue | `outreachforge/` |
-| **AuthForge** | Auth complete FastAPI — JWT, OAuth, 2FA, roles, SSO, dashboard users | `authforge/` |
-| **LLMForge** | LLM Router Multi-Provider — fallback auto, routing intelligent, observabilite | `llmforge/` |
-
-### Relation avec MAXIA V12
-
-Les produits Forge sont **extraits et ameliores** depuis la codebase MAXIA V12 (`C:\Users\Mini pc\Desktop\MAXIA V12`). Chaque produit est standalone — zero dependance vers MAXIA V12 une fois extrait.
-
-| Produit Forge | Source MAXIA V12 |
-|---|---|
-| MissionForge | `agents/scheduler.py`, `ai/llm_router.py`, `ceo_rag.py`, `ceo_vector_memory.py`, dashboard CEO |
-| OracleForge | `trading/price_oracle.py`, `trading/pyth_oracle.py`, `trading/chainlink_oracle.py` |
-| GuardForge | `enterprise/pii_shield.py`, `enterprise/policy_engine.py`, `enterprise/vault.py` |
-| OutreachForge | `local_ceo/sales/sales_agent.py`, `local_ceo/sales/email_manager.py`, `local_ceo/sales/lead_tier.py` |
-| AuthForge | `core/auth.py`, `core/security.py`, `agents/agent_permissions.py`, `enterprise/enterprise_sso.py` |
-| LLMForge | `ai/llm_router.py`, `ai/llm_service.py` |
-
-## Stack technique
-
-### Backend (tous les produits)
-- Python 3.12 + FastAPI
-- PostgreSQL (prod) / SQLite (dev)
-- ChromaDB (RAG — MissionForge uniquement)
-- Pydantic V2 pour validation
-
-### Frontend / Dashboards (tous les produits)
-- Next.js (App Router)
-- Tailwind CSS
-- shadcn/ui (composants)
-- Recharts (graphiques)
-- Lucide Icons
-- Style : **friendly, accessible, Notion-like** (fond clair, coins arrondis, pas intimidant)
-
-### Infra
-- VPS OVH (cloud instances)
-- LemonSqueezy (billing, subscriptions, licence keys)
-- RapidAPI (OracleForge API monetisee)
-- GitHub org (repos publics = version gratuite limitee)
-
-## Architecture par produit
-
-Chaque produit suit la meme structure :
-```
-<produit>/
-├── backend/
-│   ├── main.py           # FastAPI entry point
-│   ├── core/             # Config, auth, models
-│   ├── services/         # Business logic
-│   ├── routes/           # API endpoints
-│   └── tests/            # pytest
-├── dashboard/
-│   ├── app/              # Next.js App Router pages
-│   ├── components/       # shadcn/ui components
-│   └── lib/              # Utils, API client
-├── docs/                 # Documentation utilisateur
-├── docker-compose.yml    # Dev environment
-├── README.md
-└── LICENSE               # Proprietary license
-```
-
-## Commands
-
-### Backend dev
-```bash
-cd <produit>/backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python -m uvicorn main:app --host 0.0.0.0 --port 8001 --reload
-```
-
-### Dashboard dev
-```bash
-cd <produit>/dashboard
-npm install
-npm run dev    # localhost:3000
-```
-
-## Conventions
-
-### Code
-- **Python** : PEP 8, type hints obligatoires, Pydantic V2 pour tous les modeles
-- **TypeScript** : strict mode, pas de `any`
-- **Immutability** : ne pas muter les objets, creer des copies
-- **Fichiers** : 200-400 lignes typique, 800 max
-- **Fonctions** : <50 lignes
-- **Erreurs** : gerer explicitement, jamais silencieusement
-- **Tests** : 80%+ coverage, TDD (RED → GREEN → REFACTOR)
-
-### Git
-- Conventional commits : `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
-- Un commit par feature logique
-- PR avec summary + test plan
-
-### Naming
-- Dossiers/fichiers : snake_case
-- Classes Python : PascalCase
-- Variables/fonctions : snake_case
-- Composants React : PascalCase
-- CSS classes : kebab-case (Tailwind)
-
-## User Preferences (Alexis)
-
-- **"no code"** = NE PAS modifier de fichiers. Donner uniquement des conseils.
-- **Langue** : Alexis parle francais. Repondre en francais.
+- **`no code`** = NE PAS modifier de fichiers, donner uniquement des conseils
+- **Langue** : Alexis parle français, répondre en français
 - **Jamais hardcoder** de valeurs fausses
 - **Backend + frontend ENSEMBLE** : jamais l'un sans l'autre
 - **Zero fake UI** : jamais de feature UI sans backend fonctionnel
+- **Auditer avant d'affirmer** (cf. mémoire `feedback_never_lie.md`)
 
-## Modele commercial
+## Routage modèles (obligatoire)
 
-- **Cloud-first** : SaaS mensuel = revenu recurrent principal + protection revente
-- **Self-hosted** : one-time premium avec licence restrictive + phone-home
-- **Open-core** : version gratuite GitHub limitee = acquisition clients
-- **3 tiers** par produit : Starter / Pro / Enterprise
-- **Bundles** : Forge Suite (6 produits) avec remise ~35%
-- **Plateformes** : LemonSqueezy (vente + TVA) + RapidAPI (OracleForge API)
+Tout appel `Agent` DOIT passer `model:` explicitement.
+- `haiku` : lookups, grep, reads, fetches, status checks
+- `sonnet` : implementation, refactor, tests, reviews
+- `opus` : rare, archi ambiguë uniquement
 
-## Repos et templates de reference
+## Token discipline
 
-Voir `docs/resources.md` pour la liste complete des boilerplates et templates recommandes.
+- **Début de session** : `/context-budget`
+- **À 60% du contexte** : `/strategic-compact`
 
-## Skills utiles (auto-trigger)
+## Stack OracleForge
 
-### A chaque session
-- `/context-budget` — debut de session
-- `/verify` + `/code-review` + `/python-review` — apres chaque modification backend
-- `/tdd` — pour chaque nouvelle feature
+- **Backend** : Python 3.12 + FastAPI + httpx + SQLite (pas PostgreSQL)
+- **Dashboard** : Next.js 16 + TypeScript + Tailwind + shadcn/ui + next-intl 15 langues
+- **Tests** : pytest (22 tests passing, mock-only — voir plan Phase 1 pour tests live)
+- **Deploy** : systemd + venv + nginx (pattern hérité de GuardForge)
 
-### Frontend
-- `/frontend-design` — lors de la creation de dashboards
+## Ports VPS `ubuntu@maxiaworld.app` (146.59.237.43)
 
-### Lancement produit
-- `/launch-strategy` — planifier le go-to-market
-- `/pricing-strategy` — valider/ajuster les tiers
-- `/marketing-ideas` — strategies croissance
-- `/seo-audit` — avant lancement public
+| Port | Service |
+|---|---|
+| 8000 | MAXIA backend (intact) |
+| 8003 | OracleForge backend (futur) |
+| 8004 | GuardForge backend (paused) |
+| 3003 | GuardForge dashboard (paused) |
+| 3004 | OracleForge dashboard (futur) |
 
-### Qualite
-- `/quality-gate` — avant de marquer un produit comme pret
-- `/test-coverage` — verifier 80%+
-- `/security-reviewer` — avant deploy cloud
+## Conventions code
+
+- Python : PEP 8, type hints, Pydantic V2
+- TypeScript : strict mode, pas de `any`
+- Immutability, fichiers <800 lignes, fonctions <50 lignes
+- Erreurs gérées explicitement
+- Commits conventionnels (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`)
+- Tests : viser 80%+, TDD quand possible
+
+## Notes pour la prochaine session Claude
+
+- **Lire `oracleforge/docs/plan-2026-04-13.md` AVANT toute action sur `oracleforge/`**
+- Ne pas démarrer Phase 1 OracleForge tant qu'Alexis n'a pas validé les 5 points du §7 du plan
+- Ne pas réveiller GuardForge sans demande explicite
+- Skills/agents/rules ont été élagués le 13 avril 2026 (voir `~/.claude/*.archive/` pour ce qui a été déplacé). Pour restaurer, voir `docs/harness-prune-2026-04-13.md`
