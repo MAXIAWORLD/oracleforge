@@ -16,6 +16,23 @@ class TestDetect:
         entities = d.detect("Call +33 6 12 34 56 78")
         assert any(e.type == "phone_international" for e in entities)
 
+    def test_phone_international_captures_full_number(self) -> None:
+        """Regression: the regex must capture the entire number, not truncate."""
+        d = PIIDetector()
+        cases = [
+            ("Call +33 6 12 34 56 78 now", "+33 6 12 34 56 78"),
+            ("Phone +1-555-123-4567", "+1-555-123-4567"),
+            ("Tel: +44 20 7946 0958", "+44 20 7946 0958"),
+            ("Mobile +49 30 12345678", "+49 30 12345678"),
+        ]
+        for text, expected in cases:
+            entities = d.detect(text)
+            phones = [e for e in entities if e.type == "phone_international"]
+            assert phones, f"no phone detected in: {text!r}"
+            assert any(p.value == expected for p in phones), (
+                f"expected {expected!r} in {text!r}, got {[p.value for p in phones]!r}"
+            )
+
     def test_detects_ssn_us(self) -> None:
         d = PIIDetector()
         entities = d.detect("SSN: 123-45-6789")

@@ -71,7 +71,7 @@ def compute_risk_distribution(risk_levels: list[str]) -> dict[str, int]:
 _PATTERNS: dict[str, re.Pattern[str]] = {
     # Existing entities
     "email": re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", re.IGNORECASE),
-    "phone_international": re.compile(r"\+\d{1,3}[\s.-]?\(?\d{1,4}\)?[\s.-]?\d{2,4}[\s.-]?\d{2,4}"),
+    "phone_international": re.compile(r"\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,4}){1,5}"),
     "credit_card": re.compile(r"\b(?:\d[ -]*?){13,16}\b"),
     "ssn_us": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
     "ssn_fr": re.compile(r"\b[12]\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{3}\s?\d{3}\s?\d{2}\b"),
