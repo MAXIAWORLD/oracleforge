@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GuardForge — Drop-in PII redaction for OpenAI &amp; Anthropic</title>
+<meta name="description" content="Stop PII from leaking to OpenAI and Anthropic in one line of code. 17 entity types, 13 jurisdictions, reversible tokenization, GDPR / HIPAA / EU AI Act built-in. Self-host or cloud from 39€/month.">
+<meta name="keywords" content="PII, redaction, GDPR, HIPAA, EU AI Act, OpenAI, Anthropic, LLM, compliance, tokenization">
+<meta property="og:title" content="GuardForge — Drop-in PII redaction for LLM apps">
+<meta property="og:description" content="One line of code. PII never leaves your infrastructure. GDPR + EU AI Act + HIPAA + 10 more.">
+<meta property="og:type" content="website">
+<style>
+:root {
+  --bg: #0a0e1a;
+  --bg-2: #0d1020;
+  --card: #111729;
+  --border: #1f2937;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --cyan: #00e5ff;
+  --violet: #b44aff;
+  --pink: #ff2d87;
+  --green: #0afe7e;
+  --amber: #ffb800;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+/* ── Navbar ─────────────────────────────── */
+nav {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: rgba(10, 14, 26, 0.9);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+}
+nav .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  box-shadow: 0 0 12px var(--cyan);
+}
+nav ul {
+  display: flex;
+  gap: 30px;
+  list-style: none;
+}
+nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+nav a:hover { color: var(--text); }
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  color: var(--bg);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 229, 255, 0.3);
+}
+.btn-secondary {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover {
+  border-color: var(--cyan);
+}
+
+/* ── Hero ───────────────────────────────── */
+.hero {
+  padding: 100px 0 80px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 800px; height: 800px;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 229, 255, 0.1);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  position: relative;
+}
+h1 {
+  font-size: clamp(36px, 6vw, 64px);
+  line-height: 1.1;
+  font-weight: 800;
+  margin-bottom: 24px;
+  letter-spacing: -0.02em;
+  position: relative;
+}
+h1 .accent {
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero p {
+  font-size: 20px;
+  color: var(--muted);
+  max-width: 700px;
+  margin: 0 auto 40px;
+  position: relative;
+}
+.hero-ctas {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  position: relative;
+}
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 16px;
+}
+
+/* ── Code block ─────────────────────────── */
+.code-showcase {
+  margin: 64px auto 0;
+  max-width: 800px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: left;
+  font-family: "Fira Code", Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.8;
+  position: relative;
+  box-shadow: 0 0 60px rgba(0, 229, 255, 0.15);
+}
+.code-showcase::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+  box-shadow: 20px 0 0 #febc2e, 40px 0 0 #28c940;
+}
+.code-showcase pre { margin-top: 28px; overflow-x: auto; }
+.code-comment { color: var(--muted); }
+.code-keyword { color: var(--violet); font-weight: 600; }
+.code-string { color: var(--green); }
+.code-strike { text-decoration: line-through; opacity: 0.5; }
+.code-highlight { color: var(--cyan); font-weight: 700; }
+
+/* ── Sections ───────────────────────────── */
+section { padding: 80px 0; }
+.section-header {
+  text-align: center;
+  max-width: 700px;
+  margin: 0 auto 60px;
+}
+.section-header h2 {
+  font-size: 40px;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+.section-header p {
+  font-size: 18px;
+  color: var(--muted);
+}
+
+/* ── Features ───────────────────────────── */
+.features {
+  background: var(--bg-2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+.feature-card {
+  padding: 32px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  transition: all 0.3s;
+}
+.feature-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--cyan);
+  box-shadow: 0 20px 40px rgba(0, 229, 255, 0.1);
+}
+.feature-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-bottom: 20px;
+  background: rgba(0, 229, 255, 0.1);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+}
+.feature-card:nth-child(2) .feature-icon {
+  background: rgba(180, 74, 255, 0.1);
+  border-color: rgba(180, 74, 255, 0.3);
+}
+.feature-card:nth-child(3) .feature-icon {
+  background: rgba(255, 45, 135, 0.1);
+  border-color: rgba(255, 45, 135, 0.3);
+}
+.feature-card:nth-child(4) .feature-icon {
+  background: rgba(10, 254, 126, 0.1);
+  border-color: rgba(10, 254, 126, 0.3);
+}
+.feature-card:nth-child(5) .feature-icon {
+  background: rgba(255, 184, 0, 0.1);
+  border-color: rgba(255, 184, 0, 0.3);
+}
+.feature-card:nth-child(6) .feature-icon {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: rgba(0, 229, 255, 0.3);
+}
+.feature-card h3 {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+.feature-card p {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ── Compare table ──────────────────────── */
+.compare-wrap { overflow-x: auto; }
+table.compare {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+table.compare th, table.compare td {
+  padding: 16px 20px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+table.compare th {
+  background: var(--bg-2);
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+}
+table.compare th.highlight {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(180, 74, 255, 0.15));
+  color: var(--cyan);
+}
+table.compare td.highlight {
+  background: rgba(0, 229, 255, 0.05);
+  font-weight: 600;
+  color: var(--text);
+}
+table.compare tr:last-child td { border-bottom: none; }
+.check { color: var(--green); font-weight: 700; }
+.cross { color: var(--muted); }
+
+/* ── Pricing ────────────────────────────── */
+.pricing {
+  background: var(--bg-2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+.price-card {
+  padding: 32px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  text-align: center;
+  transition: all 0.3s;
+}
+.price-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--cyan);
+}
+.price-card.featured {
+  border-color: var(--cyan);
+  background: linear-gradient(180deg, rgba(0, 229, 255, 0.05), var(--card));
+  box-shadow: 0 20px 60px rgba(0, 229, 255, 0.2);
+  position: relative;
+}
+.price-card.featured::before {
+  content: "⭐ Most popular";
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 16px;
+  background: var(--cyan);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.price-card h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.price-amount {
+  font-size: 48px;
+  font-weight: 800;
+  margin: 16px 0;
+}
+.price-amount span {
+  font-size: 16px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.price-features {
+  list-style: none;
+  margin: 24px 0;
+  text-align: left;
+}
+.price-features li {
+  padding: 8px 0;
+  font-size: 14px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.price-features li:last-child { border-bottom: none; }
+.price-features strong { color: var(--text); }
+
+/* ── Footer ─────────────────────────────── */
+footer {
+  padding: 40px 0;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+footer a { color: var(--cyan); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+/* ── CTA section ────────────────────────── */
+.final-cta {
+  text-align: center;
+  padding: 120px 0;
+}
+.final-cta h2 {
+  font-size: 44px;
+  margin-bottom: 24px;
+  letter-spacing: -0.02em;
+}
+.final-cta p {
+  font-size: 20px;
+  color: var(--muted);
+  max-width: 600px;
+  margin: 0 auto 40px;
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="container">
+    <a href="#" class="logo">
+      <span class="logo-dot"></span>
+      GuardForge
+    </a>
+    <ul>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#compare">Compare</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li><a href="#docs">Docs</a></li>
+    </ul>
+    <a href="#pricing" class="btn btn-primary">Start free</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="container">
+    <div class="badge">⚡ Drop-in for OpenAI, Anthropic, and any LLM SDK</div>
+    <h1>
+      Your users' PII should never reach<br>
+      <span class="accent">OpenAI or Anthropic.</span>
+    </h1>
+    <p>
+      Replace one import line and GuardForge automatically redacts names, IBANs, emails, SSNs, and 13 more entity types before they leave your infrastructure. GDPR, EU AI Act, HIPAA compliant by default.
+    </p>
+    <div class="hero-ctas">
+      <a href="#pricing" class="btn btn-primary btn-lg">Start free — 10k scans/month</a>
+      <a href="#docs" class="btn btn-secondary btn-lg">Read the docs</a>
+    </div>
+
+    <div class="code-showcase">
+      <pre><span class="code-comment"># Before</span>
+<span class="code-keyword code-strike">from</span> <span class="code-strike">openai import OpenAI</span>
+
+<span class="code-comment"># After — one line changed, zero PII leaks</span>
+<span class="code-keyword">from</span> <span class="code-highlight">guardforge</span> <span class="code-keyword">import</span> OpenAI
+
+client = OpenAI(api_key=<span class="code-string">"sk-..."</span>)
+response = client.chat.completions.create(
+    model=<span class="code-string">"gpt-4"</span>,
+    messages=[{<span class="code-string">"role"</span>: <span class="code-string">"user"</span>,
+               <span class="code-string">"content"</span>: <span class="code-string">"Hi, I am Jean Dupont, IBAN FR76..."</span>}],
+)
+<span class="code-comment"># OpenAI sees: "Hi, I am [PERSON_NAME_a3f2], IBAN [IBAN_b491]..."</span>
+<span class="code-comment"># Your user sees: "Hello Jean Dupont, your IBAN FR76... is confirmed."</span></pre>
+    </div>
+  </div>
+</section>
+
+<section class="features" id="features">
+  <div class="container">
+    <div class="section-header">
+      <h2>Everything you need for AI compliance</h2>
+      <p>Built specifically for companies shipping AI features under GDPR and EU AI Act.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Reversible tokenization</h3>
+        <p>Replace PII with stable tokens, send to LLM, restore real values in the response. Your users never know.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌍</div>
+        <h3>13 jurisdictions</h3>
+        <p>GDPR, EU AI Act, HIPAA, PCI-DSS, CCPA, LGPD, PIPEDA, APPI, PIPL, DPDP, POPIA, Privacy Act AU, and more.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Compliance reports</h3>
+        <p>One-click PDF export of all scans by date range. Perfect for GDPR Article 30 Records of Processing Activities.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <h3>17 built-in entity types</h3>
+        <p>Email, phone, SSN US/FR, IBAN, credit card (Luhn-validated), SIRET, SIREN, RIB, Steuer-ID, DNI/NIE, Codice Fiscale, and more. Plus unlimited custom regex entities.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>Sub-10ms latency</h3>
+        <p>p50 5ms, p95 7ms on scan. p50 9ms, p95 11ms on tokenize. 178 req/sec sustained throughput.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔔</div>
+        <h3>Real-time webhook alerts</h3>
+        <p>Get notified in Slack or your SIEM the moment a high-risk PII event hits. HMAC-SHA256 signed payloads.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="container">
+    <div class="section-header">
+      <h2>How we compare</h2>
+      <p>40-65% cheaper than the major players. Self-hosted actually affordable.</p>
+    </div>
+    <div class="compare-wrap">
+      <table class="compare">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="highlight">GuardForge</th>
+            <th>Microsoft Presidio</th>
+            <th>Nightfall AI</th>
+            <th>Private AI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Starter price / month</td>
+            <td class="highlight">39€</td>
+            <td>Free (OSS)</td>
+            <td>~300$</td>
+            <td>99$</td>
+          </tr>
+          <tr>
+            <td>Reversible tokenization</td>
+            <td class="highlight check">✓</td>
+            <td class="cross">✗</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td>13 jurisdictions built-in</td>
+            <td class="highlight check">✓</td>
+            <td class="cross">✗</td>
+            <td class="cross">Partial</td>
+            <td class="cross">Partial</td>
+          </tr>
+          <tr>
+            <td>Drop-in OpenAI SDK</td>
+            <td class="highlight check">✓</td>
+            <td class="cross">✗</td>
+            <td class="cross">✗</td>
+            <td class="cross">Partial</td>
+          </tr>
+          <tr>
+            <td>Dashboard + compliance reports</td>
+            <td class="highlight check">✓</td>
+            <td class="cross">✗</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td>Self-hosted affordable</td>
+            <td class="highlight check">✓ 299€</td>
+            <td class="check">Free</td>
+            <td class="cross">✗</td>
+            <td class="cross">Contact sales</td>
+          </tr>
+          <tr>
+            <td>EU data residency</td>
+            <td class="highlight check">✓</td>
+            <td class="check">DIY</td>
+            <td class="cross">US</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td>15-language dashboard</td>
+            <td class="highlight check">✓</td>
+            <td class="cross">✗</td>
+            <td class="cross">EN only</td>
+            <td class="cross">EN only</td>
+          </tr>
+          <tr>
+            <td>Free tier</td>
+            <td class="highlight check">10k scans/mo</td>
+            <td class="check">Unlimited (self-host)</td>
+            <td class="cross">✗ demo only</td>
+            <td class="cross">✗</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="pricing" id="pricing">
+  <div class="container">
+    <div class="section-header">
+      <h2>Simple, honest pricing</h2>
+      <p>Start free. Scale without surprises. Self-host with one-time payments.</p>
+    </div>
+    <div class="price-grid">
+      <div class="price-card">
+        <h3>Free</h3>
+        <div class="price-amount">0€<span>/month</span></div>
+        <ul class="price-features">
+          <li><strong>10,000</strong> scans/mo</li>
+          <li>3 languages (EN/FR/DE)</li>
+          <li>1 user</li>
+          <li>Community support</li>
+          <li>All built-in entities</li>
+        </ul>
+        <a href="#" class="btn btn-secondary" style="width:100%">Start free</a>
+      </div>
+      <div class="price-card">
+        <h3>Starter</h3>
+        <div class="price-amount">39€<span>/month</span></div>
+        <ul class="price-features">
+          <li><strong>100,000</strong> scans/mo</li>
+          <li>15 languages</li>
+          <li>1 user</li>
+          <li>Email support 48h</li>
+          <li>5 custom entities</li>
+          <li>30 days audit retention</li>
+        </ul>
+        <a href="#" class="btn btn-secondary" style="width:100%">Get Starter</a>
+      </div>
+      <div class="price-card featured">
+        <h3>Pro</h3>
+        <div class="price-amount">129€<span>/month</span></div>
+        <ul class="price-features">
+          <li><strong>1,000,000</strong> scans/mo</li>
+          <li>5 users</li>
+          <li>Priority support 24h</li>
+          <li>Unlimited custom entities</li>
+          <li>PDF export compliance</li>
+          <li>Python SDK</li>
+          <li>Webhooks + SIEM</li>
+          <li>1 year audit retention</li>
+        </ul>
+        <a href="#" class="btn btn-primary" style="width:100%">Get Pro</a>
+      </div>
+      <div class="price-card">
+        <h3>Business</h3>
+        <div class="price-amount">349€<span>/month</span></div>
+        <ul class="price-features">
+          <li><strong>5,000,000</strong> scans/mo</li>
+          <li>20 users</li>
+          <li>Multi-tenant</li>
+          <li>SLA 99.9%</li>
+          <li>Dedicated Slack</li>
+          <li>Unlimited audit retention</li>
+        </ul>
+        <a href="#" class="btn btn-secondary" style="width:100%">Get Business</a>
+      </div>
+    </div>
+    <div style="text-align:center; margin-top:48px; color:var(--muted); font-size:14px;">
+      Need <strong style="color:var(--text)">Enterprise</strong> (SSO, CSM, custom SLA)? <a href="mailto:contact@maxialab.com" style="color:var(--cyan)">Contact us</a> — from 999€/month.<br>
+      Prefer <strong style="color:var(--text)">Self-hosted</strong>? One-time from 299€ up to 2999€. <a href="#" style="color:var(--cyan)">See plans</a>
+    </div>
+  </div>
+</section>
+
+<section class="final-cta">
+  <div class="container">
+    <h2>Ship AI features without the compliance headache.</h2>
+    <p>GDPR fines reach 4% of revenue. The EU AI Act adds criminal liability in 2025-2026. Get compliant in one line of code.</p>
+    <a href="#pricing" class="btn btn-primary btn-lg">Get started free</a>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    © 2026 MAXIA Lab — GuardForge is part of the Forge Suite.<br>
+    <a href="mailto:contact@maxialab.com">contact@maxialab.com</a> ·
+    <a href="#">Privacy Policy</a> ·
+    <a href="#">Terms of Service</a> ·
+    <a href="#">DPA</a>
+  </div>
+</footer>
+
+</body>
+</html>

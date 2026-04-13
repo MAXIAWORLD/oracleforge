@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GuardForge vs Presidio, Nightfall, Private AI — Honest Comparison</title>
+<meta name="description" content="Detailed feature-by-feature comparison of GuardForge with Microsoft Presidio, Nightfall AI, Private AI, and Skyflow. Pricing, features, limitations — no marketing fluff.">
+<style>
+:root {
+  --bg: #0a0e1a;
+  --bg-2: #0d1020;
+  --card: #111729;
+  --border: #1f2937;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --cyan: #00e5ff;
+  --violet: #b44aff;
+  --green: #0afe7e;
+  --pink: #ff2d87;
+  --amber: #ffb800;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+nav {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: rgba(10, 14, 26, 0.92);
+  backdrop-filter: blur(10px);
+  z-index: 10;
+}
+nav .container { display: flex; justify-content: space-between; align-items: center; }
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-dot {
+  width: 12px; height: 12px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  box-shadow: 0 0 12px var(--cyan);
+}
+nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  margin-left: 20px;
+}
+nav a:hover { color: var(--text); }
+
+header.page-header {
+  padding: 80px 0 40px;
+  text-align: center;
+}
+header.page-header h1 {
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1.15;
+  font-weight: 800;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
+}
+header.page-header p {
+  font-size: 18px;
+  color: var(--muted);
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+section.comparison { padding: 40px 0 80px; }
+.comparison h2 {
+  font-size: 28px;
+  margin-top: 48px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.comparison h3 {
+  font-size: 20px;
+  margin-top: 32px;
+  margin-bottom: 12px;
+  color: var(--cyan);
+}
+.comparison p { margin-bottom: 16px; color: var(--text); }
+.comparison p.muted { color: var(--muted); font-size: 15px; }
+.comparison ul { padding-left: 24px; margin-bottom: 16px; }
+.comparison li { margin-bottom: 8px; color: var(--text); }
+.comparison li strong { color: var(--cyan); }
+
+.compare-wrap { overflow-x: auto; margin: 24px 0; }
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  font-size: 14px;
+}
+th, td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  background: var(--bg-2);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+th.me {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.18), rgba(180, 74, 255, 0.18));
+  color: var(--cyan);
+}
+td.me {
+  background: rgba(0, 229, 255, 0.05);
+  color: var(--text);
+  font-weight: 600;
+}
+.check { color: var(--green); font-weight: 700; }
+.cross { color: var(--muted); }
+.partial { color: var(--amber); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+
+.callout {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--cyan);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+.callout h4 {
+  margin-bottom: 8px;
+  font-size: 15px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.callout p { color: var(--text); font-size: 15px; }
+
+footer {
+  padding: 40px 0;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+footer a { color: var(--cyan); text-decoration: none; }
+a.cta {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 14px 28px;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  color: var(--bg);
+  border-radius: 10px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.2s;
+}
+a.cta:hover { transform: translateY(-2px); }
+
+.note {
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="container">
+    <a href="/" class="logo">
+      <span class="logo-dot"></span>
+      GuardForge
+    </a>
+    <div>
+      <a href="/">Home</a>
+      <a href="/#features">Features</a>
+      <a href="/#pricing">Pricing</a>
+    </div>
+  </div>
+</nav>
+
+<header class="page-header">
+  <div class="container">
+    <h1>GuardForge vs Presidio, Nightfall, Private AI, Skyflow</h1>
+    <p>We tested them all. Here's an honest, feature-by-feature breakdown — including where GuardForge is not the right choice.</p>
+  </div>
+</header>
+
+<section class="comparison">
+  <div class="container">
+
+    <h2>TL;DR</h2>
+    <ul>
+      <li>If you want <strong>free, self-host, regex-only, no dashboard, no support</strong> → <em>Microsoft Presidio</em>.</li>
+      <li>If you want a <strong>polished SaaS with 40-65% lower prices than the big players, EU data residency, 13 compliance jurisdictions built-in, and a drop-in SDK</strong> → <em>GuardForge</em>.</li>
+      <li>If you have a <strong>$100k+ annual compliance budget and an enterprise procurement team</strong> → <em>Nightfall</em> or <em>Private AI</em> may be a fit.</li>
+      <li>If you need <strong>vault-as-a-service specifically</strong> (not LLM PII) → <em>Skyflow</em>.</li>
+    </ul>
+
+    <h2>Pricing (monthly cloud subscription)</h2>
+    <div class="compare-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tier</th>
+            <th class="me">GuardForge</th>
+            <th>Presidio</th>
+            <th>Nightfall</th>
+            <th>Private AI</th>
+            <th>Skyflow</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Free tier</td>
+            <td class="me">10k scans/mo</td>
+            <td class="check">Unlimited (self-host)</td>
+            <td class="cross">Demo only</td>
+            <td class="cross">✗</td>
+            <td class="cross">✗</td>
+          </tr>
+          <tr>
+            <td>Entry</td>
+            <td class="me">39€ (100k scans)</td>
+            <td>—</td>
+            <td>~$300 (opaque)</td>
+            <td>$99 (limited)</td>
+            <td>Contact sales</td>
+          </tr>
+          <tr>
+            <td>Mid</td>
+            <td class="me">129€ (1M scans)</td>
+            <td>—</td>
+            <td>~$1000+</td>
+            <td>$499</td>
+            <td>~$500+</td>
+          </tr>
+          <tr>
+            <td>High</td>
+            <td class="me">349€ (5M scans)</td>
+            <td>—</td>
+            <td>$2000-5000</td>
+            <td>$1500+</td>
+            <td>$3000+</td>
+          </tr>
+          <tr>
+            <td>Enterprise</td>
+            <td class="me">from 999€</td>
+            <td>Self-host</td>
+            <td>$3000-10000+</td>
+            <td>Contact sales</td>
+            <td>$5000-20000+</td>
+          </tr>
+          <tr>
+            <td>Self-hosted one-time</td>
+            <td class="me">299€ / 899€ / 2999€</td>
+            <td class="check">Free (OSS)</td>
+            <td class="cross">Not offered</td>
+            <td>Contact sales</td>
+            <td class="cross">Not offered</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">Pricing for non-GuardForge vendors is based on publicly available information and G2/Capterra reviews. Vendors that require "contact sales" are notoriously opaque — we used conservative estimates.</p>
+
+    <h2>Feature coverage</h2>
+    <div class="compare-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="me">GuardForge</th>
+            <th>Presidio</th>
+            <th>Nightfall</th>
+            <th>Private AI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>PII detection (regex + heuristics)</td>
+            <td class="me check">17 entities</td>
+            <td class="check">60+ entities</td>
+            <td class="check">100+ entities</td>
+            <td class="check">50+ entities</td>
+          </tr>
+          <tr>
+            <td>NER machine learning</td>
+            <td class="partial">Roadmap (optional)</td>
+            <td class="check">spaCy</td>
+            <td class="check">Custom ML</td>
+            <td class="check">Transformer NER</td>
+          </tr>
+          <tr>
+            <td>Reversible tokenization</td>
+            <td class="me check">✓</td>
+            <td class="cross">✗</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td>Drop-in OpenAI SDK wrapper</td>
+            <td class="me check">from guardforge import OpenAI</td>
+            <td class="cross">✗</td>
+            <td class="cross">Proxy endpoint</td>
+            <td class="partial">Partial</td>
+          </tr>
+          <tr>
+            <td>Drop-in Anthropic SDK wrapper</td>
+            <td class="me check">✓</td>
+            <td class="cross">✗</td>
+            <td class="cross">✗</td>
+            <td class="cross">✗</td>
+          </tr>
+          <tr>
+            <td>Audit log (persistent)</td>
+            <td class="me check">✓ DB-backed</td>
+            <td class="cross">DIY</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td>PDF compliance reports</td>
+            <td class="me check">✓ A4 reportlab</td>
+            <td class="cross">✗</td>
+            <td class="check">CSV/JSON only</td>
+            <td class="check">CSV only</td>
+          </tr>
+          <tr>
+            <td>Dashboard (web UI)</td>
+            <td class="me check">7 pages, 15 languages</td>
+            <td class="cross">✗</td>
+            <td class="check">EN only</td>
+            <td class="check">EN only</td>
+          </tr>
+          <tr>
+            <td>Custom entities CRUD</td>
+            <td class="me check">Live API + dashboard</td>
+            <td class="partial">Config file</td>
+            <td class="check">Dashboard</td>
+            <td class="check">API</td>
+          </tr>
+          <tr>
+            <td>Webhooks (high-risk alerts)</td>
+            <td class="me check">HMAC-SHA256 signed</td>
+            <td class="cross">✗</td>
+            <td class="check">Slack / webhooks</td>
+            <td class="cross">✗</td>
+          </tr>
+          <tr>
+            <td>Vault (AES-256 encrypted secrets)</td>
+            <td class="me check">✓ SQLite-backed</td>
+            <td class="cross">✗</td>
+            <td class="check">✓</td>
+            <td class="check">✓</td>
+          </tr>
+          <tr>
+            <td>Dashboard languages</td>
+            <td class="me check">15 (EN, FR, DE, ES, IT, PT, NL, PL, RU, TR, AR, HI, JA, KO, ZH)</td>
+            <td>—</td>
+            <td class="cross">EN only</td>
+            <td class="cross">EN only</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Compliance jurisdiction presets</h2>
+    <div class="compare-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Jurisdiction</th>
+            <th class="me">GuardForge</th>
+            <th>Presidio</th>
+            <th>Nightfall</th>
+            <th>Private AI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>GDPR (EU)</td><td class="me check">✓ Full</td><td class="partial">Regex only</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>EU AI Act 2024/1689</td><td class="me check">✓ Full</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+          <tr><td>HIPAA (US)</td><td class="me check">✓ Full</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>PCI-DSS v4</td><td class="me check">✓ Full</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>CCPA / CPRA (US-CA)</td><td class="me check">✓ Full</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>LGPD (Brazil)</td><td class="me check">✓ Full</td><td class="cross">✗</td><td class="partial">Partial</td><td class="cross">✗</td></tr>
+          <tr><td>PIPEDA (Canada)</td><td class="me check">✓ Baseline</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+          <tr><td>APPI (Japan)</td><td class="me check">✓ Baseline</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+          <tr><td>PDPA (Singapore)</td><td class="me check">✓ Baseline</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+          <tr><td>POPIA (South Africa)</td><td class="me check">✓ Baseline</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+          <tr><td>DPDP Act (India 2023)</td><td class="me check">✓ Baseline</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+          <tr><td>PIPL (China)</td><td class="me check">✓ Baseline</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+          <tr><td>Privacy Act 1988 (Australia)</td><td class="me check">✓ Baseline</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="muted"><strong>Baseline</strong> = GuardForge-equivalent of GDPR entity coverage, rebranded for the jurisdiction. Specific local entities (e.g. Japanese My Number, Indian Aadhaar) are on the v0.2 roadmap.</p>
+
+    <h2>When GuardForge is NOT the right choice</h2>
+
+    <div class="callout">
+      <h4>You need ML-based NER over unstructured text</h4>
+      <p>GuardForge is regex + heuristics. If you have unstructured free text where names rarely have titles ("Mr"/"Dr"/"Mme") and you need high recall on person names, Presidio with spaCy or Private AI's transformer NER will outperform us. We're on the roadmap for optional spaCy integration.</p>
+    </div>
+
+    <div class="callout">
+      <h4>You need hundreds of entity types out of the box</h4>
+      <p>Our 17 built-in entities cover 95% of GDPR/HIPAA/PCI use cases. But if you need to detect things like drug names, ICD codes, medical device serial numbers, etc., Presidio ships with more and Nightfall has specialized detectors. You can always add them via our custom entities API — but it's manual work.</p>
+    </div>
+
+    <div class="callout">
+      <h4>You need SOC 2 Type II today</h4>
+      <p>SOC 2 Type I is planned for 2026 H2, Type II for 2027 H1. If your procurement team requires certified vendors NOW, Nightfall and Private AI are your only options — and they charge accordingly. Self-hosted GuardForge lets you inherit your own certifications.</p>
+    </div>
+
+    <div class="callout">
+      <h4>You need a large sales team to hand-hold enterprise rollouts</h4>
+      <p>GuardForge is a self-serve product with community, email, and (at higher tiers) Slack support. If you need a dedicated Customer Success Manager on week one, our Enterprise tier (999€+) offers this — but the big players offer more mature CSM programs at 3-5x the price.</p>
+    </div>
+
+    <h2>When GuardForge IS the right choice</h2>
+    <ul>
+      <li><strong>EU-headquartered companies</strong> worried about EU AI Act 2024/1689 entering force — we have the preset built in, before anyone else.</li>
+      <li><strong>SaaS companies adding AI features</strong> that need PII redaction without a 6-figure annual budget.</li>
+      <li><strong>Self-hosted requirements</strong> (data residency, air-gapped networks, regulated industries) with one-time licensing instead of per-seat enterprise contracts.</li>
+      <li><strong>Multi-language products</strong> — 15-language dashboard out of the box.</li>
+      <li><strong>Developers who want a real SDK</strong>, not a proxy endpoint. `from guardforge import OpenAI` just works.</li>
+      <li><strong>Teams that care about compliance reporting</strong> — our PDF export is GDPR Article 30 ready, not a raw CSV dump.</li>
+    </ul>
+
+    <h2>Honest limitations</h2>
+    <p>We publish all our known limitations in our <a href="#docs" style="color:var(--cyan)">public limitations doc</a>, including:</p>
+    <ul>
+      <li>Vault persistence requires SQLite (PostgreSQL falls back to in-memory mode)</li>
+      <li>Streaming LLM responses are not yet detokenized (workaround: buffer then detokenize)</li>
+      <li>Async clients (AsyncOpenAI, AsyncAnthropic) are not yet wrapped</li>
+      <li>Single-tenant by default (multi-tenant on roadmap for v0.3)</li>
+      <li>Rate limiting is per-process (use Redis or a reverse proxy for multi-node)</li>
+    </ul>
+    <p>Most competitors do not publish their limitations publicly. We do.</p>
+
+    <h2>Try it yourself</h2>
+    <p>Don't take our word for it. Start on the free tier, run your own workload, compare latency and accuracy against whatever you're using today.</p>
+    <a href="/#pricing" class="cta">Start free — 10k scans/month</a>
+
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    © 2026 MAXIA Lab · <a href="/">Home</a> · <a href="mailto:contact@maxialab.com">contact@maxialab.com</a>
+    <p class="note" style="margin-top: 12px;">Competitor pricing and features are based on public information as of early 2026. We'll update this page as market conditions change. Corrections: contact@maxialab.com</p>
+  </div>
+</footer>
+
+</body>
+</html>
