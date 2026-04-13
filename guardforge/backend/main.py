@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.pii_detector = PIIDetector(confidence_threshold=settings.pii_confidence_threshold)
     app.state.vault = Vault(
         encryption_key=settings.vault_encryption_key,
-        database_url=settings.database_url,
+        database_url=settings.vault_database_url or settings.database_url,
     )
     app.state.policy_engine = PolicyEngine(default_policy=settings.default_policy)
     app.state.audit_log: list[dict] = []  # In-memory audit trail (last 1000 scans)

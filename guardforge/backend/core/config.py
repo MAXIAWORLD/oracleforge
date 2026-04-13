@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
     database_url: str = "sqlite+aiosqlite:///./guardforge.db"
 
+    vault_database_url: str = Field(
+        default="",
+        description="Optional dedicated DB URL for vault persistence. Must be SQLite (sync). "
+                    "If empty, falls back to `database_url` (which only persists when it is SQLite). "
+                    "Set to sqlite+aiosqlite:////opt/guardforge/vault.db in production when main DB is PostgreSQL.",
+    )
+
     # Vault encryption
     vault_encryption_key: str = Field(default="", description="AES-256 key (32 bytes base64). Auto-generated if empty.")
 
