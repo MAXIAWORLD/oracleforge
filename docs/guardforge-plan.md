@@ -122,11 +122,52 @@
 
 ## 6. ÉTAT D'AVANCEMENT
 
-| Phase | Statut |
-|---|---|
-| A | 🟡 EN COURS — démarrage A1 |
-| B | ⚪ pending |
-| C | ⚪ pending |
-| D | ⚪ pending |
+| Phase | Statut | Commit |
+|---|---|---|
+| A | ✅ COMPLÈTE | `f260119` — vault persistence, 16 compliance presets, README, LICENSE, 5 legal docs, page /compliance |
+| B | ✅ COMPLÈTE | `e58643e` — Python SDK drop-in, PDF export, custom entities CRUD, webhooks, pages dashboard |
+| C | ✅ COMPLÈTE | `066357a` — E2E tests, benchmarks perf, precision/recall, limitations doc, 83% coverage, hardening sécu |
+| D | ✅ COMPLÈTE (parties solo) | `c399408` — landing page, compare, OSS README, launch drafts. D4/D5 restent actions user. |
 
-**Dernière action** : 13 avril 2026 — plan validé, démarrage Phase A.1 vault persistence
+**Dernière action** : 13 avril 2026 — session autonome, toutes les 4 phases livrées + committées
+
+## 7. MÉTRIQUES FINALES
+
+- **Backend tests** : 161 (passage de 68 → 86 → 101 → 161)
+- **SDK tests** : 12
+- **Coverage backend** : 83% (objectif 80% ✅)
+- **Bandit security** : 0 issues sur 2463 lignes
+- **Latence /api/scan** : p50 5.4ms, p95 7.1ms, p99 8.5ms (178 req/s)
+- **Latence /api/tokenize** : p50 9ms, p95 11ms, p99 13.5ms (108 req/s)
+- **PII detection** : precision 1.00, recall 0.90, F1 0.95 (31 exemples × 5 langues)
+- **Dashboard** : 10 routes, 15 langues complètes
+- **Backend** : 19 endpoints (scanner, tokenize, policies, audit, reports, entities, webhooks, vault)
+- **Compliance** : 16 policies (3 generic + 13 jurisdictions)
+
+## 8. ACTIONS RESTANTES USER
+
+1. **D4 — LemonSqueezy** : créer compte + 4 products, wire checkout URLs dans `guardforge/marketing/index.html`
+2. **D5 — Démo vidéo Loom** : 2-3 min (landing → playground → scanner → reports → entities → compliance)
+3. **Déploiement** : Vercel (marketing) + VPS OVH (backend Cloud Edition) + domaine
+4. **D3 publication** : créer `github.com/maxia-lab/guardforge-oss` repo avec SDK + README_OSS.md
+
+## 9. BUGS DÉCOUVERTS + FIXÉS PENDANT LA SESSION
+
+1. **Vault persistence** (C1 target) — Fernet key auto-regenerated at restart → tokenmaps perdues. Fixé avec VAULT_ENCRYPTION_KEY stable + SQLite write-through cache.
+2. **Audit endpoint field names mismatch** — Backend renvoyait `pii_found`/`action_taken`/`policy_applied`/`scanned_at`, frontend attendait `pii_count`/`action`/`policy`/`timestamp`. Fixé côté backend.
+3. **Audit `pii_types` non parsé** — Stocké en DB comme JSON string, renvoyé tel quel. Fixé avec `json.loads` dans l'endpoint.
+4. **Eye icon oublié** — Après suppression du Scanner widget de la home page, Eye était encore utilisé par Row 4 stats → ReferenceError. Remis dans imports.
+5. **Playground title mix EN/FR** — fr.json avait `"Demonstration tokenization"` au lieu de `"Demonstration de tokenisation"`. Corrigé.
+6. **Descriptions policies hardcodées EN backend** — Migré en i18n frontend via script Python idempotent pour 15 langues.
+7. **SIRET / credit_card collision** — 14-digit Luhn-valid SIRET détecté comme les 2. Fixé avec `_deduplicate_overlapping()` qui garde la plus haute confidence.
+8. **Webhook fantôme → 20× latence** — Test listener killed mais webhook toujours enregistré → scans critical tentaient POST → timeout 100ms. Trouvé via benchmark, documenté dans LIMITATIONS §4.4.
+9. **Rate limit hardcodé 60/min** — Cassait les benchmarks. Rendu configurable via RATE_LIMIT_MAX_REQUESTS env var.
+10. **`time.monotonic()` résolution Windows 15ms** — Benchmark affichait p50 0ms. Remplacé par `time.perf_counter()`.
+11. **DPA false positive bandit** — String `"shared-hmac-secret"` dans OpenAPI example. Marqué `# nosec B105` avec justification.
+
+## 10. ÉTAT SERVICES LIVE
+
+- Backend port 8004 : up, 16 policies, vault persistent, rate limit 10k/min, tous les security headers
+- Dashboard port 3003 : up, 10 routes 200, hot-reload actif
+- VAULT_ENCRYPTION_KEY : `MU5aCPvKMx1FfwQFcss7Ly27C5O2CStJ1yAvsgPJXRU=` (stable, dans `.env`)
+- SECRET_KEY / API_KEY : `change-me-to-a-random-32-char-string` (dev)
