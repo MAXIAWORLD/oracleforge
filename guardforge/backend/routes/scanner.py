@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -13,7 +14,7 @@ from sqlalchemy import select
 
 from core.config import get_settings
 from core.database import get_db
-from core.models import ScanLog
+from core.models import ScanLog, Webhook
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +149,60 @@ class DetokenizeRequest(BaseModel):
 
 # ── Helpers ──────────────────────────────────────────────────────
 
+async def _maybe_dispatch_webhooks(
+    input_hash: str,
+    pii_count: int,
+    pii_types: list[str],
+    policy: str,
+    action: str,
+    risk_level: str,
+) -> None:
+    """Fetch enabled webhooks and dispatch a high-risk event if appropriate.
+
+    Runs as a fire-and-forget background task. Failures are logged but never
+    propagated to the scan endpoint — webhook delivery must NEVER block or
+    break the scan flow.
+    """
+    logger.info("[webhook] dispatch entry: risk=%s", risk_level)
+    if risk_level not in ("critical", "high"):
+        return
+    try:
+        async for db_session in get_db():
+            stmt = select(Webhook).where(Webhook.enabled == 1)
+            rows = (await db_session.execute(stmt)).scalars().all()
+            logger.info("[webhook] found %d enabled webhooks", len(rows))
+            if not rows:
+                return
+            webhooks_data = [
+                {
+                    "id": w.id,
+                    "name": w.name,
+                    "url": w.url,
+                    "secret": w.secret,
+                    "min_risk_level": w.min_risk_level,
+                    "enabled": True,
+                }
+                for w in rows
+            ]
+            from services.webhook_dispatcher import dispatch_event
+            results = await dispatch_event(
+                webhooks=webhooks_data,
+                event_type=f"scan.{risk_level}_risk",
+                risk_level=risk_level,
+                payload={
+                    "scan_input_hash": input_hash,
+                    "pii_count": pii_count,
+                    "pii_types": pii_types,
+                    "action": action,
+                    "policy": policy,
+                },
+            )
+            logger.info("[webhook] dispatch results: %s", results)
+            return
+    except Exception as exc:
+        logger.warning("[webhook] dispatch failed: %s", exc, exc_info=True)
+
+
 async def _persist_scan_log(
     request: Request,
     input_hash: str,
@@ -260,6 +315,16 @@ async def scan_text(req: ScanRequest, request: Request) -> dict:
         action=decision.action,
         risk_level=overall_risk,
     )
+
+    # Fire-and-forget webhook dispatch for high-risk events
+    asyncio.create_task(_maybe_dispatch_webhooks(
+        input_hash=input_hash,
+        pii_count=result["pii_count"],
+        pii_types=result["pii_types"],
+        policy=req.policy or "default",
+        action=decision.action,
+        risk_level=overall_risk,
+    ))
 
     return {**result, "policy_decision": {
         "allowed": decision.allowed,

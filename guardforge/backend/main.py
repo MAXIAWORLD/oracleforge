@@ -9,6 +9,13 @@ import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
+# Set up basic logging so logger.info() calls from services/routes are visible
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -17,6 +24,8 @@ from core.database import close_db, init_db
 from core.models import HealthResponse
 from routes.scanner import router as scanner_router
 from routes.reports import router as reports_router
+from routes.entities import router as entities_router
+from routes.webhooks import router as webhooks_router
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +47,42 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.policy_engine = PolicyEngine(default_policy=settings.default_policy)
     app.state.audit_log: list[dict] = []  # In-memory audit trail (last 1000 scans)
 
-    logger.info("[startup] GuardForge ready — vault=%s, policies=%d",
+    # Load custom entity patterns from DB into the live detector
+    custom_count = 0
+    try:
+        import re as _re
+        from sqlalchemy import select as _select
+        from core.database import get_db as _get_db
+        from core.models import CustomEntity as _CustomEntity
+        from services.pii_detector import CustomPattern as _CustomPattern
+
+        async for db_session in _get_db():
+            rows = (await db_session.execute(
+                _select(_CustomEntity).where(_CustomEntity.enabled == 1)
+            )).scalars().all()
+            patterns = []
+            for row in rows:
+                try:
+                    compiled = _re.compile(row.pattern)
+                except _re.error as exc:
+                    logger.warning("[startup] skipping invalid custom regex %s: %s", row.name, exc)
+                    continue
+                patterns.append(_CustomPattern(
+                    name=row.name,
+                    regex=compiled,
+                    risk_level=row.risk_level,
+                    confidence=row.confidence,
+                ))
+            app.state.pii_detector.set_custom_patterns(patterns)
+            custom_count = len(patterns)
+            break
+    except Exception as exc:
+        logger.warning("[startup] failed to load custom entities: %s", exc)
+
+    logger.info("[startup] GuardForge ready — vault=%s, policies=%d, custom_entities=%d",
                 "on" if app.state.vault.is_available else "off",
-                len(app.state.policy_engine.list_policies()))
+                len(app.state.policy_engine.list_policies()),
+                custom_count)
     yield
     await close_db()
 
@@ -123,6 +165,8 @@ def create_app() -> FastAPI:
                        allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
     app.include_router(scanner_router)
     app.include_router(reports_router)
+    app.include_router(entities_router)
+    app.include_router(webhooks_router)
 
     @app.get(
         "/health",

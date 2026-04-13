@@ -165,11 +165,43 @@ def _deduplicate_overlapping(entities: list[PIIEntity]) -> list[PIIEntity]:
     return kept
 
 
+@dataclass(frozen=True)
+class CustomPattern:
+    """User-defined PII pattern with metadata."""
+    name: str
+    regex: re.Pattern[str]
+    risk_level: str = "medium"
+    confidence: float = 0.85
+
+
 class PIIDetector:
-    """Detect and anonymise PII in text."""
+    """Detect and anonymise PII in text.
+
+    Supports both built-in patterns (17 entity types) and custom user-defined
+    patterns added at runtime via add_custom_pattern() / set_custom_patterns().
+    """
 
     def __init__(self, confidence_threshold: float = 0.7) -> None:
         self._threshold = confidence_threshold
+        self._custom: list[CustomPattern] = []
+
+    def set_custom_patterns(self, patterns: list[CustomPattern]) -> None:
+        """Replace all custom patterns. Used at startup to load from DB."""
+        self._custom = list(patterns)
+
+    def add_custom_pattern(self, pattern: CustomPattern) -> None:
+        """Add or update a single custom pattern by name."""
+        self._custom = [p for p in self._custom if p.name != pattern.name]
+        self._custom.append(pattern)
+
+    def remove_custom_pattern(self, name: str) -> bool:
+        """Remove a custom pattern by name. Returns True if existed."""
+        before = len(self._custom)
+        self._custom = [p for p in self._custom if p.name != name]
+        return len(self._custom) < before
+
+    def list_custom_patterns(self) -> list[CustomPattern]:
+        return list(self._custom)
 
     def detect(self, text: str) -> list[PIIEntity]:
         """Scan text and return all PII entities above confidence threshold."""
@@ -180,7 +212,6 @@ class PIIDetector:
                 continue
             for match in pattern.finditer(text):
                 value = match.group()
-                # Extra validation for credit cards
                 if pii_type == "credit_card":
                     clean = re.sub(r"[^0-9]", "", value)
                     if not _luhn_check(clean):
@@ -194,6 +225,21 @@ class PIIDetector:
                     confidence=confidence,
                     risk_level=risk_level,
                 ))
+
+        # Custom user-defined patterns
+        for cp in self._custom:
+            if cp.confidence < self._threshold:
+                continue
+            for match in cp.regex.finditer(text):
+                entities.append(PIIEntity(
+                    type=cp.name,
+                    value=match.group(),
+                    start=match.start(),
+                    end=match.end(),
+                    confidence=cp.confidence,
+                    risk_level=cp.risk_level,
+                ))
+
         return _deduplicate_overlapping(entities)
 
     def anonymize(

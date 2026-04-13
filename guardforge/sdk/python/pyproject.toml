@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "guardforge"
+version = "0.1.0"
+description = "Drop-in PII redaction for OpenAI, Anthropic, and other LLM SDKs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [
+    { name = "MAXIA Lab", email = "contact@maxialab.com" },
+]
+keywords = ["pii", "privacy", "gdpr", "llm", "openai", "anthropic", "tokenization", "compliance"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "httpx>=0.27,<1.0",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0,<2.0"]
+anthropic = ["anthropic>=0.30,<1.0"]
+all = ["openai>=1.0,<2.0", "anthropic>=0.30,<1.0"]
+dev = [
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=0.23,<1.0",
+]
+
+[project.urls]
+Homepage = "https://maxialab.com/guardforge"
+Documentation = "https://maxialab.com/guardforge/docs"
+Repository = "https://github.com/maxia-lab/guardforge"
+
+[tool.setuptools.packages.find]
+include = ["guardforge*"]
+exclude = ["tests*"]

@@ -14,6 +14,7 @@ from datetime import date, datetime, timezone
 from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -147,6 +148,119 @@ async def get_summary(
         "risk_distribution": dict(risk_distribution),
         "top_policies": top_policies,
     }
+
+
+async def _build_summary(
+    from_date: str | None,
+    to_date: str | None,
+    session: AsyncSession,
+) -> dict:
+    """Internal helper that builds a summary dict (used by both /summary and /pdf)."""
+    today = date.today()
+    from_dt = _parse_date(from_date, date(today.year, today.month, max(1, today.day - 30)))
+    to_dt_base = _parse_date(to_date, today)
+    to_dt = to_dt_base.replace(hour=23, minute=59, second=59)
+
+    pii_by_type: dict[str, int] = defaultdict(int)
+    action_distribution: dict[str, int] = defaultdict(int)
+    risk_distribution: dict[str, int] = defaultdict(int)
+    policy_counts: dict[str, int] = defaultdict(int)
+    total_scans = 0
+    total_pii = 0
+
+    stmt = select(ScanLog).where(
+        ScanLog.scanned_at >= from_dt,
+        ScanLog.scanned_at <= to_dt,
+    )
+    rows = (await session.execute(stmt)).scalars().all()
+
+    for row in rows:
+        total_scans += 1
+        total_pii += row.pii_found
+        try:
+            types = json.loads(row.pii_types) if row.pii_types else []
+        except (json.JSONDecodeError, ValueError):
+            types = [t.strip() for t in row.pii_types.split(",") if t.strip()]
+        for t in types:
+            pii_by_type[t] += 1
+        action_distribution[row.action_taken] += 1
+        risk_distribution[row.risk_level] += 1
+        policy_counts[row.policy_applied] += 1
+
+    top_policies = sorted(
+        [{"name": k, "count": v} for k, v in policy_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True,
+    )
+
+    return {
+        "period": {
+            "from": from_dt.strftime("%Y-%m-%d"),
+            "to": to_dt_base.strftime("%Y-%m-%d"),
+        },
+        "total_scans": total_scans,
+        "total_pii_detected": total_pii,
+        "pii_by_type": dict(pii_by_type),
+        "action_distribution": dict(action_distribution),
+        "risk_distribution": dict(risk_distribution),
+        "top_policies": top_policies,
+    }
+
+
+@router.get(
+    "/pdf",
+    summary="Compliance summary as PDF",
+    description=(
+        "Generates a PDF compliance report from the audit log for the given date range. "
+        "Suitable for CISO/DPO inclusion in GDPR Article 30 Records of Processing Activities, "
+        "internal audits, or board reporting. Same data as `/api/reports/summary` but rendered "
+        "as a clean A4 PDF with stat cards, PII breakdown, action distribution, risk distribution, "
+        "and top policies.\n\n"
+        "**Optional `org_name`** query parameter is shown in the report header for branding."
+    ),
+    responses={
+        200: {
+            "description": "Returns the PDF binary with Content-Type application/pdf.",
+            "content": {"application/pdf": {}},
+        },
+        401: {"description": "Missing or invalid X-API-Key."},
+        422: {"description": "Invalid date format."},
+        500: {"description": "Internal error generating PDF."},
+    },
+)
+async def get_pdf_report(
+    from_date: str | None = None,
+    to_date: str | None = None,
+    org_name: str | None = None,
+    _: str = Depends(_require_auth),
+    session: AsyncSession = Depends(get_db),
+) -> Response:
+    """Compliance report as PDF, ready to download."""
+    try:
+        summary = await _build_summary(from_date, to_date, session)
+    except Exception as exc:
+        logger.error("[reports] PDF summary build failed: %s", exc)
+        raise HTTPException(500, "Failed to build summary") from exc
+
+    try:
+        from services.pdf_reports import render_compliance_report_pdf
+        pdf_bytes = render_compliance_report_pdf(summary, org_name=org_name)
+    except Exception as exc:
+        logger.error("[reports] PDF rendering failed: %s", exc)
+        raise HTTPException(500, "Failed to render PDF") from exc
+
+    period = summary.get("period", {})
+    filename = (
+        f"guardforge-compliance-{period.get('from', 'unknown')}-to-{period.get('to', 'unknown')}.pdf"
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.get(
