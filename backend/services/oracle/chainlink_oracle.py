@@ -15,17 +15,19 @@ Usage:
     verified = await verify_price_chainlink("ETH", expected_price=3200, max_deviation_pct=1.0)
     # {"verified": True, "chainlink_price": 3201.5, "deviation_pct": 0.04}
 """
-import time
 import logging
+import os
 import struct
+import time
 
 import httpx
 
+from core.errors import safe_error
+
 logger = logging.getLogger("chainlink")
 
-# ── Base Mainnet RPC ──
-# Utilise le RPC public Base ou un provider configure
-import os
+# ── Base mainnet RPC ──
+# Uses the public Base RPC by default; override via BASE_RPC_URL env var.
 BASE_RPC_URL = os.getenv("BASE_RPC_URL", "https://mainnet.base.org")
 
 # ── Chainlink Aggregator V3 addresses on Base mainnet ──
@@ -173,8 +175,10 @@ async def get_chainlink_price(symbol: str) -> dict:
 
     except Exception as e:
         _cl_metrics["errors"] += 1
-        logger.error(f"[Chainlink] {sym} error: {e}")
-        return {"error": str(e)[:100], "source": "chainlink_base"}
+        return {
+            "error": safe_error(f"Chainlink eth_call failed for {sym}", e, logger),
+            "source": "chainlink_base",
+        }
 
 
 async def verify_price_chainlink(symbol: str, expected_price: float,
@@ -236,7 +240,10 @@ async def verify_feeds_at_startup() -> dict:
             else:
                 results[sym] = {"verified": False, "error": "description() returned empty"}
         except Exception as e:
-            results[sym] = {"verified": False, "error": str(e)[:100]}
+            results[sym] = {
+                "verified": False,
+                "error": safe_error(f"Chainlink feed verification failed for {sym}", e, logger),
+            }
     return results
 
 
