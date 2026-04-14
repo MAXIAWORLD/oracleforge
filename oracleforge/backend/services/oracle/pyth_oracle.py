@@ -36,6 +36,8 @@ from typing import Optional
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 
+from core.errors import safe_error
+
 logger = logging.getLogger("pyth_oracle")
 
 # ── Finnhub API (3rd equity source) ──
@@ -237,19 +239,42 @@ def _track_latency(start: float):
         _oracle_metrics["latency_samples"] = samples[-_METRICS_MAX_SAMPLES:]
 
 
+# ── Input validation helpers ──
+
+# Pyth feed IDs are 32-byte values serialized as 64 lowercase hex characters
+# (no 0x prefix). We validate at every public entry point to reject
+# arbitrary strings before they reach Hermes or the in-memory cache.
+_FEED_ID_LEN = 64
+_HEX_CHARS = frozenset("0123456789abcdef")
+
+
+def _is_valid_feed_id(feed_id: str) -> bool:
+    """Return True iff feed_id is a valid 64-char lowercase hex string."""
+    if not isinstance(feed_id, str):
+        return False
+    if len(feed_id) != _FEED_ID_LEN:
+        return False
+    return all(c in _HEX_CHARS for c in feed_id.lower())
+
+
 # ── Fonctions principales ──
 
 async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
-    """Recupere le prix d'un feed Pyth via Hermes API.
+    """Fetch a single Pyth price from Hermes.
 
     Args:
-        feed_id: ID du feed Pyth (hex, sans 0x)
-        hft: True pour mode HFT (cache 1s, staleness strict)
+        feed_id: 64-char lowercase hex Pyth feed ID (no 0x prefix).
+                 Invalid inputs are rejected BEFORE hitting the network or
+                 the in-memory cache to prevent cache pollution / SSRF.
+        hft: True for HFT mode (1s cache, strict staleness).
 
     Returns:
-        {"price": float, "confidence": float, "publish_time": int, "source": "pyth"}
-        ou {"error": "..."} en cas d'echec
+        On success: {"price": float, "confidence": float, "publish_time": int, "source": "pyth", ...}
+        On failure: {"error": str, "source": "pyth"}
     """
+    if not _is_valid_feed_id(feed_id):
+        return {"error": "invalid feed_id format", "source": "pyth"}
+
     # Metrics tracking
     _oracle_metrics["total_requests"] += 1
     _req_start = time.time()
@@ -363,7 +388,7 @@ async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
         return {"error": "Pyth Hermes timeout", "source": "pyth"}
     except Exception as e:
         _track_latency(_req_start)
-        return {"error": f"Pyth error: {str(e)[:100]}", "source": "pyth"}
+        return {"error": safe_error("Pyth Hermes fetch failed", e, logger), "source": "pyth"}
 
 
 async def verify_price_onchain(feed_id: str, expected_price: float, max_age_s: int = 30,
@@ -407,7 +432,7 @@ async def verify_price_onchain(feed_id: str, expected_price: float, max_age_s: i
         return {"verified": True, "onchain_price": onchain_price, "expected_price": expected_price,
                 "deviation_pct": round(deviation, 2), "age_s": age_s, "source": "pyth_hermes_hft"}
     except Exception as e:
-        return {"verified": False, "error": str(e)[:100]}
+        return {"verified": False, "error": safe_error("Pyth on-chain verification failed", e, logger)}
 
 
 async def get_stock_price_finnhub(symbol: str) -> dict:
@@ -451,7 +476,7 @@ async def get_stock_price_finnhub(symbol: str) -> dict:
     except httpx.TimeoutException:
         return {"error": "Finnhub timeout", "source": "finnhub"}
     except Exception as e:
-        return {"error": f"Finnhub error: {str(e)[:100]}", "source": "finnhub"}
+        return {"error": safe_error("Finnhub fetch failed", e, logger), "source": "finnhub"}
 
 
 async def get_stock_price(symbol: str) -> dict:
