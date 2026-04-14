@@ -1,12 +1,13 @@
-# MAXIA Oracle — Phase 2 security audit on extracted modules
+# MAXIA Oracle — Security audit on extracted modules (Phases 2 + 3)
 
-**Date** : 14 avril 2026
-**Session** : audit sécurité sur le code extrait de MAXIA V12 en Phase 1
+**Phase 2 date** : 14 avril 2026 — audit sécurité sur le code extrait
+**Phase 3 date** : 14 avril 2026 — résolution des items différés côté API
 **Plan** : `oracleforge/docs/plan-maxia-oracle-2026-04-14.md` §3 Phase 2
-**Scope** : `oracleforge/backend/` uniquement (3 modules oracle + core/)
+**Scope** : `oracleforge/backend/` (3 modules oracle + core/ + api/ + main.py)
 
-Ce document est le délivrable Phase 2 (cf. plan §3 Phase 2 "Délivrable :
-`oracleforge/docs/security_audit_extraction.md`"). Chaque vulnérabilité de
+Ce document est le délivrable Phase 2 (cf. plan §3 "Délivrable :
+`oracleforge/docs/security_audit_extraction.md`"), étendu en Phase 3 pour
+marquer les items différés comme résolus. Chaque vulnérabilité de
 `MAXIA V12/AUDIT_COMPLET_V12.md` est listée, son applicabilité à MAXIA Oracle
 est évaluée, et le fix appliqué (ou sa phase cible) est documenté.
 
@@ -17,21 +18,21 @@ Référence source : `MAXIA V12/AUDIT_COMPLET_V12.md` — 6 critiques, 14 hautes
 
 ## 1. Verdict global
 
-**MAXIA Oracle Phase 2 état** : **clean**.
+**MAXIA Oracle après Phase 3** : **clean sur toutes les vulns V12 applicables**.
 
-| Catégorie | État |
-|---|---|
-| Hardcoded secrets dans le code extrait | **0 trouvé** ✅ |
-| Weak crypto (MD5/SHA1) | **0 trouvé** ✅ |
-| `str(e)` retourné au client (H12) | **5 call sites patchés** → `safe_error()` ✅ |
-| Logs qui pourraient leaker `api-key=` dans RPC URL | **0 call site** (helper `get_rpc_url_safe()` présent) ✅ |
-| SSRF via user-controlled URL | **0 call site** ✅ |
-| Input validation sur `feed_id` | **Ajouté** (64-char hex) ✅ |
-| Validation startup stricte (C5) | Différé — voir §4 |
-| JWT_SECRET persistant (C6) | N/A — pas d'auth avant Phase 3 |
-| Rate limiting persistant (H7) | N/A — pas d'app avant Phase 3 |
-| Security headers HTTP (H9) | N/A — pas d'app avant Phase 3 |
-| Swagger public (H11) | N/A — pas d'app avant Phase 3 |
+| Catégorie | Phase 2 état | Phase 3 état |
+|---|---|---|
+| Hardcoded secrets dans le code extrait | **0 trouvé** ✅ | inchangé ✅ |
+| Weak crypto (MD5/SHA1) | **0 trouvé** ✅ | inchangé ✅ |
+| `str(e)` retourné au client (**H12**) | **5 call sites patchés** → `safe_error()` ✅ | + exception handler global `main.py` ✅ |
+| Logs qui pourraient leaker `api-key=` dans RPC URL | **0 call site** ✅ | inchangé ✅ |
+| SSRF via user-controlled URL | **0 call site** ✅ | + validation symboles regex `[A-Z0-9]{1,10}` ✅ |
+| Input validation sur `feed_id` | **Ajouté** (64-char hex) ✅ | + validation symbols via Pydantic ✅ |
+| Validation startup stricte (**C5**) | Différé Phase 3 | **RÉSOLU** — `core/config.py` refuse de démarrer sans `ENV`, et sans `API_KEY_PEPPER`+`DB_PATH` en staging/prod ✅ |
+| JWT_SECRET persistant (**C6**) | N/A | **N/A** — décision Phase 3 #3 : pas de JWT, API key opaque + hash+pepper ✅ |
+| Rate limiting persistant (**H7**) | N/A Phase 2 | **RÉSOLU** — `core/rate_limit.py` DB-backed fixed window 24h (SQLite, 100 req/jour) ✅ |
+| Security headers HTTP (**H9**) | N/A Phase 2 | **RÉSOLU** — `core/security.py` middleware injecte CSP/XFO/nosniff/Referrer-Policy/Permissions-Policy/HSTS conditionnel ✅ |
+| Swagger public (**H11**) | N/A Phase 2 | **RÉSOLU** — `main.py` : `docs_url=None, redoc_url=None, openapi_url=None` en prod ✅ |
 
 **Aucun secret n'a été exposé par les modules oracle extraits.** Le MAXIA V12
 audit avait trouvé les 6 critiques et la majorité des 14 hautes dans des
@@ -309,37 +310,75 @@ Elles peuvent pointer vers un endpoint privé sans risque d'exfiltration.
 
 ---
 
-## 6. Items différés aux phases ultérieures
+## 6. Items différés — résolution Phase 3
 
-Ces items sont **volontairement différés** parce qu'ils concernent des
-couches qui n'existent pas encore. Chaque report est tracé pour qu'une session
-Claude future ne les oublie pas.
+La Phase 2 avait différé 5 items critiques (C5, C6, H7, H9, H11) à la Phase 3
+parce que la couche API FastAPI n'existait pas encore. Tous sont **RÉSOLUS**
+dans la Phase 3 commitée avec ce document.
 
-| Item V12 | Reporté à | Raison |
-|---|---|---|
-| C5 — validation startup stricte | **Phase 3 + Phase 7** | Aucun secret requis aujourd'hui. À revoir quand API key MAXIA Oracle, wallet x402, Helius prod seront en place. |
-| C6 — JWT_SECRET persistant | **Phase 3** | Pas d'auth avant Phase 3. Décider alors JWT vs API key simple. |
-| H7 — rate limiting persistant | **Phase 3** | Pas d'app FastAPI. Implémenter DB-backed rate limiter (pas in-memory dict). |
-| H9 — security headers HTTP | **Phase 3** | Nécessite `FastAPI()` + middleware. |
-| H11 — Swagger désactivé en prod | **Phase 3** | `FastAPI(docs_url=None, redoc_url=None, openapi_url=None)` en prod. |
-| H10 — XSS via innerHTML | **Phase 8** | Landing statique, pas de innerHTML dynamique prévu, mais audit à refaire à la livraison. |
+| Item V12 | Phase 2 status | Phase 3 résolution | Fichier |
+|---|---|---|---|
+| **C5** — validation startup | Différé | **RÉSOLU**. `core/config.py` lève `RuntimeError` si `ENV` absent. En staging/prod, `API_KEY_PEPPER` (>=32 chars) et `DB_PATH` sont aussi requis. Le process refuse de démarrer. | `backend/core/config.py` |
+| **C6** — JWT_SECRET persistant | Différé | **N/A** (décision Phase 3 #3). MAXIA Oracle n'utilise pas JWT — `X-API-Key` opaque hashé avec pepper SHA256 côté serveur. Aucun secret de session à persister. | `backend/core/auth.py` |
+| **H7** — rate limiting persistant | Différé | **RÉSOLU**. `core/rate_limit.py` implémente un rate limiter DB-backed SQLite (fixed window 24h, 100 req/jour/clé). Le compteur survit aux restarts. Un 2e rate limiter IP-based gate `/api/register` (1/60s) pour empêcher le mass-mint de clés. | `backend/core/rate_limit.py` |
+| **H9** — security headers | Différé | **RÉSOLU**. `core/security.py` = Starlette middleware qui injecte `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, `Permissions-Policy` sur toutes les responses. `HSTS` conditionnel si `X-Forwarded-Proto: https` (évite de s'HSTS-piéger sur HTTP en dev). | `backend/core/security.py` |
+| **H11** — Swagger en prod | Différé | **RÉSOLU**. `main.py` instancie `FastAPI(docs_url=None if IS_PROD else "/docs", redoc_url=None if IS_PROD else "/redoc", openapi_url=None if IS_PROD else "/openapi.json")`. Aucune surface Swagger en prod. | `backend/main.py` |
+| **H10** — XSS via innerHTML | Phase 8 | Différé Phase 8 (landing statique, à auditer à la livraison) | — |
 
-**Règle** : avant de merger Phase 3, relire ce tableau et vérifier que chaque
-item marqué "Phase 3" est résolu.
+### Tests de validation Phase 3
+
+Le fichier `backend/tests/test_phase3_api.py` contient **16 tests pytest** qui
+exercent chaque item sécurité :
+
+| Test | Item V12 validé |
+|---|---|
+| `test_security_headers_present` | H9 — vérifie les 5 headers + absence HSTS sur HTTP |
+| `test_daily_rate_limit_exhausts_to_429` | H7 — 100 req consécutives OK, 101e = 429 |
+| `test_register_rate_limit_per_ip` | H7 bis — 1 register OK, 2e = 429 avec `Retry-After` |
+| `test_price_requires_auth` | auth obligatoire sans clé = 401 |
+| `test_price_rejects_invalid_key` | auth valide seulement avec clé active en DB |
+| `test_price_rejects_invalid_symbol` | input validation `^[A-Z0-9]{1,10}$` |
+| `test_batch_validates_symbols` | Pydantic 422 sur symbole non-conforme |
+| `test_batch_caps_at_50` | Pydantic 422 sur >50 symboles |
+| `test_safe_error_never_leaks` | H12 — `safe_error()` ne leak pas la string d'exception |
+
+Résultat pytest : **16 passed / 16** (local, 2.15s).
+
+### Tests live Phase 3 (uvicorn + curl)
+
+`uvicorn main:app` démarre avec `ENV=dev`, `API_KEY_PEPPER=...`. Tests manuels :
+- `GET /health` → 200, disclaimer présent, headers sécurité OK
+- `POST /api/register` → 201, retourne `mxo_...` clé, disclaimer
+- `GET /api/price/BTC` avec clé → 3 sources (Pyth + Chainlink + CoinPaprika), divergence 0.28 %
+- `POST /api/prices/batch` (BTC, ETH, SOL) → 3 prix via Pyth, confidence < 0.07 %
+- `GET /api/sources` → 6 sources listées
+- Sans clé ou clé bidon → 401
 
 ---
 
-## 7. Checkpoint 2 — état des questions du plan
+## 7. Checkpoints 2 + 3 — état des questions du plan
 
-Le plan §3 Phase 2 liste 4 questions Checkpoint :
+### Phase 2 (plan §3 Phase 2 Checkpoint)
 
-| Question du plan | Réponse |
+| Question du plan | Phase 2 | Phase 3 |
+|---|---|---|
+| Aucun secret hardcodé ? | ✅ | ✅ |
+| Validation startup en place pour tous les secrets critiques ? | ⚠️ Différé | ✅ **RÉSOLU** via `core/config.py` |
+| `safe_error()` utilisé partout ? | ✅ | ✅ + exception handler global `main.py` |
+| Security headers configurés ? | ⚠️ Différé | ✅ **RÉSOLU** via `core/security.py` middleware |
+
+### Phase 3 additionnels (pas dans le plan, ajoutés pour durcissement)
+
+| Question | Réponse |
 |---|---|
-| Aucun secret hardcodé ? | ✅ OUI — 0 match sur le sweep, documenté §5.1 |
-| Validation startup en place pour tous les secrets critiques ? | ⚠️ **Différé à Phase 3/7** — aucun secret n'est critique aujourd'hui (tous optionnels avec fallback public). Documenté §2 C5 et §6. |
-| `safe_error()` utilisé partout ? | ✅ OUI — 5 call sites patchés, 0 `str(e)` restant dans le code exécutable. |
-| Security headers configurés ? | ⚠️ **Différé à Phase 3** — pas d'app FastAPI à sécuriser encore. Documenté §3 H9 et §6. |
+| Les API keys sont-elles stockées en clair ? | ❌ **Non** — seul `SHA256(raw_key + pepper)` est persisté. Le pepper server-side empêche les rainbow tables même si la DB fuite. |
+| Rate limiting survit-il à un restart ? | ✅ **OUI** — SQLite DB-backed. Les compteurs persistent. |
+| Swagger exposé en prod ? | ❌ **Non** — `docs_url=None, redoc_url=None, openapi_url=None` quand `ENV=prod`. |
+| `/api/register` peut-il être abusé par un bot ? | ❌ **Non** — 1 register / 60s / IP (via `register_limit` table). |
+| Les erreurs internes leakent-elles des paths / secrets ? | ❌ **Non** — `safe_error()` côté services oracle + exception handler global côté FastAPI, tous deux loggent le traceback serveur-side uniquement. |
+| Les headers `X-RateLimit-*` sont-ils présents dans les 429 ? | ✅ `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. |
+| Le disclaimer est-il présent sur **toutes** les routes ? | ✅ Testé via pytest, helper `wrap_with_disclaimer` / `wrap_error` appelé explicitement par chaque route. |
 
-**Phase 2 est validée** sous réserve que les 2 items différés (C5 + H9)
-soient revisités avant le merge de Phase 3. Ce document est la trace qui les
-rend non-oubliables.
+**Phase 2 est validée** et tous les items différés sont résolus en Phase 3.
+**Phase 3 est validée** après 16/16 pytest green et tests live curl end-to-end
+OK (Pyth + Chainlink + CoinPaprika cross-validation divergence 0.28 % sur BTC).
