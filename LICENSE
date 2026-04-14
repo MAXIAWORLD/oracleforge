@@ -1,6 +1,17 @@
-OracleForge Proprietary License
+MAXIA Oracle Proprietary License
 Copyright (c) 2026 MAXIA Lab. All rights reserved.
-PERMITTED: Use and modify for personal or internal business purposes. One installation per license key.
-PROHIBITED: Redistribute, sublicense, resell, or provide as a competing service.
+
+This license applies to the MAXIA Oracle backend service source code in this
+repository. The public SDKs, MCP server, and framework plugins published
+under the `sdk/` and `plugins/` subdirectories are released separately under
+the MIT license (see their respective LICENSE files when published).
+
+PERMITTED: Use and modify the backend service for personal or internal business
+purposes. One deployment per license key.
+
+PROHIBITED: Redistribute, sublicense, resell, or provide the backend service as
+a competing hosted service.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
-For licensing: contact@maxialab.com
+
+Contact: contact@maxialab.com
