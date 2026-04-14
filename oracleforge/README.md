@@ -1,43 +1,59 @@
-# OracleForge
+# MAXIA Oracle
 
-**Multi-Source Price Oracle** -- Cross-verified crypto & stock prices with confidence scoring and circuit breakers.
+**Multi-source price data feed for AI agents.** Pay-per-call in USDC via x402.
+No custody. No KYC. No investment advice. Just data.
 
-Part of the [Forge Suite](https://maxialab.com) by MAXIA Lab.
+> **Status — 14 avril 2026** : Phase 0 terminée (archivage du code OracleForge from-scratch, pivot validé). Phases 1 à 9 à exécuter selon le plan source de vérité.
 
-## Features
+## Plan source de vérité
 
-- **5 Sources** -- CoinGecko, Pyth Network, Chainlink (on-chain), Finnhub, Yahoo Finance
-- **Confidence Scoring** -- Cross-verification between sources, 0-1 confidence score
-- **Circuit Breaker** -- Per-source failure isolation with auto-recovery
-- **Batch Pricing** -- Up to 50 symbols in one request
-- **Anomaly Detection** -- Flags when sources diverge significantly
-- **Stocks + Crypto** -- Unified API for both asset classes
+**`docs/plan-maxia-oracle-2026-04-14.md`** — à lire intégralement avant toute action sur ce dossier.
 
-## Quick Start
+Ce produit est extrait des modules oracle de MAXIA V12 (`C:/Users/Mini pc/Desktop/MAXIA V12/`), pas construit from-scratch. Le plan précédent (`docs/archive/plan-2026-04-13-OBSOLETE.md`) est archivé pour traçabilité et ne doit plus être suivi.
 
-```bash
-cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn main:app --port 8003 --reload
-```
+## Scope
 
-## API
+| ✅ Dans le scope | ❌ Hors scope (régulé) |
+|---|---|
+| Multi-source price feed (Pyth, Chainlink, CoinGecko, Helius, Yahoo) | Custody, escrow, fonds clients |
+| Batch API pour agents IA | Marketplace AI-to-AI intermédiaire |
+| MCP server (10 tools oracle-only) | Tokenized securities, fiat onramp |
+| Pay-per-call x402 en vente directe | Trading bots, signals, investment advice |
+| SDK Python `maxia-oracle` + plugins frameworks | KYC utilisateurs |
 
-```bash
-# Single price with confidence
-curl http://localhost:8003/api/price/BTC
-# {"symbol":"BTC","price_usd":67234.5,"confidence":0.95,"sources_used":3}
+## Composants cibles
 
-# Batch pricing
-curl -X POST http://localhost:8003/api/prices/batch \
-  -d '{"symbols": ["BTC","ETH","SOL"]}'
+| Composant | Statut | Destination |
+|---|---|---|
+| Backend FastAPI | Phase 1-3 | `backend/` (port 8003 dev, `oracle.maxiaworld.app` prod) |
+| MCP server | Phase 5 | `backend/mcp/` (10 tools filtrés depuis les 46 de MAXIA V12) |
+| x402 middleware | Phase 4 | `backend/x402/` (mode vente directe pure, extrait de MAXIA V12) |
+| SDK Python `maxia-oracle` | Phase 6 | `sdk/python/` (nouveau package PyPI) |
+| SDK TypeScript `@maxia/oracle` | Phase 6 | `sdk/typescript/` |
+| Plugins frameworks | Phase 6 | `plugins/{langchain,crewai,autogen,llama-index}-maxia-oracle/` |
+| Landing page statique | Phase 8 | `landing/` |
+| Deploy systemd + nginx | Phase 7 | `deploy/` |
 
-# Source health
-curl http://localhost:8003/api/sources
-```
+**Hors V1** : Eliza plugin, Vercel AI SDK plugin, dashboard frontend.
 
-## Tech Stack
+## Disclaimers obligatoires
 
-Python 3.12, FastAPI, httpx. 22 tests. Proprietary license.
+- **Data feed only.** Not investment advice. Not a trading tool.
+- **No custody.** Direct sale, no intermediation, no escrow.
+- **No KYC.** Free tier without registration.
+- **Best-effort multi-source.** No guarantee of uptime or accuracy.
+
+## Archive
+
+Le code OracleForge "from-scratch" (plan 13 avril) est préservé :
+- Tag git : `oracleforge-v0-archive`
+- Tarball : `C:/Users/Mini pc/Desktop/maxia-lab-backups/oracleforge-v0-2026-04-14.tar.gz`
+
+Pour restaurer un fichier de l'archive : `git checkout oracleforge-v0-archive -- oracleforge/<chemin>`
+
+## License
+
+- **Backend** (`backend/`) : MAXIA Oracle Proprietary — voir `LICENSE`
+- **SDK + plugins** (`sdk/`, `plugins/`) : MIT (à la publication, licenses dans chaque subdir)
+
+Contact : contact@maxialab.com
