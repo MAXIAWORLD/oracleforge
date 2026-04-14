@@ -1,9 +1,16 @@
-# MAXIA Oracle — backend runtime dependencies (Phase 1)
+# MAXIA Oracle — backend runtime + test dependencies
 #
-# Phase 1 needs only the bare minimum to import and exercise the extracted
-# oracle modules. The FastAPI server, MCP server, x402 middleware and test
-# suite dependencies will be added in their respective phases.
+# Phase 1: bare minimum to import and exercise the extracted oracle modules.
+# Phase 3: FastAPI app, SQLite persistence, pytest test suite.
 
+# Runtime
 httpx>=0.27.0,<0.28
 python-dotenv>=1.0.1,<2.0
-fastapi>=0.115.0,<0.117  # APIRouter is instantiated at module import in pyth_oracle
+fastapi>=0.115.0,<0.117
+uvicorn[standard]>=0.32.0,<0.40
+pydantic>=2.9.0,<3.0
+
+# Testing (Phase 3 pytest suite uses the FastAPI TestClient)
+pytest>=8.3.0,<9
+pytest-asyncio>=0.24.0,<1
+httpx[http2]>=0.27.0,<0.28  # httpx is already listed, [http2] enables TestClient streaming
