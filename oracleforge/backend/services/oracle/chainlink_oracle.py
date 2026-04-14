@@ -71,18 +71,15 @@ _cl_metrics = {
     "feeds_verified": 0,
 }
 
-# HTTP client singleton
-_http: httpx.AsyncClient | None = None
+# HTTP client — shared singleton from core.http_client (Phase 4 Step 5).
+# Before Step 5 this module maintained its own AsyncClient with
+# max_connections=5 / keepalive=3. The shared client uses 30/15 which
+# comfortably covers chainlink's own RPC fan-out.
+from core.http_client import get_http_client
 
 
 async def _get_http() -> httpx.AsyncClient:
-    global _http
-    if _http is None or getattr(_http, "is_closed", True):
-        _http = httpx.AsyncClient(
-            timeout=httpx.Timeout(10, connect=5),
-            limits=httpx.Limits(max_connections=5, max_keepalive_connections=3),
-        )
-    return _http
+    return get_http_client()
 
 
 async def _eth_call(to: str, data: str) -> str:

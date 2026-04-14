@@ -206,28 +206,22 @@ _CACHE_MAX = 100         # Limite max d'entrees en cache pour eviter fuite memoi
 # Streaming: prix live Pyth via SSE (server-sent events) pour les clients HFT
 _streaming_prices: dict = {}  # {feed_id: {"price": float, "ts": float}} mis a jour par le stream
 
-# ── Client HTTP partage ──
-
-_http_client: Optional[httpx.AsyncClient] = None
+# ── Shared HTTP client — singleton from core.http_client (Phase 4 Step 5) ──
+# The old per-module pool has been replaced with the process-wide singleton
+# exported by `core.http_client`. `close_http_client` is kept as a thin
+# delegate for backwards compat with existing callers.
+from core.http_client import close_http_client as _close_shared_http
+from core.http_client import get_http_client as _get_shared_http
 
 
 async def _get_http() -> httpx.AsyncClient:
-    """Retourne un client HTTP partage avec connection pooling."""
-    global _http_client
-    if _http_client is None or getattr(_http_client, "is_closed", True):
-        _http_client = httpx.AsyncClient(
-            timeout=10,
-            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
-        )
-    return _http_client
+    """Return the shared process-wide AsyncClient."""
+    return _get_shared_http()
 
 
-async def close_http_client():
-    """Ferme le client HTTP partage (appeler au shutdown)."""
-    global _http_client
-    if _http_client is not None and not getattr(_http_client, "is_closed", True):
-        await _http_client.aclose()
-        _http_client = None
+async def close_http_client() -> None:
+    """Close the shared HTTP client (delegates to core.http_client)."""
+    await _close_shared_http()
 
 
 def _track_latency(start: float):

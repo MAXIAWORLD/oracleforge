@@ -14,6 +14,9 @@ Schema:
     api_keys        — one row per issued key, holds the SHA256(key+pepper) hash
     rate_limit      — one row per (key_hash, window_start), atomic UPDATE
     register_limit  — one row per (ip, window_start) for /api/register IP gating
+    x402_txs        — one row per verified x402 payment, replay-protection
+                      (Phase 4): tx_hash is PRIMARY KEY so INSERT OR FAIL
+                      detects reuse atomically
 """
 from __future__ import annotations
 
@@ -51,11 +54,21 @@ CREATE TABLE IF NOT EXISTS register_limit (
     PRIMARY KEY (ip, window_start)
 );
 
+CREATE TABLE IF NOT EXISTS x402_txs (
+    tx_hash      TEXT PRIMARY KEY NOT NULL,
+    amount_usdc  REAL NOT NULL,
+    path         TEXT NOT NULL,
+    created_at   INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_rate_limit_window
     ON rate_limit (window_start);
 
 CREATE INDEX IF NOT EXISTS idx_register_limit_window
     ON register_limit (window_start);
+
+CREATE INDEX IF NOT EXISTS idx_x402_txs_created_at
+    ON x402_txs (created_at);
 """
 
 
@@ -139,3 +152,63 @@ def close_db() -> None:
 def now_unix() -> int:
     """Return the current Unix timestamp in seconds as int (UTC)."""
     return int(time.time())
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── x402 replay protection helpers (Phase 4) ──
+# ══════════════════════════════════════════════════════════════════════════
+#
+# The x402 middleware inserts a row per verified payment. A PRIMARY KEY
+# collision on tx_hash means the same payment header is being re-used
+# (replay attack), and the middleware returns 402 with an explicit message.
+#
+# tx_hash format is validated by the caller (66 chars, 0x + 64 hex for EVM).
+# We do not re-validate here — the DB only enforces uniqueness.
+
+_TX_HASH_MAX_LENGTH: Final[int] = 128  # safety cap against oversized inputs
+
+
+def x402_tx_already_processed(
+    conn: sqlite3.Connection, tx_hash: str
+) -> bool:
+    """Return True if the given x402 tx_hash has already been recorded.
+
+    Used as a pre-check by the middleware before attempting insertion. The
+    authoritative check is the INSERT in x402_record_tx() — this function is
+    a defensive fast path that lets the middleware return a specific error
+    message without relying on exception control flow.
+    """
+    if not tx_hash or len(tx_hash) > _TX_HASH_MAX_LENGTH:
+        return False
+    row = conn.execute(
+        "SELECT 1 FROM x402_txs WHERE tx_hash = ? LIMIT 1",
+        (tx_hash,),
+    ).fetchone()
+    return row is not None
+
+
+def x402_record_tx(
+    conn: sqlite3.Connection,
+    tx_hash: str,
+    amount_usdc: float,
+    path: str,
+) -> bool:
+    """Record a verified x402 transaction. Return True on insert, False on replay.
+
+    Uses INSERT OR IGNORE so that concurrent duplicate inserts resolve
+    deterministically: the first writer wins, subsequent writers observe a
+    0-row change and receive False.
+    """
+    if not tx_hash or len(tx_hash) > _TX_HASH_MAX_LENGTH:
+        raise ValueError("tx_hash must be a non-empty string")
+    if amount_usdc <= 0:
+        raise ValueError(f"amount_usdc must be strictly positive, got {amount_usdc}")
+    if not path:
+        raise ValueError("path must be a non-empty string")
+
+    cursor = conn.execute(
+        "INSERT OR IGNORE INTO x402_txs (tx_hash, amount_usdc, path, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (tx_hash, amount_usdc, path, now_unix()),
+    )
+    return cursor.rowcount == 1
