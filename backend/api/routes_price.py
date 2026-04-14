@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from core.auth import require_api_key
+from core.auth import X402_KEY_HASH_SENTINEL, require_access
 from core.db import get_db
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
@@ -30,7 +30,14 @@ _MAX_BATCH_SYMBOLS = 50
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
 def _enforce_rate_limit(key_hash: str, cost: int = 1) -> JSONResponse | None:
-    """Apply the daily quota, optionally charging more than 1 for batch calls."""
+    """Apply the daily quota, optionally charging more than 1 for batch calls.
+
+    Phase 4: x402-paid requests bypass the daily quota entirely. The
+    pay-per-call model already prices each request, so compounding it with
+    the free-tier quota would double-charge the caller.
+    """
+    if key_hash == X402_KEY_HASH_SENTINEL:
+        return None
     db = get_db()
     decisions = [check_daily(db, key_hash) for _ in range(cost)]
     last = decisions[-1]
@@ -126,7 +133,7 @@ async def _collect_sources(symbol: str) -> list[dict[str, Any]]:
 
 
 @router.get("/price/{symbol}")
-async def get_single_price(symbol: str, key_hash: str = Depends(require_api_key)):
+async def get_single_price(symbol: str, key_hash: str = Depends(require_access)):
     """Return a multi-source live price for a single symbol."""
     symbol = symbol.upper()
     if not _is_valid_symbol(symbol):
@@ -187,7 +194,7 @@ class BatchRequest(BaseModel):
 
 @router.post("/prices/batch")
 async def get_batch_prices_route(
-    body: BatchRequest, key_hash: str = Depends(require_api_key)
+    body: BatchRequest, key_hash: str = Depends(require_access)
 ):
     """Return prices for up to 50 symbols in a single Pyth Hermes call.
 

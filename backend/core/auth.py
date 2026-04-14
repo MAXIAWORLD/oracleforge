@@ -32,7 +32,7 @@ import secrets
 import sqlite3
 from typing import Final, Optional
 
-from fastapi import Header, HTTPException, status
+from fastapi import Header, HTTPException, Request, status
 
 from core.config import API_KEY_PEPPER
 from core.db import get_db, now_unix
@@ -41,6 +41,12 @@ logger = logging.getLogger("maxia_oracle.auth")
 
 _KEY_PREFIX: Final[str] = "mxo_"
 _TOKEN_BYTES: Final[int] = 32  # -> ~43 chars of base64url
+
+# Sentinel returned by `require_access` when the request was paid via x402.
+# Routes compare the returned key_hash against this sentinel to skip the
+# daily rate-limit check (pay-per-call users pay on every request, the
+# quota does not apply).
+X402_KEY_HASH_SENTINEL: Final[str] = "__x402_paid__"
 
 
 def generate_key() -> tuple[str, str]:
@@ -121,3 +127,24 @@ async def require_api_key(
             headers={"WWW-Authenticate": 'ApiKey realm="maxia-oracle"'},
         )
     return row["key_hash"]
+
+
+async def require_access(
+    request: Request,
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> str:
+    """Phase 4 unified access dependency: accepts either x402 payment or X-API-Key.
+
+    The x402 middleware runs before the route is resolved and, on successful
+    payment, sets `request.state.x402_paid = True`. This dependency checks
+    that flag first; if set, the request is authorized without an API key
+    and the daily rate-limit is skipped (pay-per-call users pay on every
+    request).
+
+    Otherwise the request is routed through the existing `require_api_key`
+    logic. This preserves the free tier (X-API-Key, 100 req/day) alongside
+    the new anonymous pay-per-call path.
+    """
+    if getattr(request.state, "x402_paid", False):
+        return X402_KEY_HASH_SENTINEL
+    return await require_api_key(x_api_key=x_api_key)

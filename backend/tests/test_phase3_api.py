@@ -112,8 +112,19 @@ def test_register_rate_limit_per_ip(client: TestClient) -> None:
 
 
 def test_price_requires_auth(client: TestClient) -> None:
+    # Phase 4: with no X-API-Key and no X-Payment, the x402 middleware emits
+    # a 402 Payment Required challenge (payment discovery) instead of a raw
+    # 401. Agents can use the challenge to pay on Base mainnet; humans
+    # using the free tier must provide X-API-Key.
     r = client.get("/api/price/BTC")
-    assert r.status_code == 401
+    assert r.status_code == 402
+    body = r.json()
+    assert body["x402Version"] == 2
+    assert isinstance(body["accepts"], list)
+    # The accepts list is only populated when X402_TREASURY_ADDRESS_BASE is
+    # configured. In test mode (dev, no env var), it is empty but the
+    # challenge shape is still valid.
+    assert r.headers.get("X-Payment-Required") == "true"
 
 
 def test_price_rejects_invalid_key(client: TestClient) -> None:
@@ -151,8 +162,12 @@ def test_price_returns_multi_source(client: TestClient, api_key: str) -> None:
 
 
 def test_batch_requires_auth(client: TestClient) -> None:
+    # Phase 4: same discovery behavior as /api/price/{symbol}.
     r = client.post("/api/prices/batch", json={"symbols": ["BTC"]})
-    assert r.status_code == 401
+    assert r.status_code == 402
+    body = r.json()
+    assert body["x402Version"] == 2
+    assert isinstance(body["accepts"], list)
 
 
 def test_batch_validates_symbols(client: TestClient, api_key: str) -> None:

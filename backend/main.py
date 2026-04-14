@@ -26,9 +26,10 @@ from api import routes_health, routes_price, routes_register, routes_sources
 from core.config import ENV, IS_PROD, LOG_LEVEL
 from core.db import close_db, get_db, init_db
 from core.disclaimer import wrap_error
+from core.http_client import close_http_client
 from core.rate_limit import purge_old_windows
 from core.security import SecurityHeadersMiddleware
-from services.oracle.price_oracle import close_http_pool as close_price_oracle_http
+from x402.middleware import x402_middleware
 
 API_VERSION = "0.1.0"
 
@@ -48,9 +49,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
     logger.info("Shutting down MAXIA Oracle")
     try:
-        await close_price_oracle_http()
+        await close_http_client()
     except Exception:
-        logger.warning("price_oracle HTTP pool close failed", exc_info=True)
+        logger.warning("shared HTTP client close failed", exc_info=True)
     close_db()
 
 
@@ -75,6 +76,14 @@ app = FastAPI(
 # Security headers middleware must be registered BEFORE any other middleware
 # that modifies the response, so its setdefault() calls run last.
 app.add_middleware(SecurityHeadersMiddleware, api_version=API_VERSION)
+
+
+# x402 Phase 4 middleware — Base mainnet direct-sale payment path.
+# Registered via the function-based middleware decorator so Starlette wraps
+# it AFTER the security-headers ASGI middleware above. The x402 handler
+# reads `request.url.path` and either emits a 402 challenge, verifies a
+# payment, or passes through unchanged for non-priced paths.
+app.middleware("http")(x402_middleware)
 
 
 # ── Routers ─────────────────────────────────────────────────────────────────

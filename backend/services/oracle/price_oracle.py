@@ -81,27 +81,22 @@ _cb_coinpaprika = CircuitBreaker("coinpaprika", max_failures=3, cooldown_s=120)
 _cb_coingecko = CircuitBreaker("coingecko", max_failures=3, cooldown_s=120)
 _cb_yahoo = CircuitBreaker("yahoo", max_failures=3, cooldown_s=120)
 
-# ── Shared HTTP client pool ──
-_http_pool: httpx.AsyncClient = None
+# ── Shared HTTP client — singleton from core.http_client (Phase 4 Step 5) ──
+# The old per-module pool has been replaced with the process-wide singleton.
+# `close_http_pool` is kept for backwards compat with main.py and simply
+# forwards to `core.http_client.close_http_client()`.
+from core.http_client import close_http_client as _close_shared_http
+from core.http_client import get_http_client as _get_shared_http
 
 
 async def _get_http() -> httpx.AsyncClient:
-    """Retourne un client HTTP partage (connection pooling)."""
-    global _http_pool
-    if _http_pool is None or getattr(_http_pool, 'is_closed', True):
-        _http_pool = httpx.AsyncClient(
-            timeout=10,
-            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
-        )
-    return _http_pool
+    """Return the shared process-wide AsyncClient."""
+    return _get_shared_http()
 
 
-async def close_http_pool():
-    """Close the shared HTTP client pool (call at shutdown)."""
-    global _http_pool
-    if _http_pool is not None and not getattr(_http_pool, 'is_closed', True):
-        await _http_pool.aclose()
-        _http_pool = None
+async def close_http_pool() -> None:
+    """Close the shared HTTP client (delegates to core.http_client)."""
+    await _close_shared_http()
 
 # Token mints pour getAsset
 TOKEN_MINTS = {
