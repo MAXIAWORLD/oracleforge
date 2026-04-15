@@ -112,3 +112,41 @@ async def cache_stats(key_hash: str = Depends(require_api_key)):
     if rl is not None:
         return rl
     return wrap_with_disclaimer(price_oracle.get_cache_stats())
+
+
+@router.get("/symbols")
+async def list_symbols(key_hash: str = Depends(require_api_key)):
+    """Return the union of supported symbols grouped by upstream source.
+
+    Mirrors the MCP `list_supported_symbols` tool (Phase 5) so the Python
+    and TypeScript SDKs have parity with the MCP surface. No upstream
+    calls — just reads the in-memory feed dictionaries.
+    """
+    rl = _enforce_rate_limit(key_hash)
+    if rl is not None:
+        return rl
+
+    pyth_crypto = sorted(pyth_oracle.CRYPTO_FEEDS.keys())
+    pyth_equity = sorted(pyth_oracle.EQUITY_FEEDS.keys())
+    chainlink_base = sorted(chainlink_oracle.CHAINLINK_FEEDS.keys())
+    price_oracle_mints = sorted(price_oracle.TOKEN_MINTS.keys())
+
+    all_symbols = sorted(
+        set(pyth_crypto)
+        | set(pyth_equity)
+        | set(chainlink_base)
+        | set(price_oracle_mints)
+    )
+
+    return wrap_with_disclaimer(
+        {
+            "total_symbols": len(all_symbols),
+            "all_symbols": all_symbols,
+            "by_source": {
+                "pyth_crypto": pyth_crypto,
+                "pyth_equity": pyth_equity,
+                "chainlink_base": chainlink_base,
+                "price_oracle": price_oracle_mints,
+            },
+        }
+    )
