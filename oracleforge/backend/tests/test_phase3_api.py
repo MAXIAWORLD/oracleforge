@@ -225,6 +225,72 @@ def test_sources_listing(client: TestClient, api_key: str) -> None:
     assert "disclaimer" in body
 
 
+# ── /api/symbols ─────────────────────────────────────────────────────────────
+
+
+def test_symbols_requires_auth(client: TestClient) -> None:
+    r = client.get("/api/symbols")
+    assert r.status_code == 401
+
+
+def test_symbols_returns_grouped_list(client: TestClient, api_key: str) -> None:
+    r = client.get("/api/symbols", headers={"X-API-Key": api_key})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["data"]["total_symbols"] > 0
+    assert "BTC" in body["data"]["all_symbols"]
+    assert "pyth_crypto" in body["data"]["by_source"]
+    assert "pyth_equity" in body["data"]["by_source"]
+    assert "chainlink_base" in body["data"]["by_source"]
+    assert "price_oracle" in body["data"]["by_source"]
+    assert "disclaimer" in body
+
+
+# ── /api/chainlink/{symbol} ──────────────────────────────────────────────────
+
+
+def test_chainlink_requires_auth(client: TestClient) -> None:
+    # /api/chainlink/* is not in X402_PRICE_MAP, so the x402 middleware
+    # passes the request through and the require_access dependency
+    # raises 401 directly (no 402 challenge unlike /api/price/*).
+    r = client.get("/api/chainlink/BTC")
+    assert r.status_code == 401
+
+
+def test_chainlink_rejects_invalid_symbol(client: TestClient, api_key: str) -> None:
+    r = client.get("/api/chainlink/BTC!!", headers={"X-API-Key": api_key})
+    assert r.status_code == 400
+    assert r.json()["error"] == "invalid symbol format"
+
+
+def test_chainlink_rejects_unsupported_symbol(
+    client: TestClient, api_key: str
+) -> None:
+    r = client.get(
+        "/api/chainlink/DOGE99",
+        headers={"X-API-Key": api_key},
+    )
+    assert r.status_code == 404
+    body = r.json()
+    assert body["error"] == "symbol has no Chainlink feed on Base"
+    assert body["symbol"] == "DOGE99"
+    assert isinstance(body["supported"], list)
+    assert "BTC" in body["supported"]
+
+
+def test_chainlink_returns_price(client: TestClient, api_key: str) -> None:
+    r = client.get("/api/chainlink/BTC", headers={"X-API-Key": api_key})
+    # 200 when the Base RPC answers, 502 when every RPC endpoint is down
+    # (possible in a strict offline CI environment).
+    assert r.status_code in (200, 502)
+    if r.status_code == 200:
+        body = r.json()
+        assert body["data"]["source"] == "chainlink_base"
+        assert body["data"]["price"] > 0
+        assert "contract" in body["data"]
+        assert "disclaimer" in body
+
+
 # ── Rate-limit burn-down ────────────────────────────────────────────────────
 
 

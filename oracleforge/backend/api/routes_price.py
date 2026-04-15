@@ -17,7 +17,7 @@ from core.auth import X402_KEY_HASH_SENTINEL, require_access
 from core.db import get_db
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
-from services.oracle import pyth_oracle
+from services.oracle import chainlink_oracle, pyth_oracle
 from services.oracle.multi_source import collect_sources, compute_divergence
 
 router = APIRouter(prefix="/api", tags=["price"])
@@ -149,3 +149,50 @@ async def get_batch_prices_route(
             "prices": results,
         }
     )
+
+
+@router.get("/chainlink/{symbol}")
+async def get_chainlink_price_route(
+    symbol: str, key_hash: str = Depends(require_access)
+):
+    """Return a single-source price directly from the Chainlink feed on Base.
+
+    Mirrors the MCP `get_chainlink_onchain` tool (Phase 5) so SDK callers
+    can force the on-chain single-source path for audit purposes. The
+    symbol must be in `chainlink_oracle.CHAINLINK_FEEDS` — unsupported
+    symbols return 404 with the list of supported tickers.
+    """
+    symbol = symbol.upper()
+    if not _is_valid_symbol(symbol):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=wrap_error("invalid symbol format"),
+        )
+
+    if symbol not in chainlink_oracle.CHAINLINK_FEEDS:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=wrap_error(
+                "symbol has no Chainlink feed on Base",
+                symbol=symbol,
+                supported=sorted(chainlink_oracle.CHAINLINK_FEEDS.keys()),
+            ),
+        )
+
+    rl = _enforce_rate_limit(key_hash)
+    if rl is not None:
+        return rl
+
+    result = await chainlink_oracle.get_chainlink_price(symbol)
+    if not isinstance(result, dict) or result.get("error"):
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content=wrap_error(
+                "chainlink fetch failed",
+                symbol=symbol,
+                detail=(
+                    result.get("error") if isinstance(result, dict) else "unexpected"
+                ),
+            ),
+        )
+    return wrap_with_disclaimer(result)
