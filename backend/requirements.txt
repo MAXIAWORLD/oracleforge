@@ -1,16 +1,37 @@
 # MAXIA Oracle — backend runtime + test dependencies
 #
-# Phase 1: bare minimum to import and exercise the extracted oracle modules.
-# Phase 3: FastAPI app, SQLite persistence, pytest test suite.
+# Versions are pinned with `==` rather than ranges so the Phase 7 VPS
+# install reproduces the exact set that Phase 3/4/5 tests were validated
+# against. Upgrade with intention, not with ambient pip drift.
+#
+# Phase-by-phase rationale:
+#   Phase 1  — httpx, python-dotenv (extracted oracle modules)
+#   Phase 3  — fastapi, uvicorn, pydantic, pytest, pytest-asyncio
+#   Phase 4  — no new deps (x402 built on top of httpx + sqlite stdlib)
+#   Phase 5  — mcp, which transitively forces starlette 1.0 and therefore
+#              fastapi >= 0.135. pytest-asyncio was bumped to 0.26 to match
+#              the new MCP test file. See docs/phase5_mcp_extraction.md §8.
+#
+# Transitive dependencies (starlette, sse-starlette, httpx-sse, pydantic-
+# settings, jsonschema, cryptography, PyJWT, anyio, etc.) are NOT listed
+# here — they are resolved automatically by pip from the direct pins below.
+# Run `pip freeze` in the venv to see the exact transitive set that was
+# tested against, if you need to generate a lock file for a hardened deploy.
 
-# Runtime
-httpx>=0.27.0,<0.28
-python-dotenv>=1.0.1,<2.0
-fastapi>=0.115.0,<0.117
-uvicorn[standard]>=0.32.0,<0.40
-pydantic>=2.9.0,<3.0
+# ── Runtime ──────────────────────────────────────────────────────────────────
 
-# Testing (Phase 3 pytest suite uses the FastAPI TestClient)
-pytest>=8.3.0,<9
-pytest-asyncio>=0.24.0,<1
-httpx[http2]>=0.27.0,<0.28  # httpx is already listed, [http2] enables TestClient streaming
+httpx==0.27.2
+python-dotenv==1.2.2
+fastapi==0.135.3
+uvicorn[standard]==0.39.0
+pydantic==2.13.0
+
+# Phase 5 — Model Context Protocol server (stdio + HTTP SSE).
+# Pulls starlette 1.0 transitively, which forced the fastapi 0.116 → 0.135
+# upgrade above. Keep these two pins in sync.
+mcp==1.27.0
+
+# ── Tests ────────────────────────────────────────────────────────────────────
+
+pytest==8.4.2
+pytest-asyncio==0.26.0
