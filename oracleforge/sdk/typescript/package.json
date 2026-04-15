@@ -1,0 +1,52 @@
+{
+  "name": "@maxia/oracle",
+  "version": "0.1.0",
+  "description": "Multi-source price data feed for AI agents. Data feed only. Not investment advice. No custody. No KYC.",
+  "license": "Apache-2.0",
+  "author": "MAXIA <ceo@maxiaworld.app>",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "maxia",
+    "oracle",
+    "price-feed",
+    "crypto",
+    "ai-agents",
+    "mcp",
+    "x402",
+    "pyth",
+    "chainlink"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "homepage": "https://oracle.maxiaworld.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maxiaworld/oracleforge.git"
+  }
+}
