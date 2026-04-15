@@ -1,0 +1,284 @@
+/**
+ * MAXIA Oracle SDK — TypeScript client.
+ *
+ * Usage:
+ *
+ *     import { MaxiaOracleClient } from "@maxia/oracle";
+ *
+ *     const client = new MaxiaOracleClient({ apiKey: "mxo_..." });
+ *     const btc = await client.price("BTC");
+ *     console.log(btc.data.price);
+ *
+ * 9 methods, full parity with the Python SDK and the MCP tool surface.
+ *
+ * Data feed only. Not investment advice. No custody. No KYC.
+ */
+
+import {
+  MaxiaOracleAuthError,
+  MaxiaOracleError,
+  MaxiaOraclePaymentRequiredError,
+  MaxiaOracleRateLimitError,
+  MaxiaOracleTransportError,
+  MaxiaOracleUpstreamError,
+  MaxiaOracleValidationError,
+} from "./errors.js";
+import type {
+  BatchPricePayload,
+  ChainlinkPayload,
+  ConfidencePayload,
+  HealthPayload,
+  MaxiaOracleClientOptions,
+  MaxiaResponse,
+  PricePayload,
+  RegisteredKey,
+  SourcesPayload,
+  SymbolsPayload,
+} from "./types.js";
+
+export const DEFAULT_BASE_URL = "https://oracle.maxiaworld.app";
+export const DEFAULT_TIMEOUT_MS = 15_000;
+export const USER_AGENT = "maxia-oracle-typescript/0.1.0";
+
+const SYMBOL_PATTERN = /^[A-Z0-9]{1,10}$/;
+const MAX_BATCH_SYMBOLS = 50;
+
+export class MaxiaOracleClient {
+  private readonly apiKey: string | undefined;
+  private readonly baseUrl: string;
+  private readonly timeoutMs: number;
+  private readonly fetchImpl: typeof globalThis.fetch;
+
+  constructor(options: MaxiaOracleClientOptions = {}) {
+    this.apiKey = options.apiKey ?? process.env.MAXIA_ORACLE_API_KEY;
+    const rawBase =
+      options.baseUrl ??
+      process.env.MAXIA_ORACLE_BASE_URL ??
+      DEFAULT_BASE_URL;
+    this.baseUrl = rawBase.replace(/\/+$/, "");
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.fetchImpl = options.fetch ?? globalThis.fetch;
+    if (typeof this.fetchImpl !== "function") {
+      throw new MaxiaOracleError(
+        "no fetch implementation available — provide options.fetch or run on Node 18+",
+      );
+    }
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────
+
+  /**
+   * Register a fresh free-tier API key.
+   *
+   * The raw key is in `response.data.api_key` — it is returned exactly
+   * once, store it immediately. Daily quota is in
+   * `response.data.daily_limit`. This endpoint is IP-throttled.
+   */
+  async register(): Promise<MaxiaResponse<RegisteredKey>> {
+    return this.request<RegisteredKey>("POST", "/api/register", { auth: false });
+  }
+
+  /** Lightweight liveness probe. No authentication required. */
+  async health(): Promise<MaxiaResponse<HealthPayload>> {
+    return this.request<HealthPayload>("GET", "/health", { auth: false });
+  }
+
+  /**
+   * Cross-validated multi-source live price for a single asset.
+   *
+   * @throws {MaxiaOracleValidationError} symbol format.
+   * @throws {MaxiaOracleUpstreamError} every upstream source failed.
+   * @throws {MaxiaOracleAuthError} missing or invalid API key.
+   * @throws {MaxiaOracleRateLimitError} daily quota exhausted.
+   */
+  async price(symbol: string): Promise<MaxiaResponse<PricePayload>> {
+    const cleaned = this.validateSymbol(symbol);
+    return this.request<PricePayload>("GET", `/api/price/${cleaned}`);
+  }
+
+  /**
+   * Up to 50 symbols in a single upstream Pyth Hermes batch call.
+   */
+  async pricesBatch(symbols: string[]): Promise<MaxiaResponse<BatchPricePayload>> {
+    if (!Array.isArray(symbols)) {
+      throw new MaxiaOracleValidationError("symbols must be an array of strings");
+    }
+    if (symbols.length === 0) {
+      throw new MaxiaOracleValidationError("symbols must contain at least one entry");
+    }
+    if (symbols.length > MAX_BATCH_SYMBOLS) {
+      throw new MaxiaOracleValidationError(
+        `batch size exceeds ${MAX_BATCH_SYMBOLS} (got ${symbols.length})`,
+      );
+    }
+    const cleaned = symbols.map((s) => this.validateSymbol(s));
+    return this.request<BatchPricePayload>("POST", "/api/prices/batch", {
+      json: { symbols: cleaned },
+    });
+  }
+
+  /** List every configured upstream oracle source and its current status. */
+  async sources(): Promise<MaxiaResponse<SourcesPayload>> {
+    return this.request<SourcesPayload>("GET", "/api/sources");
+  }
+
+  /** Aggregator in-memory cache hit-rate and circuit-breaker state. */
+  async cacheStats(): Promise<MaxiaResponse<Record<string, unknown>>> {
+    return this.request<Record<string, unknown>>("GET", "/api/cache/stats");
+  }
+
+  /** Union of all supported asset symbols, grouped by upstream source. */
+  async listSymbols(): Promise<MaxiaResponse<SymbolsPayload>> {
+    return this.request<SymbolsPayload>("GET", "/api/symbols");
+  }
+
+  /**
+   * Single-source price directly from the Chainlink feed on Base mainnet.
+   * Bypasses Pyth and the aggregator. Independently verifiable on-chain.
+   */
+  async chainlinkOnchain(symbol: string): Promise<MaxiaResponse<ChainlinkPayload>> {
+    const cleaned = this.validateSymbol(symbol);
+    return this.request<ChainlinkPayload>("GET", `/api/chainlink/${cleaned}`);
+  }
+
+  /**
+   * Compact multi-source divergence for a symbol ("do the sources agree?").
+   *
+   * Built on top of `price()` — returns the symbol, the source count and
+   * the divergence in percent, without the per-source price breakdown.
+   */
+  async confidence(symbol: string): Promise<MaxiaResponse<ConfidencePayload>> {
+    const full = await this.price(symbol);
+    return {
+      data: {
+        symbol: full.data.symbol,
+        source_count: full.data.source_count ?? null,
+        divergence_pct: full.data.divergence_pct ?? null,
+      },
+      disclaimer: full.disclaimer ?? "",
+    };
+  }
+
+  // ── Internals ─────────────────────────────────────────────────────────
+
+  private validateSymbol(symbol: string): string {
+    if (typeof symbol !== "string") {
+      throw new MaxiaOracleValidationError("symbol must be a string");
+    }
+    const cleaned = symbol.trim().toUpperCase();
+    if (!SYMBOL_PATTERN.test(cleaned)) {
+      throw new MaxiaOracleValidationError(
+        `symbol must match ${SYMBOL_PATTERN.source}`,
+      );
+    }
+    return cleaned;
+  }
+
+  private buildHeaders(auth: boolean, hasBody: boolean): Record<string, string> {
+    const headers: Record<string, string> = {
+      "User-Agent": USER_AGENT,
+      Accept: "application/json",
+    };
+    if (hasBody) {
+      headers["Content-Type"] = "application/json";
+    }
+    if (auth) {
+      if (!this.apiKey) {
+        throw new MaxiaOracleAuthError(
+          "API key required — pass options.apiKey or set MAXIA_ORACLE_API_KEY",
+        );
+      }
+      headers["X-API-Key"] = this.apiKey;
+    }
+    return headers;
+  }
+
+  private async request<T>(
+    method: "GET" | "POST",
+    path: string,
+    options: { auth?: boolean; json?: unknown } = {},
+  ): Promise<MaxiaResponse<T>> {
+    const auth = options.auth !== false;
+    const hasBody = options.json !== undefined;
+    const headers = this.buildHeaders(auth, hasBody);
+    const url = `${this.baseUrl}${path}`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, {
+        method,
+        headers,
+        body: hasBody ? JSON.stringify(options.json) : undefined,
+        signal: controller.signal,
+      });
+    } catch (err) {
+      clearTimeout(timeoutId);
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new MaxiaOracleTransportError(
+        `transport error on ${method} ${path}: ${msg}`,
+      );
+    }
+    clearTimeout(timeoutId);
+
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      throw new MaxiaOracleTransportError(
+        `non-JSON response from ${method} ${path}: status=${response.status}`,
+      );
+    }
+
+    if (response.ok) {
+      return body as MaxiaResponse<T>;
+    }
+
+    this.raiseTypedError(response.status, body, method, path);
+  }
+
+  private raiseTypedError(
+    status: number,
+    body: unknown,
+    method: string,
+    path: string,
+  ): never {
+    const isObject = typeof body === "object" && body !== null;
+    const envelope = isObject ? (body as Record<string, unknown>) : {};
+    const messageRaw = envelope["error"];
+    const message =
+      typeof messageRaw === "string" && messageRaw.length > 0
+        ? messageRaw
+        : `HTTP ${status}`;
+
+    if (status === 401) {
+      throw new MaxiaOracleAuthError(message);
+    }
+    if (status === 402) {
+      const acceptsRaw = envelope["accepts"];
+      throw new MaxiaOraclePaymentRequiredError(
+        message,
+        Array.isArray(acceptsRaw) ? acceptsRaw : [],
+      );
+    }
+    if (status === 404 && message === "no live price available") {
+      throw new MaxiaOracleUpstreamError(message);
+    }
+    if (status === 400 || status === 422 || status === 404) {
+      throw new MaxiaOracleValidationError(message);
+    }
+    if (status === 429) {
+      const retryRaw = envelope["retry_after_seconds"];
+      const limitRaw = envelope["limit"];
+      throw new MaxiaOracleRateLimitError(message, {
+        retryAfterSeconds: typeof retryRaw === "number" ? retryRaw : null,
+        limit: typeof limitRaw === "number" ? limitRaw : null,
+      });
+    }
+    throw new MaxiaOracleTransportError(
+      `unexpected ${status} on ${method} ${path}: ${message}`,
+    );
+  }
+}
