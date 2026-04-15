@@ -7,9 +7,7 @@ whether the quote is trustworthy.
 """
 from __future__ import annotations
 
-import asyncio
 import re
-from typing import Any
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
@@ -19,7 +17,8 @@ from core.auth import X402_KEY_HASH_SENTINEL, require_access
 from core.db import get_db
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
-from services.oracle import chainlink_oracle, price_oracle, pyth_oracle
+from services.oracle import pyth_oracle
+from services.oracle.multi_source import collect_sources, compute_divergence
 
 router = APIRouter(prefix="/api", tags=["price"])
 
@@ -66,69 +65,6 @@ def _is_valid_symbol(symbol: str) -> bool:
     return bool(_SYMBOL_REGEX.match(symbol))
 
 
-def _compute_divergence(prices: list[float]) -> float:
-    """Return the max/min - 1 ratio in percent, or 0 if fewer than 2 prices."""
-    positive = [p for p in prices if p > 0]
-    if len(positive) < 2:
-        return 0.0
-    return round((max(positive) / min(positive) - 1.0) * 100, 4)
-
-
-async def _collect_sources(symbol: str) -> list[dict[str, Any]]:
-    """Gather prices for `symbol` from every applicable source concurrently.
-
-    Returns a list of per-source dicts in the form:
-        {"name": "pyth", "price": 74287.07, "age_s": 1, "source_meta": {...}}
-    A source is omitted if it has no feed for this symbol or returned an error.
-    """
-    tasks: list[tuple[str, Any]] = []
-
-    # Pyth — crypto feed
-    if symbol in pyth_oracle.CRYPTO_FEEDS:
-        tasks.append(("pyth_crypto", pyth_oracle.get_pyth_price(pyth_oracle.CRYPTO_FEEDS[symbol])))
-    # Pyth — equity feed
-    lookup_eq = "GOOG" if symbol == "GOOGL" else symbol
-    if lookup_eq in pyth_oracle.EQUITY_FEEDS:
-        tasks.append(
-            ("pyth_equity", pyth_oracle.get_pyth_price(pyth_oracle.EQUITY_FEEDS[lookup_eq]))
-        )
-    # Chainlink — on-chain Base
-    if symbol in chainlink_oracle.CHAINLINK_FEEDS:
-        tasks.append(("chainlink_base", chainlink_oracle.get_chainlink_price(symbol)))
-    # price_oracle — Helius/CoinPaprika/CoinGecko aggregator
-    tasks.append(("price_oracle", price_oracle.get_prices([symbol])))
-
-    results = await asyncio.gather(*(coro for _, coro in tasks), return_exceptions=True)
-    out: list[dict[str, Any]] = []
-    for (name, _), result in zip(tasks, results):
-        if isinstance(result, Exception) or not isinstance(result, dict):
-            continue
-        if name == "price_oracle":
-            entry = result.get(symbol)
-            if not entry or not entry.get("price"):
-                continue
-            out.append(
-                {
-                    "name": entry.get("source", "price_oracle"),
-                    "price": float(entry["price"]),
-                    "age_s": None,
-                }
-            )
-            continue
-        if "error" in result or not result.get("price"):
-            continue
-        out.append(
-            {
-                "name": result.get("source", name),
-                "price": float(result["price"]),
-                "age_s": result.get("age_s"),
-                "confidence_pct": result.get("confidence_pct"),
-                "stale": result.get("stale", False),
-            }
-        )
-    return out
-
-
 # ── Routes ──────────────────────────────────────────────────────────────────
 
 
@@ -146,7 +82,7 @@ async def get_single_price(symbol: str, key_hash: str = Depends(require_access))
     if rl is not None:
         return rl
 
-    sources = await _collect_sources(symbol)
+    sources = await collect_sources(symbol)
     if not sources:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -155,7 +91,7 @@ async def get_single_price(symbol: str, key_hash: str = Depends(require_access))
 
     prices = [s["price"] for s in sources]
     median_price = sorted(prices)[len(prices) // 2]
-    divergence_pct = _compute_divergence(prices)
+    divergence_pct = compute_divergence(prices)
 
     return wrap_with_disclaimer(
         {
