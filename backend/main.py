@@ -22,7 +22,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from api import routes_health, routes_price, routes_register, routes_sources
+from api import routes_health, routes_mcp, routes_price, routes_register, routes_sources
 from core.config import ENV, IS_PROD, LOG_LEVEL
 from core.db import close_db, get_db, init_db
 from core.disclaimer import wrap_error
@@ -92,6 +92,12 @@ app.include_router(routes_health.router)
 app.include_router(routes_register.router)
 app.include_router(routes_sources.router)
 app.include_router(routes_price.router)
+app.include_router(routes_mcp.router)
+
+# Mount the SSE message receiver as an ASGI sub-application so the MCP SDK
+# handles session routing by `session_id` query parameter. Must use the same
+# SseServerTransport instance as the GET /mcp/sse handler above.
+app.mount("/mcp/messages/", app=routes_mcp.sse_transport.handle_post_message)
 
 
 # ── Generic JSON error handler ──────────────────────────────────────────────

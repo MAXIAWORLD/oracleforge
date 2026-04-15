@@ -1,0 +1,264 @@
+"""MAXIA Oracle — MCP server instance and tool registration (Phase 5 Step 4).
+
+Creates the `mcp.server.lowlevel.Server` instance, registers the 8 V1 tools
+declared in `tools.py`, and exposes a `build_server()` factory that both the
+stdio entry point (`__main__.py`) and the HTTP SSE transport
+(`api/routes_mcp.py`, Phase 5 Step 6) reuse.
+
+The factory returns a fresh server on each call so that two different
+transports can run side by side without sharing internal state.
+
+Return contract (aligned with `tools.py`):
+    - Tool functions return a plain `dict`. The `lowlevel` framework wraps it
+      into a `CallToolResult` with `TextContent` + `structuredContent`
+      automatically and `isError=False`.
+    - When a tool dict contains an `"error"` key, this module rebuilds the
+      result as `CallToolResult(isError=True, ...)` so MCP clients
+      (Claude Desktop, Cursor, Zed) can visually distinguish failures.
+    - Unknown tool names and arity mismatches also surface as `isError=True`
+      with a JSON-encoded error body.
+"""
+from __future__ import annotations
+
+import json
+from typing import Any, Awaitable, Callable
+
+from mcp import types
+from mcp.server.lowlevel import Server
+
+from . import tools
+
+SERVER_NAME = "maxia-oracle"
+SERVER_VERSION = "0.1.0"
+SERVER_INSTRUCTIONS = (
+    "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP tools. "
+    "Each result is a read-only live data point intended for AI agents that need "
+    "market data from Pyth, Chainlink and aggregator sources. "
+    "Data feed only. Not investment advice. No custody. No KYC."
+)
+
+_DISCLAIMER_LINE = "Data feed only. Not investment advice. No custody. No KYC."
+
+_SYMBOL_SCHEMA: dict[str, Any] = {
+    "type": "string",
+    "pattern": "^[A-Z0-9]{1,10}$",
+    "description": (
+        "Asset ticker, 1 to 10 uppercase alphanumeric characters "
+        "(e.g. 'BTC', 'ETH', 'SOL', 'AAPL')."
+    ),
+}
+
+
+_TOOL_DEFINITIONS: list[types.Tool] = [
+    types.Tool(
+        name="get_price",
+        description=(
+            "Return a cross-validated multi-source live price for a single asset. "
+            "Queries Pyth, Chainlink and the aggregator in parallel, computes the "
+            "median and the inter-source divergence in percent. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_SCHEMA},
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
+        name="get_prices_batch",
+        description=(
+            "Return live prices for up to 50 symbols in a single upstream batch "
+            "call via the Pyth Hermes endpoint. Dramatically cheaper than issuing "
+            "one get_price per symbol. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "symbols": {
+                    "type": "array",
+                    "items": _SYMBOL_SCHEMA,
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "description": "List of 1 to 50 asset ticker symbols.",
+                },
+            },
+            "required": ["symbols"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
+        name="get_sources_status",
+        description=(
+            "Probe each upstream oracle source (Pyth, Chainlink, aggregator) with "
+            "BTC and report up/down status. Liveness probe only — does not "
+            "validate correctness of returned prices. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
+        name="get_cache_stats",
+        description=(
+            "Return the aggregator in-memory cache hit rate and circuit-breaker "
+            "state. Debug tool for agents that want to introspect their own "
+            "latency amplification. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
+        name="get_confidence",
+        description=(
+            "Return the multi-source divergence for a symbol as a compact metric "
+            "('do the sources agree?') without the per-source price breakdown. "
+            "Lighter than get_price when only the agreement signal is needed. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_SCHEMA},
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
+        name="list_supported_symbols",
+        description=(
+            "Return the union of all asset symbols supported by MAXIA Oracle, "
+            "grouped by source (Pyth crypto, Pyth equity, Chainlink Base, "
+            "aggregator). "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
+        name="get_chainlink_onchain",
+        description=(
+            "Fetch a single-source price directly from the Chainlink on-chain "
+            "feed on Base mainnet. Independently verifiable on-chain; useful to "
+            "cross-check the median returned by get_price. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_SCHEMA},
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
+        name="health_check",
+        description=(
+            "Minimal liveness probe for the MAXIA Oracle MCP server. Does not "
+            "touch upstream sources — meant to be cheap enough for monitoring "
+            "agents to call every few seconds. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    ),
+]
+
+
+_ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
+
+_TOOL_DISPATCH: dict[str, _ToolHandler] = {
+    "get_price": tools.get_price,
+    "get_prices_batch": tools.get_prices_batch,
+    "get_sources_status": tools.get_sources_status,
+    "get_cache_stats": tools.get_cache_stats,
+    "get_confidence": tools.get_confidence,
+    "list_supported_symbols": tools.list_supported_symbols,
+    "get_chainlink_onchain": tools.get_chainlink_onchain,
+    "health_check": tools.health_check,
+}
+
+
+def _error_result(payload: dict[str, Any]) -> types.CallToolResult:
+    """Wrap an error dict in a CallToolResult with isError=True.
+
+    MCP clients use isError to visually distinguish tool failures from
+    successful responses; keeping the payload as JSON text preserves the
+    full error context for the agent.
+    """
+    return types.CallToolResult(
+        content=[types.TextContent(type="text", text=json.dumps(payload, indent=2))],
+        isError=True,
+    )
+
+
+def build_server(rate_limit_key_hash: str | None = None) -> Server:
+    """Create a fresh MCP server instance with all 8 V1 tools registered.
+
+    Args:
+        rate_limit_key_hash: If provided, every `tools/call` invocation
+            counts against the Phase 3 daily quota (100 req/day per key)
+            via `core.rate_limit.check_daily`. Meant for the HTTP SSE
+            transport, where each connected agent is authenticated by its
+            `X-API-Key`. The stdio transport calls `build_server()` without
+            this argument so that local installs run with no quota.
+    """
+    server: Server = Server(
+        SERVER_NAME,
+        version=SERVER_VERSION,
+        instructions=SERVER_INSTRUCTIONS,
+    )
+
+    @server.list_tools()
+    async def _list_tools() -> list[types.Tool]:
+        return list(_TOOL_DEFINITIONS)
+
+    @server.call_tool()
+    async def _call_tool(
+        name: str, arguments: dict[str, Any]
+    ) -> dict[str, Any] | types.CallToolResult:
+        if rate_limit_key_hash is not None:
+            # Imported lazily so stdio installs that never touch the daily
+            # quota do not pay the SQLite bootstrap cost on import.
+            from core.db import get_db
+            from core.rate_limit import check_daily
+
+            decision = check_daily(get_db(), rate_limit_key_hash)
+            if not decision.allowed:
+                return _error_result(
+                    {
+                        "error": "rate limit exceeded",
+                        "limit": decision.limit,
+                        "window_s": decision.window_s,
+                        "retry_after_s": decision.retry_after,
+                        "reset_at": decision.reset_at,
+                    }
+                )
+
+        handler = _TOOL_DISPATCH.get(name)
+        if handler is None:
+            return _error_result({"error": f"unknown tool: {name}"})
+
+        try:
+            result = await handler(**(arguments or {}))
+        except TypeError as exc:
+            return _error_result({"error": "invalid arguments", "detail": str(exc)})
+
+        if isinstance(result, dict) and "error" in result:
+            return _error_result(result)
+
+        return result
+
+    return server
