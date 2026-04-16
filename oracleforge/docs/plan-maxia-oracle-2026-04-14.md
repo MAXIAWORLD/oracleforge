@@ -487,6 +487,69 @@ oracleforge/
 
 ---
 
+## 5.1. Roadmap post-V1 (V1.1 → V2) — multi-chain
+
+Ajouté 16 avril 2026 après pesée pour/contre EVM vs Solana (cf. mémoire `project_maxia_oracle_decisions.md` §"V1.x multi-chain"). Le principe : **étendre la surface multi-chain seulement si V1 génère une traction mesurable en Phase 9**. Pas de feature bloat spéculatif.
+
+### V1.1 — Chainlink sur Ethereum + Arbitrum (lecture) — 1 jour
+
+- Étendre `services/oracle/chainlink_oracle.py` à 3 chaînes au lieu de 1.
+- Ajouter paramètre `?chain=ethereum|arbitrum|base` sur `GET /api/chainlink/{symbol}`.
+- Ajouter `BASE_RPC_URL`, `ETHEREUM_RPC_URL`, `ARBITRUM_RPC_URL` dans `.env` (tous 3 optionnels, fallback publics).
+- Étendre le dict de contract addresses (Ethereum a ~50 feeds, Arbitrum ~30, Base ~15).
+- **Gain** : couvre "je veux le prix Chainlink que verra *tel* contrat sur *telle* chaîne", passe de 79 à ~120 symboles supportés.
+- **Coût** : lecture read-only on-chain, pas de gas, pas de clé privée, pas de nouvelle dépendance Python.
+
+### V1.2 — x402 paiement sur Arbitrum + Optimism + Polygon — 1 jour
+
+- Étendre `backend/x402/base_verifier.py` en `multichain_verifier.py` supportant 4 chaînes EVM (Base, Arbitrum, Optimism, Polygon).
+- Ajouter `X402_TREASURY_ADDRESS_*` pour chaque chaîne (même adresse publique possible, vérifier compatibilité).
+- Gas oracle per-chain pour estimer le coût d'un paiement.
+- **Gain** : agents qui vivent sur Arbitrum/Optimism/Polygon paient sans bridge, gas <$0.01 sur chaque, élargit le réservoir.
+- **Coût** : middleware déjà architecturé modulaire, extension prévue Phase 4 design.
+
+### V1.3 — RedStone en 4e source + plugin Eliza + Pyth natif Solana (lecture) — 2 jours
+
+**3 ajouts complémentaires, même release** :
+
+1. **RedStone** comme 4e upstream dans `services/oracle/` (API REST `https://api.redstone.finance/prices`). Complémentaire à Pyth+Chainlink car modèle "pull on-demand" et coverage long-tail crypto récents.
+2. **Plugin Eliza** (`eliza-plugin-maxia-oracle`, TypeScript) — 5e plugin framework, ouvre l'écosystème Solana AI agents (Eliza, ai16z, Virtuals). Agent Eliza peut utiliser MAXIA Oracle via X-API-Key ou x402 Base (pas besoin de payer en Solana côté V1.3).
+3. **Pyth natif Solana** en source de lecture : les 400+ feeds on-chain Solana de Pyth (vs ~150 via Hermes REST), sub-second latency.
+
+- **Gain** : divergence calculée sur 4 sources (+robustesse) ; positionnement crédible dans l'écosystème Solana ; plus de symboles long-tail.
+- **Coût** : ~2 jours total. Pas de x402 Solana (intentionnel — attente de spec officielle).
+
+### V1.4 — (optionnel) Uniswap v3 TWAP on-chain — 2-3 jours
+
+- Lecture directe de pools Uniswap v3 sur Base et Ethereum pour obtenir le prix TWAP 30min que verra un smart contract au moment d'une tx.
+- **Gain** : killer feature pour agents DeFi qui commit des tx trading autonomes.
+- **Coût** : calcul TWAP non-trivial (decode sqrtPriceX96, gestion ticks, etc.).
+
+### V2 — x402 Solana custom (si x402 spec reste EVM-only) — 5 jours
+
+- Implémenter notre propre `solana_verifier.py` : SPL USDC transfer + signature verification via Helius RPC.
+- **Déclencheur** : ≥20 users actifs qui demandent Solana OU 6 mois sans move côté x402 officiel.
+- **Coût** : +5 j dev + 15% maintenance permanente (2 protocoles de paiement à maintenir).
+- **Risque** : obsolète si Coinbase sort x402 Solana après.
+
+### Ce qui est explicitement HORS roadmap V1.x
+
+- **BNB Chain** : réputation risk sur le branding "data you can trust" (manipulations historiques).
+- **Tron, Cardano, Near, Sui, Aptos** : volume devs agents 2026 négligeable.
+- **Testnets** : aucun agent autonome ne paie avec de l'USDC de test.
+- **Bitcoin L2 (Stacks, Rootstock)** : pas de feeds Chainlink natifs.
+
+### Filtre d'acceptation pour toute chaîne additionnelle
+
+Une nouvelle chaîne ne rentre dans la roadmap QUE si les 4 critères sont remplis :
+
+1. Un agent réel a un cas d'usage clair sur cette chaîne spécifiquement.
+2. USDC natif existe (pas wrapped).
+3. Les feeds Chainlink (ou équivalent) sont maintenus activement, lastUpdate < 1h.
+4. Ajouter cette chaîne ne multiplie pas notre surface de bug/monitoring par > 1.3×.
+
+---
+
 ## 6. Risques qui peuvent tuer ce plan
 
 1. **Dépendances cachées dans les modules oracle MAXIA V12** : les modules `pyth_oracle.py`, `chainlink_oracle.py`, `price_oracle.py` peuvent importer 10-20 autres modules MAXIA V12 (config, models, db, etc.). L'extraction propre peut prendre 3-5 jours au lieu de 2. **Mitigation** : mapping complet des dépendances en début Phase 1, décision d'extraction granulaire.
