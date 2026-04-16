@@ -69,8 +69,14 @@ export interface SymbolsPayload {
     pyth_crypto: string[];
     pyth_equity: string[];
     chainlink_base: string[];
+    chainlink_ethereum?: string[];
+    chainlink_arbitrum?: string[];
     price_oracle: string[];
+    /** V1.3 — RedStone has dynamic coverage, always empty here. */
+    redstone?: string[];
   };
+  /** V1.3 — human-readable notes for dynamic-coverage sources. */
+  coverage_notes?: Record<string, string>;
 }
 
 export interface ChainlinkPayload {
@@ -89,3 +95,17 @@ export interface ConfidencePayload {
   source_count: number | null;
   divergence_pct: number | null;
 }
+
+/**
+ * V1.3 — RedStone REST public oracle single-source payload.
+ */
+export interface RedstonePayload {
+  price: number;
+  publish_time: number;
+  age_s: number;
+  stale: boolean;
+  source: "redstone";
+  symbol: string;
+  provider: string;
+}
+

@@ -1,0 +1,159 @@
+/**
+ * Smoke tests for eliza-plugin-maxia-oracle.
+ *
+ * No Eliza runtime and no MAXIA Oracle backend needed:
+ *   - `runtime` is a bare object that satisfies the structural `IAgentRuntime`.
+ *   - `MaxiaOracleClient` is swapped for a stub via `setClientForTests()`.
+ */
+import { describe, expect, it } from "vitest";
+
+import {
+  DISCLAIMER,
+  extractSymbol,
+  maxiaOracleActions,
+  maxiaOraclePlugin,
+  setClientForTests,
+} from "../src/index.js";
+import type { IAgentRuntime, Memory } from "../src/types.js";
+
+interface RuntimeOpts {
+  apiKey?: string | null;
+}
+
+function makeRuntime(opts: RuntimeOpts = { apiKey: "mxo_test_key" }): IAgentRuntime {
+  const apiKey = opts.apiKey;
+  return {
+    getSetting: (key: string) =>
+      key === "MAXIA_ORACLE_API_KEY" ? (apiKey ?? undefined) : undefined,
+  };
+}
+
+function makeMessage(text: string): Memory {
+  return { content: { text } };
+}
+
+describe("plugin shape", () => {
+  it("exports 9 actions", () => {
+    expect(maxiaOracleActions).toHaveLength(9);
+    expect(maxiaOraclePlugin.actions).toHaveLength(9);
+  });
+
+  it("every action has name + description + validate + handler", () => {
+    for (const action of maxiaOracleActions) {
+      expect(action.name).toMatch(/^[A-Z_]+$/);
+      expect(action.description.length).toBeGreaterThan(20);
+      expect(typeof action.validate).toBe("function");
+      expect(typeof action.handler).toBe("function");
+    }
+  });
+
+  it("every description ends with the disclaimer", () => {
+    for (const action of maxiaOracleActions) {
+      expect(action.description).toContain(DISCLAIMER);
+    }
+  });
+
+  it("action names are unique", () => {
+    const names = maxiaOracleActions.map((a) => a.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe("extractSymbol", () => {
+  it("finds BTC in a natural question", () => {
+    expect(extractSymbol("what's the price of BTC?")).toBe("BTC");
+  });
+
+  it("returns null if no ticker candidate", () => {
+    expect(extractSymbol("just chatting, no ticker here")).toBeNull();
+  });
+
+  it("ignores common stopwords that match the ticker pattern", () => {
+    expect(extractSymbol("the price please")).toBeNull();
+  });
+
+  it("returns null on undefined input", () => {
+    expect(extractSymbol(undefined)).toBeNull();
+  });
+});
+
+describe("GET_PRICE handler (stubbed client)", () => {
+  const runtime = makeRuntime();
+
+  it("validates when API key + symbol are present", async () => {
+    const action = maxiaOracleActions.find((a) => a.name === "GET_PRICE")!;
+    const ok = await action.validate(runtime, makeMessage("quote BTC"));
+    expect(ok).toBe(true);
+  });
+
+  it("rejects when API key is missing", async () => {
+    const action = maxiaOracleActions.find((a) => a.name === "GET_PRICE")!;
+    const noKey = makeRuntime({ apiKey: null });
+    const ok = await action.validate(noKey, makeMessage("quote BTC"));
+    expect(ok).toBe(false);
+  });
+
+  it("handler forwards the extracted symbol and reports a price", async () => {
+    const action = maxiaOracleActions.find((a) => a.name === "GET_PRICE")!;
+    let called = "";
+    const stub = {
+      price: async (sym: string) => {
+        called = sym;
+        return {
+          data: { symbol: sym, price: 74000, source_count: 4, divergence_pct: 0.02 },
+          disclaimer: DISCLAIMER,
+        };
+      },
+    };
+    setClientForTests(runtime, stub as unknown as import("@maxia/oracle").MaxiaOracleClient);
+
+    let captured = "";
+    const ok = await action.handler(
+      runtime,
+      makeMessage("price of BTC?"),
+      undefined,
+      undefined,
+      async ({ text }) => {
+        captured = text;
+      },
+    );
+    expect(ok).toBe(true);
+    expect(called).toBe("BTC");
+    expect(captured).toContain("BTC");
+    expect(captured).toContain("$74000");
+  });
+});
+
+describe("GET_REDSTONE_PRICE handler (stubbed client)", () => {
+  const runtime = makeRuntime();
+
+  it("handler forwards the symbol to client.redstone", async () => {
+    const action = maxiaOracleActions.find((a) => a.name === "GET_REDSTONE_PRICE")!;
+    let called = "";
+    const stub = {
+      redstone: async (sym: string) => {
+        called = sym;
+        return {
+          data: { symbol: sym, price: 74200, age_s: 5 },
+          disclaimer: DISCLAIMER,
+        };
+      },
+    };
+    setClientForTests(runtime, stub as unknown as import("@maxia/oracle").MaxiaOracleClient);
+
+    let captured = "";
+    await action.handler(
+      runtime,
+      makeMessage("redstone quote on ETH"),
+      undefined,
+      undefined,
+      async ({ text }) => {
+        captured = text;
+      },
+    );
+    expect(called).toBe("ETH");
+    expect(captured).toContain("RedStone");
+    expect(captured).toContain("ETH");
+  });
+});
+

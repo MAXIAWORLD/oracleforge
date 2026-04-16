@@ -31,7 +31,12 @@ import re
 from typing import Any, Final
 
 from core.disclaimer import wrap_error, wrap_with_disclaimer
-from services.oracle import chainlink_oracle, price_oracle, pyth_oracle
+from services.oracle import (
+    chainlink_oracle,
+    price_oracle,
+    pyth_oracle,
+    redstone_oracle,
+)
 from services.oracle.multi_source import collect_sources, compute_divergence
 
 _SYMBOL_REGEX: Final[re.Pattern[str]] = re.compile(r"^[A-Z0-9]{1,10}$")
@@ -327,7 +332,34 @@ async def get_chainlink_onchain(
     return wrap_with_disclaimer(result)
 
 
-# ── 8. health_check ──────────────────────────────────────────────────────────
+# ── 9. get_redstone_price (V1.3) ─────────────────────────────────────────────
+
+
+async def get_redstone_price(symbol: str) -> dict[str, Any]:
+    """Fetch a single-source price directly from the RedStone public REST API.
+
+    V1.3: RedStone is the 4th independent upstream. Coverage is dynamic
+    (400+ assets: crypto majors + long-tail + forex + equities). Unknown
+    symbols return an error rather than being pre-rejected on a hardcoded
+    allow-list. Useful to cross-check the median returned by `get_price`.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+
+    result = await redstone_oracle.get_redstone_price(symbol)
+    if not isinstance(result, dict) or result.get("error"):
+        return wrap_error(
+            "redstone fetch failed",
+            symbol=symbol,
+            detail=result.get("error") if isinstance(result, dict) else "unexpected",
+        )
+    return wrap_with_disclaimer(result)
+
+
+# ── 10. health_check ─────────────────────────────────────────────────────────
 
 
 async def health_check() -> dict[str, Any]:

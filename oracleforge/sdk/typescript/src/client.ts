@@ -31,6 +31,7 @@ import type {
   MaxiaOracleClientOptions,
   MaxiaResponse,
   PricePayload,
+  RedstonePayload,
   RegisteredKey,
   SourcesPayload,
   SymbolsPayload,
@@ -38,7 +39,7 @@ import type {
 
 export const DEFAULT_BASE_URL = "https://oracle.maxiaworld.app";
 export const DEFAULT_TIMEOUT_MS = 15_000;
-export const USER_AGENT = "maxia-oracle-typescript/0.1.0";
+export const USER_AGENT = "maxia-oracle-typescript/0.2.0";
 
 const SYMBOL_PATTERN = /^[A-Z0-9]{1,10}$/;
 const MAX_BATCH_SYMBOLS = 50;
@@ -160,6 +161,19 @@ export class MaxiaOracleClient {
       `/api/chainlink/${cleanedSymbol}`,
       { query: { chain: cleanedChain } },
     );
+  }
+
+  /**
+   * V1.3 — Single-source RedStone REST price.
+   *
+   * RedStone is the 4th independent upstream in MAXIA Oracle. Coverage
+   * is dynamic (400+ assets: crypto majors, long-tail, forex, equities).
+   * Unknown symbols throw `MaxiaOracleUpstreamError` (404) rather than
+   * being pre-rejected on a hardcoded allow-list.
+   */
+  async redstone(symbol: string): Promise<MaxiaResponse<RedstonePayload>> {
+    const cleaned = this.validateSymbol(symbol);
+    return this.request<RedstonePayload>("GET", `/api/redstone/${cleaned}`);
   }
 
   /**

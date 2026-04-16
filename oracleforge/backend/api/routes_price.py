@@ -17,7 +17,7 @@ from core.auth import X402_KEY_HASH_SENTINEL, require_access
 from core.db import get_db
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
-from services.oracle import chainlink_oracle, pyth_oracle
+from services.oracle import chainlink_oracle, pyth_oracle, redstone_oracle
 from services.oracle.multi_source import collect_sources, compute_divergence
 
 router = APIRouter(prefix="/api", tags=["price"])
@@ -205,3 +205,47 @@ async def get_chainlink_price_route(
             ),
         )
     return wrap_with_disclaimer(result)
+
+
+@router.get("/redstone/{symbol}")
+async def get_redstone_price_route(
+    symbol: str, key_hash: str = Depends(require_access)
+):
+    """Return a single-source RedStone REST price for `symbol`.
+
+    V1.3: RedStone is the 4th independent upstream. Coverage is dynamic
+    (400+ assets across crypto majors, long-tail, forex and equities) so
+    unknown symbols return 404 rather than being pre-rejected on a hardcoded
+    allow-list. Callers that want the multi-source median should use
+    `/api/price/{symbol}` instead — this route is for audit / cross-check.
+    """
+    symbol = symbol.upper()
+    if not _is_valid_symbol(symbol):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=wrap_error("invalid symbol format"),
+        )
+
+    rl = _enforce_rate_limit(key_hash)
+    if rl is not None:
+        return rl
+
+    result = await redstone_oracle.get_redstone_price(symbol)
+    if not isinstance(result, dict) or result.get("error"):
+        detail = result.get("error") if isinstance(result, dict) else "unexpected"
+        http_status = (
+            status.HTTP_404_NOT_FOUND
+            if isinstance(detail, str) and "not found" in detail
+            else status.HTTP_502_BAD_GATEWAY
+        )
+        return JSONResponse(
+            status_code=http_status,
+            content=wrap_error(
+                "redstone fetch failed",
+                symbol=symbol,
+                detail=detail,
+            ),
+        )
+    return wrap_with_disclaimer(result)
+
+

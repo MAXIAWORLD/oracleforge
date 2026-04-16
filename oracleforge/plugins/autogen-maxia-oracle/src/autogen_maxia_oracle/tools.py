@@ -30,6 +30,7 @@ TOOL_NAMES: Final[tuple[str, ...]] = (
     "maxia_oracle_get_confidence",
     "maxia_oracle_list_supported_symbols",
     "maxia_oracle_get_chainlink_onchain",
+    "maxia_oracle_get_redstone_price",
     "maxia_oracle_health_check",
 )
 
@@ -136,6 +137,16 @@ def get_all_tools(
         """
         return _fmt(shared.chainlink_onchain(symbol, chain=chain))
 
+    def maxia_oracle_get_redstone_price(symbol: str) -> str:
+        """V1.3 — Single-source RedStone REST price.
+
+        RedStone is the 4th independent upstream in MAXIA Oracle (400+
+        assets: crypto majors, long-tail, forex, equities). Useful to
+        cross-check the multi-source median.
+        Data feed only. Not investment advice. No custody. No KYC.
+        """
+        return _fmt(shared.redstone(symbol))
+
     def maxia_oracle_health_check() -> str:
         """Minimal liveness probe for the MAXIA Oracle backend.
 
@@ -153,6 +164,7 @@ def get_all_tools(
         maxia_oracle_get_confidence,
         maxia_oracle_list_supported_symbols,
         maxia_oracle_get_chainlink_onchain,
+        maxia_oracle_get_redstone_price,
         maxia_oracle_health_check,
     )
 

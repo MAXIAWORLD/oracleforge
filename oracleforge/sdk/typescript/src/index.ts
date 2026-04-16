@@ -39,6 +39,7 @@ export type {
   MaxiaResponse,
   PricePayload,
   PriceSource,
+  RedstonePayload,
   RegisteredKey,
   SourcesPayload,
   SymbolsPayload,

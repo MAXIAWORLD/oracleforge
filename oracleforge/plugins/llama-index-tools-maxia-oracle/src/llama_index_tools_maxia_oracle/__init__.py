@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from .tools import DISCLAIMER, TOOL_NAMES, get_all_tools
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "__version__",

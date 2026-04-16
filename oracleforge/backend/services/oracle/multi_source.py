@@ -27,7 +27,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from services.oracle import chainlink_oracle, price_oracle, pyth_oracle
+from services.oracle import chainlink_oracle, price_oracle, pyth_oracle, redstone_oracle
 
 
 def compute_divergence(prices: list[float]) -> float:
@@ -84,6 +84,9 @@ async def collect_sources(symbol: str) -> list[dict[str, Any]]:
         )
     # price_oracle — Helius/CoinPaprika/CoinGecko aggregator
     tasks.append(("price_oracle", price_oracle.get_prices([symbol])))
+    # V1.3 — RedStone public REST (4th independent upstream). Every symbol
+    # is attempted; `symbol not found` replies are silent-dropped below.
+    tasks.append(("redstone", redstone_oracle.get_redstone_price(symbol)))
 
     results = await asyncio.gather(
         *(coro for _, coro in tasks), return_exceptions=True

@@ -211,6 +211,22 @@ class MaxiaOracleClient:
             "GET", f"/api/chainlink/{symbol}", params={"chain": chain}
         )
 
+    def redstone(self, symbol: str) -> dict[str, Any]:
+        """V1.3 — Single-source RedStone REST price.
+
+        RedStone is the 4th independent upstream in MAXIA Oracle. Coverage
+        is dynamic (400+ assets: crypto majors, long-tail, forex,
+        equities). Unknown symbols raise
+        :class:`MaxiaOracleUpstreamError` (404) rather than being
+        pre-rejected on a hardcoded allow-list.
+
+        Raises:
+            MaxiaOracleValidationError: symbol format invalid.
+            MaxiaOracleUpstreamError: symbol not available on RedStone.
+        """
+        symbol = self._validate_symbol(symbol)
+        return self._request("GET", f"/api/redstone/{symbol}")
+
     def confidence(self, symbol: str) -> dict[str, Any]:
         """Return the multi-source divergence for a symbol, compact.
 

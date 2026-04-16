@@ -19,13 +19,14 @@ from .tools import (
     MaxiaOracleGetConfidenceTool,
     MaxiaOracleGetPriceTool,
     MaxiaOracleGetPricesBatchTool,
+    MaxiaOracleGetRedstoneTool,
     MaxiaOracleGetSourcesStatusTool,
     MaxiaOracleHealthCheckTool,
     MaxiaOracleListSupportedSymbolsTool,
     get_all_tools,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "__version__",
@@ -38,6 +39,7 @@ __all__ = [
     "MaxiaOracleGetConfidenceTool",
     "MaxiaOracleListSupportedSymbolsTool",
     "MaxiaOracleGetChainlinkOnchainTool",
+    "MaxiaOracleGetRedstoneTool",
     "MaxiaOracleHealthCheckTool",
     "get_all_tools",
 ]

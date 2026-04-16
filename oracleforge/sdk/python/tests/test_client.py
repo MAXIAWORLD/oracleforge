@@ -283,6 +283,32 @@ def test_chainlink_onchain_rejects_invalid_chain() -> None:
             c.chainlink_onchain("BTC", chain="solana")
 
 
+def test_redstone_hits_expected_path() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        return _ok(
+            {
+                "data": {
+                    "source": "redstone",
+                    "symbol": "BTC",
+                    "price": 74200.1,
+                    "publish_time": 1_700_000_000,
+                    "age_s": 4,
+                    "stale": False,
+                    "provider": "redstone-primary-prod",
+                },
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        result = c.redstone("BTC")
+    assert captured["path"] == "/api/redstone/BTC"
+    assert result["data"]["source"] == "redstone"
+
+
 def test_confidence_extracts_divergence_from_price_call() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/price/ETH"

@@ -174,6 +174,23 @@ _TOOL_DEFINITIONS: list[types.Tool] = [
         },
     ),
     types.Tool(
+        name="get_redstone_price",
+        description=(
+            "Fetch a single-source price directly from the RedStone public "
+            "REST API (V1.3). RedStone covers 400+ assets (crypto majors, "
+            "long-tail, forex, equities) and is the 4th independent upstream "
+            "in the MAXIA Oracle pipeline. Useful to cross-check the median "
+            "returned by get_price. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_SCHEMA},
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
         name="health_check",
         description=(
             "Minimal liveness probe for the MAXIA Oracle MCP server. Does not "
@@ -200,6 +217,7 @@ _TOOL_DISPATCH: dict[str, _ToolHandler] = {
     "get_confidence": tools.get_confidence,
     "list_supported_symbols": tools.list_supported_symbols,
     "get_chainlink_onchain": tools.get_chainlink_onchain,
+    "get_redstone_price": tools.get_redstone_price,
     "health_check": tools.health_check,
 }
 

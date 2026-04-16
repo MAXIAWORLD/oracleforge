@@ -261,6 +261,29 @@ describe("metadata endpoints", () => {
   });
 });
 
+describe("redstone (V1.3)", () => {
+  it("hits /api/redstone/{symbol}", async () => {
+    const client = makeClient(async (url) => {
+      expect(url).toBe("http://test.invalid/api/redstone/BTC");
+      return jsonResponse(200, {
+        data: {
+          source: "redstone",
+          symbol: "BTC",
+          price: 74200.1,
+          publish_time: 1_700_000_000,
+          age_s: 4,
+          stale: false,
+          provider: "redstone-primary-prod",
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    const r = await client.redstone("BTC");
+    expect(r.data.source).toBe("redstone");
+    expect(r.data.price).toBe(74200.1);
+  });
+});
+
 describe("confidence", () => {
   it("extracts divergence from the price call", async () => {
     const client = makeClient(async (url) => {

@@ -227,6 +227,23 @@ class MaxiaOracleGetChainlinkOnchainTool(_MaxiaOracleTool):
         return _fmt(self._get_client().chainlink_onchain(symbol, chain=chain))
 
 
+class MaxiaOracleGetRedstoneTool(_MaxiaOracleTool):
+    """V1.3 — Single-source price from the RedStone public REST API."""
+
+    name: str = "maxia_oracle_get_redstone_price"
+    description: str = (
+        "Fetch a single-source price from the RedStone public REST API (V1.3). "
+        "RedStone is the 4th independent upstream in MAXIA Oracle, covering "
+        "400+ assets (crypto majors, long-tail, forex, equities). Useful to "
+        "cross-check the multi-source median. "
+        + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = SymbolInput
+
+    def _run(self, symbol: str) -> str:
+        return _fmt(self._get_client().redstone(symbol))
+
+
 class MaxiaOracleHealthCheckTool(_MaxiaOracleTool):
     """Minimal liveness probe on the MAXIA Oracle backend."""
 
@@ -254,6 +271,7 @@ MAXIA_ORACLE_TOOL_CLASSES: Final[tuple[type[_MaxiaOracleTool], ...]] = (
     MaxiaOracleGetConfidenceTool,
     MaxiaOracleListSupportedSymbolsTool,
     MaxiaOracleGetChainlinkOnchainTool,
+    MaxiaOracleGetRedstoneTool,
     MaxiaOracleHealthCheckTool,
 )
 

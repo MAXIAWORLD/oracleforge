@@ -14,7 +14,12 @@ from core.config import CHAIN_RPC_URLS
 from core.db import get_db
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
-from services.oracle import chainlink_oracle, price_oracle, pyth_oracle
+from services.oracle import (
+    chainlink_oracle,
+    price_oracle,
+    pyth_oracle,
+    redstone_oracle,
+)
 
 router = APIRouter(prefix="/api", tags=["sources"])
 
@@ -106,6 +111,19 @@ async def list_sources(key_hash: str = Depends(require_api_key)):
                     "endpoint": "https://query1.finance.yahoo.com/v8/finance/spark",
                     "circuit_breaker": cb["yahoo"],
                 },
+                {
+                    "name": "redstone",
+                    "type": "rest_oracle",
+                    "endpoint": redstone_oracle.REDSTONE_URL,
+                    "provider": redstone_oracle.REDSTONE_PROVIDER,
+                    "coverage_note": (
+                        "Dynamic coverage — RedStone publishes 400+ assets "
+                        "(crypto majors + long-tail + forex + equities). "
+                        "Symbols are attempted on demand; unknown symbols "
+                        "return a 404."
+                    ),
+                    "circuit_breaker": redstone_oracle.get_metrics()["circuit"],
+                },
             ],
         }
     )
@@ -159,6 +177,14 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
                 "chainlink_ethereum": chainlink_by_chain.get("ethereum", []),
                 "chainlink_arbitrum": chainlink_by_chain.get("arbitrum", []),
                 "price_oracle": price_oracle_mints,
+                "redstone": [],
+            },
+            "coverage_notes": {
+                "redstone": (
+                    "Dynamic coverage — RedStone supports 400+ assets, "
+                    "attempted on demand. See https://app.redstone.finance "
+                    "for the live list."
+                ),
             },
         }
     )

@@ -1,7 +1,7 @@
 {
-  "name": "@maxia/oracle",
-  "version": "0.2.0",
-  "description": "Multi-source price data feed for AI agents. Data feed only. Not investment advice. No custody. No KYC.",
+  "name": "eliza-plugin-maxia-oracle",
+  "version": "0.1.0",
+  "description": "ElizaOS plugin for the MAXIA Oracle price feed. Data feed only. Not investment advice. No custody. No KYC.",
   "license": "Apache-2.0",
   "author": "MAXIA <ceo@maxiaworld.app>",
   "type": "module",
@@ -28,16 +28,27 @@
   "keywords": [
     "maxia",
     "oracle",
+    "eliza",
+    "elizaos",
+    "ai-agents",
     "price-feed",
     "crypto",
-    "ai-agents",
-    "mcp",
-    "x402",
-    "pyth",
-    "chainlink"
+    "solana",
+    "plugin"
   ],
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "@maxia/oracle": "file:../../sdk/typescript"
+  },
+  "peerDependencies": {
+    "@elizaos/core": ">=1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@elizaos/core": {
+      "optional": false
+    }
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -47,6 +58,7 @@
   "homepage": "https://oracle.maxiaworld.app",
   "repository": {
     "type": "git",
-    "url": "https://github.com/maxiaworld/oracleforge.git"
+    "url": "https://github.com/maxiaworld/oracleforge.git",
+    "directory": "plugins/eliza-plugin-maxia-oracle"
   }
 }
