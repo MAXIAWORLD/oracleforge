@@ -1,0 +1,56 @@
+# MAXIA Oracle
+
+> A multi-source price feed API for autonomous AI agents. Reconciles Pyth Hermes, Chainlink (Base mainnet, read directly from the aggregator contract), and a spot venue aggregator into a single response. Data feed only. Not investment advice. No custody. No KYC. No trade routing.
+
+MAXIA Oracle is consumed by agent frameworks via six first-party client packages: `maxia-oracle` (Python, PyPI), `@maxia/oracle` (TypeScript, npm), plus four framework adapters on PyPI — `langchain-maxia-oracle`, `crewai-tools-maxia-oracle`, `autogen-maxia-oracle`, `llama-index-tools-maxia-oracle`. A spec-compliant Model Context Protocol (MCP) server exposes the same eight tools over stdio and HTTP SSE for MCP-native clients (Claude Desktop, Cursor, Continue).
+
+Every response includes the full list of contributing sources, their ages, and a divergence percentage so integrators can reject on drift. Authentication is either a free-tier API key header (100 requests/day, issued on demand by `POST /api/register`) or anonymous pay-per-call at 0.001 USDC per request via the x402 protocol on Base mainnet. Direct sale — no intermediation, no escrow, no custody.
+
+## Product
+
+- [Landing page](https://oracle.maxiaworld.app/): single-page overview of what the API is, the eight tools, install snippets for all six packages, pricing, quick-start.
+- [API reference](https://oracle.maxiaworld.app/docs/): static OpenAPI 3.1 reference rendered with Scalar. Six public endpoints, every parameter and response shape.
+
+## Endpoints
+
+- [GET /health](https://oracle.maxiaworld.app/health): service liveness and env indicator. No auth required.
+- [POST /api/register](https://oracle.maxiaworld.app/api/register): issue a free-tier API key (100 req/day). One call, no identity fields.
+- [GET /api/price/{symbol}](https://oracle.maxiaworld.app/api/price/BTC): multi-source aggregated price. Returns every contributing source with age and a divergence figure.
+- [POST /api/prices/batch](https://oracle.maxiaworld.app/api/prices/batch): up to 20 symbols in one call, same shape.
+- [GET /api/sources](https://oracle.maxiaworld.app/api/sources): list of every upstream source, the feeds each exposes, heartbeat status.
+- [GET /api/symbols](https://oracle.maxiaworld.app/api/symbols): all 79 symbols currently covered — crypto majors, select US equities via Pyth, stablecoins.
+- [GET /api/chainlink/{symbol}](https://oracle.maxiaworld.app/api/chainlink/BTC): direct Base mainnet read from the Chainlink aggregator contract. Round ID, contract address, update timestamp, age.
+
+## Tools (MCP + SDK + plugin parity)
+
+Eight named tools available through every surface (REST, MCP, Python SDK, TypeScript SDK, and the four framework adapters), with identical names and inputs:
+
+- `get_price`
+- `get_prices_batch`
+- `get_sources_status`
+- `get_cache_stats`
+- `get_confidence`
+- `list_supported_symbols`
+- `get_chainlink_onchain`
+- `health_check`
+
+A ninth SDK method, `register`, is deliberately absent from the tool surface — operators call it, agents do not.
+
+## What MAXIA Oracle is not
+
+- Not a trading execution API. There is no order placement, no position management, no settlement of anything other than the access-fee payment itself.
+- Not a custodian. The service never holds user funds, private keys, or wallet seeds. The only wallet-shaped string anywhere in the system is the public treasury address that receives x402 payments.
+- Not an investment adviser. Responses are numeric data. Any decision made on the basis of a response is the integrator's and their regulator's concern.
+- Not a KYC operator. `POST /api/register` captures no identity fields. The pay-per-call path is anonymous.
+- Not a marketplace or intermediary. The x402 middleware is configured for direct sale only — MAXIA sells API access to the caller; MAXIA does not route third-party data, escrow third-party funds, or intermediate any third-party transaction.
+
+## Operational facts
+
+- Backend: Python 3.12 + FastAPI, served behind nginx with TLS (Let's Encrypt, auto-renewed). SQLite for rate-limit state and payment replay protection.
+- Licence: Apache-2.0 on every package and on the backend source (repo `github.com/MAXIAWORLD/oracleforge`).
+- Contact: `ceo@maxiaworld.app`.
+- Version: 0.1.0 (April 2026).
+
+## Optional
+
+- [GitHub repository](https://github.com/MAXIAWORLD/oracleforge): source code for the backend, SDKs, and framework plugins.

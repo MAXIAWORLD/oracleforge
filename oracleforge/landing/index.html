@@ -1,0 +1,1310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MAXIA Oracle — Multi-source price feed for AI agents</title>
+<meta name="description" content="A drop-in price oracle for autonomous agents. Pyth, Chainlink on-chain, and a basket of spot venues, aggregated and served as one call. Data feed only. Not investment advice. No custody. No KYC.">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta name="theme-color" content="#0a0a0b">
+<meta name="color-scheme" content="dark">
+<link rel="canonical" href="https://oracle.maxiaworld.app/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MAXIA Oracle">
+<meta property="og:title" content="MAXIA Oracle — Multi-source price feed for AI agents">
+<meta property="og:description" content="A drop-in price oracle for autonomous agents. Data feed only. No custody. No KYC.">
+<meta property="og:url" content="https://oracle.maxiaworld.app/">
+<meta property="og:image" content="https://oracle.maxiaworld.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="MAXIA Oracle — Multi-source price feed for AI agents">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="MAXIA Oracle — Multi-source price feed for AI agents">
+<meta name="twitter:description" content="A drop-in price oracle for autonomous agents. Data feed only. No custody. No KYC.">
+<meta name="twitter:image" content="https://oracle.maxiaworld.app/og.png">
+<meta name="twitter:image:alt" content="MAXIA Oracle — Multi-source price feed for AI agents">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://oracle.maxiaworld.app/#org",
+      "name": "MAXIA",
+      "url": "https://oracle.maxiaworld.app/",
+      "email": "ceo@maxiaworld.app",
+      "sameAs": ["https://github.com/MAXIAWORLD"]
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "MAXIA Oracle",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Any",
+      "description": "Multi-source price feed for AI agents. Aggregates Pyth Hermes, Chainlink on Base mainnet, and a spot venue into a single call with explicit divergence reporting. Data feed only — not investment advice, no custody, no KYC.",
+      "url": "https://oracle.maxiaworld.app/",
+      "softwareVersion": "0.1.0",
+      "license": "https://www.apache.org/licenses/LICENSE-2.0",
+      "image": "https://oracle.maxiaworld.app/og.png",
+      "provider": { "@id": "https://oracle.maxiaworld.app/#org" },
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "Free tier",
+          "description": "100 requests per day per API key, no signup.",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        {
+          "@type": "Offer",
+          "name": "Pay-per-call (x402 on Base)",
+          "description": "0.001 USDC per single request via the x402 protocol on Base mainnet.",
+          "price": "0.001",
+          "priceCurrency": "USDC"
+        }
+      ]
+    },
+    {
+      "@type": "WebAPI",
+      "name": "MAXIA Oracle API",
+      "url": "https://oracle.maxiaworld.app/docs/",
+      "documentation": "https://oracle.maxiaworld.app/docs/",
+      "description": "REST and MCP surface exposing 8 tools for multi-source price aggregation, Chainlink on-chain reads, and source-status inspection."
+    }
+  ]
+}
+</script>
+
+<style>
+  /* ────────────────────────────────────────────────────────────────
+     MAXIA Oracle — single-file landing
+     No build, no framework, no external assets.
+     ──────────────────────────────────────────────────────────────── */
+
+  :root {
+    --bg:              #0a0a0b;
+    --bg-raised:       #101013;
+    --bg-code:         #0d0d10;
+    --bg-code-strip:   #09090b;
+    --border:          #1f1f24;
+    --border-dim:      #15151a;
+    --border-accent:   #223734;
+    --text:            #ececf1;
+    --text-dim:        #8a8a93;
+    --text-faint:      #56565f;
+    --accent:          #5eead4;
+    --accent-dim:      #2dd4bf;
+    --accent-soft:     rgba(94, 234, 212, 0.08);
+    --danger:          #f87171;
+    --warn:            #fbbf24;
+
+    --grid-unit: 8px;
+    --content-max: 1120px;
+    --gutter-px: 2rem;
+
+    --font-sans:
+      -apple-system, BlinkMacSystemFont,
+      "Segoe UI Variable Display", "Segoe UI",
+      "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-mono:
+      ui-monospace, SFMono-Regular, "SF Mono",
+      "Cascadia Mono", "Cascadia Code",
+      "JetBrains Mono", "Fira Code",
+      Menlo, Consolas, "Liberation Mono", monospace;
+    --font-serif:
+      ui-serif, "Iowan Old Style", "Apple Garamond",
+      Baskerville, "Times New Roman", serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  html {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "ss01", "cv11";
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(94, 234, 212, 0.06), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Fine dotted grid overlay — atmosphere only */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.025) 1px, transparent 0);
+    background-size: 32px 32px;
+    pointer-events: none;
+    z-index: 0;
+    mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+  }
+
+  main, header, footer { position: relative; z-index: 1; }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  /* ─── A11y: focus ring, globally (WCAG 2.4.11) ─────────────── */
+  :focus { outline: none; }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+  .btn:focus-visible,
+  .copy:focus-visible {
+    outline-offset: 2px;
+  }
+
+  /* ─── A11y: reduced motion — universal brake ───────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .brand-dot { animation: none; }
+  }
+
+  /* ─── A11y: skip link ──────────────────────────────────────── */
+  .skip-link {
+    position: absolute;
+    top: 0; left: 0;
+    padding: 0.6rem 1rem;
+    background: var(--accent);
+    color: var(--bg);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 0 0 4px 0;
+    transform: translateY(-120%);
+    transition: transform 160ms ease;
+    z-index: 100;
+  }
+  .skip-link:focus { transform: translateY(0); }
+
+  /* ─── Layout primitives ──────────────────────────────────────── */
+
+  .wrap {
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 0 var(--gutter-px);
+  }
+
+  .hairline {
+    border: none;
+    height: 1px;
+    background: var(--border-dim);
+    margin: 0;
+  }
+
+  .label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  .label--accent { color: var(--accent-dim); }
+
+  .section {
+    padding: clamp(4rem, 10vw, 7rem) 0;
+    position: relative;
+  }
+
+  .section-head {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.75rem;
+    align-items: baseline;
+    margin-bottom: 3.5rem;
+  }
+
+  .section-head .numeral {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent-dim);
+    letter-spacing: 0.12em;
+    padding-top: 0.35em;
+  }
+
+  .section-head h2 {
+    margin: 0;
+    font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  .section-head p {
+    margin: 0.5rem 0 0;
+    color: var(--text-dim);
+    font-size: 15px;
+    max-width: 48ch;
+  }
+
+  /* ─── Nav ────────────────────────────────────────────────────── */
+
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    backdrop-filter: saturate(140%) blur(12px);
+    -webkit-backdrop-filter: saturate(140%) blur(12px);
+    background: color-mix(in oklab, var(--bg) 78%, transparent);
+    border-bottom: 1px solid var(--border-dim);
+  }
+
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+  }
+
+  .brand {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .brand-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1;   transform: scale(1); }
+    50%      { opacity: 0.55; transform: scale(0.88); }
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+
+  .nav-links a {
+    position: relative;
+    padding: 0.35rem 0;
+    transition: color 120ms ease;
+  }
+  .nav-links a:hover { color: var(--text); }
+  .nav-links a::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: -2px;
+    height: 1px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 180ms ease;
+  }
+  .nav-links a:hover::after { transform: scaleX(1); }
+
+  /* ─── Hero ───────────────────────────────────────────────────── */
+
+  .hero {
+    padding: clamp(5rem, 12vw, 8.5rem) 0 clamp(4rem, 9vw, 6.5rem);
+    position: relative;
+  }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: clamp(2.5rem, 5vw, 4.5rem);
+    align-items: end;
+  }
+
+  @media (max-width: 820px) {
+    .hero-grid { grid-template-columns: 1fr; }
+  }
+
+  .hero-kicker {
+    display: inline-flex;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.3rem 0.75rem 0.3rem 0.55rem;
+    border: 1px solid var(--border-accent);
+    border-radius: 999px;
+    background: var(--accent-soft);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--accent-dim);
+    margin-bottom: 2rem;
+  }
+  .hero-kicker::before {
+    content: "";
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  h1.hero-title {
+    margin: 0 0 1.75rem;
+    font-size: clamp(2.25rem, 6vw, 4.25rem);
+    font-weight: 500;
+    letter-spacing: -0.035em;
+    line-height: 0.98;
+    max-width: 14ch;
+  }
+
+  h1.hero-title em {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    color: var(--accent-dim);
+    letter-spacing: -0.01em;
+  }
+
+  .hero-lede {
+    max-width: 44ch;
+    font-size: clamp(15px, 1.4vw, 17px);
+    line-height: 1.55;
+    color: var(--text-dim);
+    margin: 0 0 2.25rem;
+  }
+
+  .hero-cta {
+    display: inline-flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.78em 1.1em;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    color: var(--text);
+    background: var(--bg-raised);
+    cursor: pointer;
+    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+  }
+  .btn:hover { border-color: var(--text-faint); transform: translateY(-1px); }
+
+  .btn--primary {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .btn--primary:hover {
+    background: var(--accent-dim);
+    border-color: var(--accent-dim);
+  }
+
+  .btn .arrow {
+    display: inline-block;
+    transition: transform 180ms ease;
+  }
+  .btn:hover .arrow { transform: translateX(3px); }
+
+  /* Live panel — the single "memorable" element of the hero ------ */
+
+  .panel {
+    border: 1px solid var(--border);
+    background:
+      linear-gradient(180deg, rgba(94, 234, 212, 0.02), transparent 40%),
+      var(--bg-raised);
+    border-radius: 10px;
+    padding: 1.5rem 1.5rem 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent) 50%, transparent);
+    opacity: 0.35;
+  }
+
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed var(--border);
+    color: var(--text-faint);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .panel-head .example-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--accent-dim);
+  }
+  .panel-head .example-tag::before {
+    content: "";
+    width: 6px; height: 6px;
+    background: var(--accent);
+    opacity: 0.8;
+    /* static marker — this panel is a reference, not a live feed */
+  }
+
+  .price {
+    font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+    color: var(--text);
+    letter-spacing: -0.02em;
+    font-weight: 500;
+    margin: 0.15rem 0 0.4rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .price .symbol { color: var(--text-faint); margin-right: 0.75rem; }
+  .price .cents  { color: var(--text-dim); }
+
+  .divergence {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    color: var(--accent-dim);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    margin-bottom: 1.25rem;
+  }
+
+  .panel-rows {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.35rem 1rem;
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+  .panel-rows .src { color: var(--text); }
+  .panel-rows .age { color: var(--text-faint); font-size: 11px; }
+
+  .panel-foot {
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px dashed var(--border);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+  .panel-foot .k { color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .panel-foot .v { color: var(--text); font-size: 14px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  /* ─── "How it works" / mechanism ─────────────────────────────── */
+
+  .mech {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border-dim);
+    border: 1px solid var(--border-dim);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  @media (max-width: 720px) { .mech { grid-template-columns: 1fr; } }
+
+  .mech-cell {
+    padding: 2rem 1.75rem;
+    background: var(--bg);
+    transition: background 180ms ease;
+  }
+  .mech-cell:hover { background: var(--bg-raised); }
+
+  .mech-num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent-dim);
+    letter-spacing: 0.14em;
+    margin-bottom: 0.85rem;
+  }
+  .mech h3 {
+    margin: 0 0 0.6rem;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .mech p {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+
+  /* ─── Tool surface table ─────────────────────────────────────── */
+
+  .tool-table {
+    border: 1px solid var(--border-dim);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-raised);
+  }
+  .tool-row {
+    display: grid;
+    grid-template-columns: 3rem 1fr 1.6fr;
+    gap: 1rem;
+    padding: 0.95rem 1.25rem;
+    border-bottom: 1px solid var(--border-dim);
+    align-items: baseline;
+    transition: background 140ms ease;
+  }
+  .tool-row:last-child { border-bottom: none; }
+  .tool-row:hover { background: var(--bg); }
+
+  .tool-row .idx {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+  }
+  .tool-row .name {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent-dim);
+    letter-spacing: -0.01em;
+  }
+  .tool-row .desc {
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+
+  @media (max-width: 640px) {
+    .tool-row { grid-template-columns: 2rem 1fr; }
+    .tool-row .desc { grid-column: 2; }
+  }
+
+  /* ─── Install tabs ───────────────────────────────────────────── */
+
+  .installs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 720px) { .installs { grid-template-columns: 1fr; } }
+
+  .pkg {
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    border-radius: 8px;
+    padding: 1.25rem 1.25rem 0.9rem;
+    transition: border-color 200ms ease, transform 200ms ease;
+  }
+  .pkg:hover { border-color: var(--border-accent); transform: translateY(-1px); }
+
+  .pkg-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+  .pkg-name {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text);
+    letter-spacing: -0.005em;
+  }
+  .pkg-reg {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  /* ─── Code blocks ────────────────────────────────────────────── */
+
+  .code {
+    position: relative;
+    background: var(--bg-code);
+    border: 1px solid var(--border-dim);
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    padding: 0.8rem 3rem 0.8rem 0.9rem;
+    color: var(--text);
+    overflow-x: auto;
+    white-space: pre;
+    tab-size: 2;
+  }
+
+  .code--lg {
+    font-size: 13px;
+    padding: 1.25rem 3rem 1.25rem 1.4rem;
+    background:
+      linear-gradient(90deg, var(--accent) 0, var(--accent) 2px, transparent 2px),
+      var(--bg-code);
+    background-repeat: no-repeat;
+    background-size: 2px 100%;
+  }
+
+  .code .token-cmt { color: var(--text-dim); font-style: italic; }
+  .code .token-str { color: var(--accent-dim); }
+  .code .token-fn  { color: var(--warn); }
+  .code .token-kw  { color: #f0abfc; }
+
+  .copy {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    padding: 0.35rem 0.55rem;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  }
+  .copy:hover { color: var(--text); border-color: var(--text-faint); }
+  .copy[data-state="copied"] { color: var(--accent-dim); border-color: var(--border-accent); }
+
+  /* ─── Pricing ─────────────────────────────────────────────── */
+
+  .price-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 720px) { .price-grid { grid-template-columns: 1fr; } }
+
+  .plan {
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    border-radius: 10px;
+    padding: 1.75rem 1.75rem 1.5rem;
+    position: relative;
+  }
+  .plan--featured {
+    border-color: var(--border-accent);
+    background:
+      linear-gradient(180deg, rgba(94, 234, 212, 0.04), transparent 30%),
+      var(--bg-raised);
+  }
+  .plan-tag {
+    position: absolute;
+    top: -10px;
+    right: 1.5rem;
+    padding: 0.15rem 0.55rem;
+    background: var(--bg);
+    border: 1px solid var(--border-accent);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-dim);
+  }
+  .plan-name {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 1rem;
+  }
+  .plan-price {
+    font-size: clamp(1.85rem, 3.5vw, 2.35rem);
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    margin-bottom: 0.35rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .plan-price .cur { color: var(--text-dim); margin-right: 0.4rem; font-weight: 400; }
+  .plan-sub {
+    color: var(--text-dim);
+    font-size: 13.5px;
+    margin-bottom: 1.5rem;
+    min-height: 2.7em;
+  }
+  .plan ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--text);
+  }
+  .plan ul li {
+    padding: 0.45rem 0;
+    border-top: 1px dashed var(--border);
+    display: grid;
+    grid-template-columns: 1.25rem 1fr;
+    gap: 0.5rem;
+  }
+  .plan ul li:first-child { border-top: none; padding-top: 0; }
+  .plan ul li::before {
+    content: "+";
+    color: var(--accent-dim);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  /* ─── Docs card ──────────────────────────────────────────── */
+
+  .docs-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 2.25rem;
+    background:
+      radial-gradient(ellipse at top right, rgba(94, 234, 212, 0.05), transparent 50%),
+      var(--bg-raised);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2rem;
+    align-items: center;
+  }
+  @media (max-width: 720px) {
+    .docs-card { grid-template-columns: 1fr; }
+  }
+  .docs-card h3 {
+    margin: 0 0 0.5rem;
+    font-size: 20px;
+    letter-spacing: -0.015em;
+    font-weight: 500;
+  }
+  .docs-card p {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 14px;
+    max-width: 48ch;
+  }
+
+  /* ─── Disclaimer block ───────────────────────────────────── */
+
+  .disc {
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--warn);
+    background: var(--bg-raised);
+    padding: 1.25rem 1.5rem;
+    border-radius: 4px;
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .disc strong {
+    color: var(--text);
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    display: block;
+    margin-bottom: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  /* ─── Footer ─────────────────────────────────────────────── */
+
+  footer {
+    border-top: 1px solid var(--border-dim);
+    padding: 2.5rem 0 3rem;
+    margin-top: 2rem;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+  }
+  .foot-inner {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    align-items: baseline;
+  }
+  @media (max-width: 640px) {
+    .foot-inner { grid-template-columns: 1fr; }
+  }
+  footer a { color: var(--text-dim); }
+  footer a:hover { color: var(--text); }
+
+  .foot-cols {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  /* ─── Small-viewport tightening (iPhone SE → 14, <480px) ── */
+
+  @media (max-width: 480px) {
+    :root { --gutter-px: 1.25rem; }
+
+    .nav-inner   { height: 52px; }
+    .brand       { font-size: 12px; letter-spacing: 0.14em; }
+    .nav-links   { gap: 0.9rem; font-size: 11px; letter-spacing: 0.06em; }
+    .nav-links a[href="/llms.txt"],
+    .nav-links a[href*="github"] { display: none; }
+
+    h1.hero-title { font-size: 2.2rem; letter-spacing: -0.03em; max-width: 100%; }
+    .hero-lede    { font-size: 14.5px; }
+    .hero-kicker  { font-size: 10.5px; padding: 0.3rem 0.65rem 0.3rem 0.5rem; }
+
+    .panel         { padding: 1.15rem; }
+    .panel-head    { flex-wrap: wrap; gap: 0.35rem; font-size: 10px; }
+    .panel-head > span:last-child { font-size: 10px; }
+    .price         { font-size: 1.65rem; }
+    .panel-rows    { grid-template-columns: 1fr auto auto; gap: 0.3rem 0.6rem; }
+    .panel-foot    { gap: 0.5rem; }
+
+    .section-head  { grid-template-columns: 1fr; gap: 0.6rem; }
+    .section-head h2 { font-size: 1.5rem; }
+
+    .tool-row      { grid-template-columns: 1.75rem 1fr; padding: 0.8rem 1rem; }
+    .tool-row .desc { grid-column: 2; font-size: 12.8px; }
+
+    .code          { font-size: 11.5px; padding: 0.7rem 2.5rem 0.7rem 0.7rem; }
+    .code--lg      { font-size: 11.5px; padding: 1rem 2.5rem 1rem 1rem; }
+    .copy          { top: 0.4rem; right: 0.4rem; padding: 0.25rem 0.45rem; font-size: 10px; }
+
+    .plan          { padding: 1.4rem 1.4rem 1.2rem; }
+    .plan-price    { font-size: 1.7rem; }
+
+    .docs-card     { padding: 1.75rem; }
+    .docs-card h3  { font-size: 18px; }
+
+    footer         { padding: 2rem 0 2.5rem; }
+    .foot-cols     { gap: 1.25rem; font-size: 11px; }
+  }
+
+  /* ─── Reveal-in animation ───────────────────────────────── */
+
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      opacity: 0;
+      transform: translateY(8px);
+      animation: reveal 700ms cubic-bezier(.16,.84,.44,1) forwards;
+    }
+    .reveal:nth-child(1) { animation-delay:  60ms; }
+    .reveal:nth-child(2) { animation-delay: 140ms; }
+    .reveal:nth-child(3) { animation-delay: 220ms; }
+    .reveal:nth-child(4) { animation-delay: 300ms; }
+    @keyframes reveal {
+      to { opacity: 1; transform: translateY(0); }
+    }
+  }
+</style>
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="/" aria-label="MAXIA Oracle">
+      <span class="brand-dot" aria-hidden="true"></span>
+      MAXIA&nbsp;·&nbsp;ORACLE
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#install">install</a>
+      <a href="#pricing">pricing</a>
+      <a href="/docs/">api reference</a>
+      <a href="https://github.com/MAXIAWORLD/oracleforge" rel="noreferrer">source</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main-content">
+
+  <!-- ── Hero ─────────────────────────────────────────────── -->
+  <section class="hero" aria-labelledby="hero-heading">
+    <div class="wrap">
+      <div class="hero-grid">
+        <div>
+          <span class="hero-kicker reveal">v0.1.0 · apache-2.0 · multi-source</span>
+          <h1 id="hero-heading" class="hero-title reveal">
+            Multi-source price&nbsp;feed<br>
+            <em>for AI agents.</em>
+          </h1>
+          <p class="hero-lede reveal">
+            A drop-in oracle for autonomous agents. Three upstreams — Pyth Hermes,
+            Chainlink on Base, and a spot venue — aggregated and reconciled into a
+            single call, with a divergence figure you can trust or refuse.
+            <br><br>
+            Six client libraries. One MCP server. Zero custody.
+          </p>
+          <div class="hero-cta reveal">
+            <a class="btn btn--primary" href="#install">
+              get started <span class="arrow" aria-hidden="true">→</span>
+            </a>
+            <a class="btn" href="/docs/">
+              api reference
+            </a>
+          </div>
+        </div>
+
+        <aside class="panel reveal" aria-label="Example response from /api/price/BTC">
+          <div class="panel-head">
+            <span class="example-tag">example · GET /api/price/BTC</span>
+            <span>v0.1.0</span>
+          </div>
+          <div class="price">
+            <span class="symbol">BTC</span>$74,757<span class="cents">.58</span>
+          </div>
+          <div class="divergence">
+            ◆ divergence 0.16% across 3 sources
+          </div>
+          <div class="panel-rows">
+            <span class="src">pyth</span>
+            <span>$74,781.31</span>
+            <span class="age">1s</span>
+
+            <span class="src">chainlink_base</span>
+            <span>$74,663.19</span>
+            <span class="age">421s</span>
+
+            <span class="src">coinpaprika</span>
+            <span>$74,757.58</span>
+            <span class="age">—</span>
+          </div>
+          <div class="panel-foot">
+            <div><div class="k">symbols</div><div class="v">79</div></div>
+            <div><div class="k">sources</div><div class="v">3</div></div>
+            <div><div class="k">uptime</div><div class="v">100%</div></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <hr class="hairline">
+
+  <!-- ── How it works ─────────────────────────────────────── -->
+  <section class="section" id="mechanism" aria-labelledby="mechanism-heading">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="numeral" aria-hidden="true">01 / 06</span>
+        <div>
+          <h2 id="mechanism-heading">Three feeds. One answer. An audit trail either way.</h2>
+          <p>No statistical magic, no secret weighting. The request returns every source that spoke, every age, and the divergence between them. You decide what to do with outliers.</p>
+        </div>
+      </div>
+
+      <div class="mech">
+        <div class="mech-cell">
+          <div class="mech-num">01</div>
+          <h3>Pyth Hermes</h3>
+          <p>Decentralized first-party publishers. Sub-second staleness, confidence intervals built-in, wide symbol coverage including equities.</p>
+        </div>
+        <div class="mech-cell">
+          <div class="mech-num">02</div>
+          <h3>Chainlink on Base</h3>
+          <p>Read directly from the aggregator contract on Base mainnet. What on-chain contracts see is what you see. No server in the middle.</p>
+        </div>
+        <div class="mech-cell">
+          <div class="mech-num">03</div>
+          <h3>Spot venue fallback</h3>
+          <p>A third reading from a spot market aggregator. If the two oracles disagree, you know it — before your agent commits to anything.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Tool surface ─────────────────────────────────────── -->
+  <section class="section" id="tools" aria-labelledby="tools-heading">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="numeral" aria-hidden="true">02 / 06</span>
+        <div>
+          <h2 id="tools-heading">Eight tools. Every agent framework speaks them.</h2>
+          <p>The same surface is available as REST endpoints, MCP tools, and typed methods in our SDKs. Swap frameworks without teaching your agent anything new.</p>
+        </div>
+      </div>
+
+      <div class="tool-table">
+        <div class="tool-row"><span class="idx">T.01</span><span class="name">get_price</span><span class="desc">Aggregated price for one symbol across every live source.</span></div>
+        <div class="tool-row"><span class="idx">T.02</span><span class="name">get_prices_batch</span><span class="desc">Up to 20 symbols in one call. Same shape, same disclaimer.</span></div>
+        <div class="tool-row"><span class="idx">T.03</span><span class="name">get_sources_status</span><span class="desc">Which upstreams answered, which feeds they expose, their last heartbeat.</span></div>
+        <div class="tool-row"><span class="idx">T.04</span><span class="name">get_cache_stats</span><span class="desc">Hit ratio, median age, per-source breakdown — useful in observability pipelines.</span></div>
+        <div class="tool-row"><span class="idx">T.05</span><span class="name">get_confidence</span><span class="desc">The divergence figure split out, for policies that reject on drift.</span></div>
+        <div class="tool-row"><span class="idx">T.06</span><span class="name">list_supported_symbols</span><span class="desc">All 79 symbols currently covered — crypto majors, select equities, stablecoins.</span></div>
+        <div class="tool-row"><span class="idx">T.07</span><span class="name">get_chainlink_onchain</span><span class="desc">Direct Base mainnet read. Round ID, contract, age. Nothing we aggregated.</span></div>
+        <div class="tool-row"><span class="idx">T.08</span><span class="name">health_check</span><span class="desc">Liveness + env. One call, no auth required.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Install ──────────────────────────────────────────── -->
+  <section class="section" id="install" aria-labelledby="install-heading">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="numeral" aria-hidden="true">03 / 06</span>
+        <div>
+          <h2 id="install-heading">Install, or wire the MCP server. Pick any surface.</h2>
+          <p>Six first-party packages covering the Python and TypeScript ecosystems that actually ship agents. Each one is a thin adapter over the same HTTP API.</p>
+        </div>
+      </div>
+
+      <div class="installs">
+        <div class="pkg">
+          <div class="pkg-head">
+            <span class="pkg-name">maxia-oracle</span>
+            <span class="pkg-reg">pypi</span>
+          </div>
+          <pre class="code"><button class="copy" type="button" data-copy="pip install maxia-oracle" aria-label="Copy command: pip install maxia-oracle">copy</button>pip install maxia-oracle</pre>
+        </div>
+
+        <div class="pkg">
+          <div class="pkg-head">
+            <span class="pkg-name">@maxia/oracle</span>
+            <span class="pkg-reg">npm</span>
+          </div>
+          <pre class="code"><button class="copy" type="button" data-copy="npm install @maxia/oracle" aria-label="Copy command: npm install @maxia/oracle">copy</button>npm install @maxia/oracle</pre>
+        </div>
+
+        <div class="pkg">
+          <div class="pkg-head">
+            <span class="pkg-name">langchain-maxia-oracle</span>
+            <span class="pkg-reg">pypi · langchain</span>
+          </div>
+          <pre class="code"><button class="copy" type="button" data-copy="pip install langchain-maxia-oracle" aria-label="Copy command: pip install langchain-maxia-oracle">copy</button>pip install langchain-maxia-oracle</pre>
+        </div>
+
+        <div class="pkg">
+          <div class="pkg-head">
+            <span class="pkg-name">crewai-tools-maxia-oracle</span>
+            <span class="pkg-reg">pypi · crewai</span>
+          </div>
+          <pre class="code"><button class="copy" type="button" data-copy="pip install crewai-tools-maxia-oracle" aria-label="Copy command: pip install crewai-tools-maxia-oracle">copy</button>pip install crewai-tools-maxia-oracle</pre>
+        </div>
+
+        <div class="pkg">
+          <div class="pkg-head">
+            <span class="pkg-name">autogen-maxia-oracle</span>
+            <span class="pkg-reg">pypi · autogen</span>
+          </div>
+          <pre class="code"><button class="copy" type="button" data-copy="pip install autogen-maxia-oracle" aria-label="Copy command: pip install autogen-maxia-oracle">copy</button>pip install autogen-maxia-oracle</pre>
+        </div>
+
+        <div class="pkg">
+          <div class="pkg-head">
+            <span class="pkg-name">llama-index-tools-maxia-oracle</span>
+            <span class="pkg-reg">pypi · llamaindex</span>
+          </div>
+          <pre class="code"><button class="copy" type="button" data-copy="pip install llama-index-tools-maxia-oracle" aria-label="Copy command: pip install llama-index-tools-maxia-oracle">copy</button>pip install llama-index-tools-maxia-oracle</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Try it now ───────────────────────────────────────── -->
+  <section class="section" id="quickstart" aria-labelledby="quickstart-heading">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="numeral" aria-hidden="true">04 / 06</span>
+        <div>
+          <h2 id="quickstart-heading">Live in two commands.</h2>
+          <p>No signup, no dashboard, no email link. Register, get a key, price something. It's that flat.</p>
+        </div>
+      </div>
+
+      <pre class="code code--lg"><button class="copy" type="button" aria-label="Copy two-step quick-start: register an API key then fetch BTC price" data-copy='KEY=$(curl -s -X POST https://oracle.maxiaworld.app/api/register | python -c "import sys,json;print(json.load(sys.stdin)[&apos;data&apos;][&apos;api_key&apos;])")
+
+curl -s -H "X-API-Key: $KEY" https://oracle.maxiaworld.app/api/price/BTC | python -m json.tool'>copy</button><span class="token-cmt"># 1. claim a free daily quota (100 req/day) — no email, no dashboard</span>
+KEY=$(curl -s -X POST https://oracle.maxiaworld.app/api/register \
+  | python -c <span class="token-str">"import sys,json;print(json.load(sys.stdin)['data']['api_key'])"</span>)
+
+<span class="token-cmt"># 2. ask a price</span>
+curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxiaworld.app/api/price/BTC \
+  | python -m json.tool</pre>
+    </div>
+  </section>
+
+  <!-- ── Pricing ──────────────────────────────────────────── -->
+  <section class="section" id="pricing" aria-labelledby="pricing-heading">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="numeral" aria-hidden="true">05 / 06</span>
+        <div>
+          <h2 id="pricing-heading">Two ways to pay. Neither of them is a subscription.</h2>
+          <p>A free tier big enough to prototype with, and a pay-per-call path on Base so your agent can settle autonomously.</p>
+        </div>
+      </div>
+
+      <div class="price-grid">
+        <div class="plan">
+          <div class="plan-name">Free tier</div>
+          <div class="plan-price"><span class="cur">$</span>0<span style="color:var(--text-dim);font-size:0.45em;font-weight:400;letter-spacing:0;"> / day</span></div>
+          <p class="plan-sub">An API key with a 100-request daily cap. Resets at midnight UTC. No card, no onboarding.</p>
+          <ul>
+            <li>100 requests / day / key</li>
+            <li>Every endpoint, no feature gating</li>
+            <li>Issued on-demand by <code style="font-family:var(--font-mono);font-size:12px;color:var(--accent-dim);">POST /api/register</code></li>
+            <li>Keyed by header, nothing client-side</li>
+          </ul>
+        </div>
+
+        <div class="plan plan--featured">
+          <span class="plan-tag">on Base</span>
+          <div class="plan-name">Pay-per-call · x402</div>
+          <div class="plan-price"><span class="cur">$</span>0.001<span style="color:var(--text-dim);font-size:0.45em;font-weight:400;letter-spacing:0;"> / request</span></div>
+          <p class="plan-sub">USDC on Base mainnet via the x402 protocol. Direct sale — no intermediation, no escrow, no holding.</p>
+          <ul>
+            <li>0.001 USDC per single request</li>
+            <li>0.005 USDC per batch (up to 20)</li>
+            <li>Coinbase x402 facilitator, with on-chain fallback</li>
+            <li>Anonymous — no key required</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Docs ─────────────────────────────────────────────── -->
+  <section class="section" id="docs" aria-labelledby="docs-heading">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="numeral" aria-hidden="true">06 / 06</span>
+        <div>
+          <h2 id="docs-heading">A reference. Not a tour.</h2>
+          <p>The full API contract — every route, every parameter, every response shape — rendered as a single static page.</p>
+        </div>
+      </div>
+
+      <a href="/docs/" class="docs-card" aria-label="Open API reference">
+        <div>
+          <h3>MAXIA Oracle — API reference</h3>
+          <p>Six public endpoints, OpenAPI 3.1, rendered with Scalar. Built from the prod schema, served as a frozen artefact — not the live backend.</p>
+        </div>
+        <div class="btn btn--primary" aria-hidden="true">
+          open reference <span class="arrow" aria-hidden="true">→</span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── Disclaimers ──────────────────────────────────────── -->
+  <section class="section" style="padding-top:0;" id="disclaimers">
+    <div class="wrap">
+      <div class="disc">
+        <strong>What MAXIA Oracle is, and is not</strong>
+        <strong style="color:var(--text-faint); text-transform:uppercase; font-size:10.5px; letter-spacing:0.14em; margin-top:0;">Data feed only. Not investment advice. No custody. No KYC.</strong>
+        MAXIA Oracle reads public price data from upstream oracles and spot aggregators, reconciles it, and returns it. It does not place orders. It does not hold funds. It does not route trades. It does not onboard users. Nothing in a response constitutes investment advice, a solicitation to buy or sell any asset, or a recommendation of any kind. Every integrator is solely responsible for how the returned numbers are used, by whom, and under which regulatory regime.
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-inner">
+    <div class="foot-cols">
+      <span>© 2026 MAXIA</span>
+      <a href="mailto:ceo@maxiaworld.app">ceo@maxiaworld.app</a>
+      <a href="/docs/">/docs</a>
+      <a href="/llms.txt">/llms.txt</a>
+      <a href="https://github.com/MAXIAWORLD/oracleforge" rel="noreferrer">github</a>
+    </div>
+    <div>Apache-2.0 · v0.1.0</div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    "use strict";
+
+    // ── copy-to-clipboard on every .copy button ───────────────────
+    document.querySelectorAll('.copy').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var txt = btn.getAttribute('data-copy') || '';
+        (navigator.clipboard && navigator.clipboard.writeText
+          ? navigator.clipboard.writeText(txt)
+          : Promise.reject()
+        ).then(function () {
+          btn.textContent = 'copied';
+          btn.setAttribute('data-state', 'copied');
+          setTimeout(function () {
+            btn.textContent = 'copy';
+            btn.removeAttribute('data-state');
+          }, 1200);
+        }).catch(function () {
+          // fallback for non-secure contexts
+          try {
+            var ta = document.createElement('textarea');
+            ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta);
+            btn.textContent = 'copied';
+            btn.setAttribute('data-state', 'copied');
+            setTimeout(function () {
+              btn.textContent = 'copy';
+              btn.removeAttribute('data-state');
+            }, 1200);
+          } catch (_) {}
+        });
+      });
+    });
+
+    // ── very gentle scroll-reveal for non-hero sections ──────────
+    if (!('IntersectionObserver' in window)
+        || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          e.target.style.opacity = '1';
+          e.target.style.transform = 'translateY(0)';
+          io.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -8%' });
+
+    document.querySelectorAll('.section .section-head, .section .mech, .section .tool-table, .section .installs, .section .code--lg, .section .price-grid, .section .docs-card').forEach(function (el) {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(10px)';
+      el.style.transition = 'opacity 600ms ease, transform 600ms cubic-bezier(.16,.84,.44,1)';
+      io.observe(el);
+    });
+  })();
+</script>
+
+</body>
+</html>
