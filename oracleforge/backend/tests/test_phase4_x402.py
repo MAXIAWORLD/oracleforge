@@ -62,16 +62,30 @@ def client(session_app) -> Iterator[TestClient]:
 
 @pytest.fixture
 def stub_verifier(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    """Replace `x402_verify_payment_base` with a controllable stub.
+    """Replace `x402_verify_payment` with a controllable stub.
+
+    V1.2: the middleware now calls `x402_verify_payment(chain, header,
+    amount)` from the generic multichain_verifier. The stub takes the
+    same three-argument signature so Phase 4's Base-only assertions keep
+    working — the `chain` parameter is recorded on the state so tests
+    can assert which chain was dispatched when they want to.
 
     The fixture returns a mutable dict that the test body can use to
     configure the stub's response. Default: valid payment, tx_hash
     derived from the payment_header.
     """
-    state: dict[str, Any] = {"valid": True, "tx_hash": None, "call_count": 0}
+    state: dict[str, Any] = {
+        "valid": True,
+        "tx_hash": None,
+        "call_count": 0,
+        "last_chain": None,
+    }
 
-    async def _stub(payment_header: str, expected_amount_usdc: float) -> dict[str, Any]:
+    async def _stub(
+        chain: str, payment_header: str, expected_amount_usdc: float
+    ) -> dict[str, Any]:
         state["call_count"] += 1
+        state["last_chain"] = chain
         tx_hash = state["tx_hash"] or (
             payment_header
             if payment_header.startswith("0x") and len(payment_header) == 66
@@ -82,15 +96,15 @@ def stub_verifier(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         return {
             "valid": True,
             "txHash": tx_hash,
-            "network": "base-mainnet",
+            "network": f"{chain}-mainnet",
             "verifiedVia": "stub",
+            "chainId": 8453 if chain == "base" else 0,
         }
 
-    # The middleware imports x402_verify_payment_base directly into its
-    # namespace, so we must patch the name at that import site.
-    monkeypatch.setattr(
-        "x402.middleware.x402_verify_payment_base", _stub
-    )
+    # The middleware imports `x402_verify_payment` into its namespace; we
+    # patch the name at that import site so the stub is hit on every
+    # middleware dispatch.
+    monkeypatch.setattr("x402.middleware.x402_verify_payment", _stub)
     return state
 
 

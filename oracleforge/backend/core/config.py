@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Final
+from typing import Any, Final
 
 from dotenv import load_dotenv
 
@@ -269,6 +269,14 @@ _ARBITRUM_RPC_PRIMARY: Final[str] = os.getenv(
     "ARBITRUM_RPC_URL", "https://arb1.arbitrum.io/rpc"
 ).strip() or "https://arb1.arbitrum.io/rpc"
 
+_OPTIMISM_RPC_PRIMARY: Final[str] = os.getenv(
+    "OPTIMISM_RPC_URL", "https://mainnet.optimism.io"
+).strip() or "https://mainnet.optimism.io"
+
+_POLYGON_RPC_PRIMARY: Final[str] = os.getenv(
+    "POLYGON_RPC_URL", "https://polygon-rpc.com"
+).strip() or "https://polygon-rpc.com"
+
 CHAIN_RPC_URLS: Final[dict[str, tuple[str, ...]]] = {
     "base": (
         _BASE_RPC_PRIMARY,
@@ -284,6 +292,16 @@ CHAIN_RPC_URLS: Final[dict[str, tuple[str, ...]]] = {
         _ARBITRUM_RPC_PRIMARY,
         "https://arbitrum.llamarpc.com",
         "https://arbitrum-one-rpc.publicnode.com",
+    ),
+    "optimism": (
+        _OPTIMISM_RPC_PRIMARY,
+        "https://optimism.llamarpc.com",
+        "https://optimism-rpc.publicnode.com",
+    ),
+    "polygon": (
+        _POLYGON_RPC_PRIMARY,
+        "https://polygon.llamarpc.com",
+        "https://polygon-bor-rpc.publicnode.com",
     ),
 }
 
@@ -324,3 +342,122 @@ X402_PRICE_MAP: Final[dict[str, float]] = {
     "/api/price/": 0.001,          # per single-symbol call (prefix match)
     "/api/prices/batch": 0.005,    # per batch call (exact match, caps at 50 symbols)
 }
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── V1.2 x402 multi-chain EVM configuration ──
+# ══════════════════════════════════════════════════════════════════════════
+#
+# V1.2 extends Phase 4's Base-only x402 verifier to four EVM chains (Base,
+# Arbitrum, Optimism, Polygon) with native USDC on each. The same EVM
+# keypair can receive USDC on all four chains, so the common setup is a
+# single `X402_TREASURY_ADDRESS` that covers every chain. Per-chain
+# overrides exist for audit-friendly setups that prefer segregated wallets.
+#
+# Treasury resolution cascade (first non-empty wins):
+#     X402_TREASURY_ADDRESS_<CHAIN>   (e.g. X402_TREASURY_ADDRESS_ARBITRUM)
+#     X402_TREASURY_ADDRESS           (generic, applies to every chain)
+#     X402_TREASURY_ADDRESS_BASE      (V1.0 compat — applies only to Base)
+#
+# A chain without any resolvable treasury is simply omitted from the 402
+# `accepts` list at runtime. This lets an operator progressively roll out
+# multi-chain support without forcing a big-bang change.
+
+X402_SUPPORTED_CHAINS: Final[tuple[str, ...]] = (
+    "base", "arbitrum", "optimism", "polygon"
+)
+
+_X402_TREASURY_GENERIC: Final[str] = os.getenv(
+    "X402_TREASURY_ADDRESS", ""
+).strip()
+
+if _X402_TREASURY_GENERIC and not _EVM_ADDRESS_PATTERN.match(_X402_TREASURY_GENERIC):
+    raise RuntimeError(
+        "X402_TREASURY_ADDRESS must match ^0x[a-fA-F0-9]{40}$ "
+        f"(42 chars total). Got length {len(_X402_TREASURY_GENERIC)}."
+    )
+
+
+def _resolve_treasury(chain: str) -> str:
+    """Resolve the treasury address for `chain` via the cascade.
+
+    Returns '' if no address is configured for this chain (the verifier
+    will omit the chain from the 402 accepts list).
+    """
+    per_chain_raw = os.getenv(
+        f"X402_TREASURY_ADDRESS_{chain.upper()}", ""
+    ).strip()
+    if per_chain_raw:
+        if not _EVM_ADDRESS_PATTERN.match(per_chain_raw):
+            raise RuntimeError(
+                f"X402_TREASURY_ADDRESS_{chain.upper()} must match "
+                f"^0x[a-fA-F0-9]{{40}}$. Got length {len(per_chain_raw)}."
+            )
+        return per_chain_raw
+    if _X402_TREASURY_GENERIC:
+        return _X402_TREASURY_GENERIC
+    if chain == "base" and X402_TREASURY_ADDRESS_BASE:
+        return X402_TREASURY_ADDRESS_BASE
+    return ""
+
+
+# USDC native contracts on each supported chain. Source: Circle official
+# docs (https://developers.circle.com/stablecoins/usdc-on-main-networks).
+# Pinned canonical values — never user-controlled.
+_USDC_CONTRACTS: Final[dict[str, str]] = {
+    "base":     "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "arbitrum": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "optimism": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+    "polygon":  "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+}
+
+# EVM chain IDs (CAIP-2).
+_CHAIN_IDS: Final[dict[str, int]] = {
+    "base":     8453,
+    "arbitrum": 42161,
+    "optimism": 10,
+    "polygon":  137,
+}
+
+# Human-readable network labels used in the x402 accepts entries.
+_NETWORK_LABELS: Final[dict[str, str]] = {
+    "base":     "base-mainnet",
+    "arbitrum": "arbitrum-mainnet",
+    "optimism": "optimism-mainnet",
+    "polygon":  "polygon-mainnet",
+}
+
+
+def _build_x402_chain_config() -> dict[str, dict[str, Any]]:
+    """Assemble the per-chain x402 configuration dict.
+
+    Each entry carries the chain_id, the USDC contract, the resolved
+    treasury address (may be empty — caller checks), the network label,
+    and the facilitator URL (None for every chain except Base — Coinbase
+    only supports Base in the x402-v2 spec, and the direct on-chain
+    fallback covers the other three).
+    """
+    return {
+        chain: {
+            "chain_id": _CHAIN_IDS[chain],
+            "usdc_contract": _USDC_CONTRACTS[chain],
+            "treasury": _resolve_treasury(chain),
+            "network_label": _NETWORK_LABELS[chain],
+            "facilitator": X402_FACILITATOR_URL if chain == "base" else None,
+        }
+        for chain in X402_SUPPORTED_CHAINS
+    }
+
+
+X402_CHAIN_CONFIG: Final[dict[str, dict[str, Any]]] = _build_x402_chain_config()
+
+
+# Fail fast in non-dev if not a single treasury address is configured.
+# Dev can run with zero treasuries (middleware will 402 every request, but
+# the server still boots so tests run without any wallet setup).
+if IS_NON_DEV and not any(c["treasury"] for c in X402_CHAIN_CONFIG.values()):
+    raise RuntimeError(
+        f"At least one x402 treasury must be configured in {ENV}. "
+        "Set X402_TREASURY_ADDRESS (applies to all chains) or at least one "
+        "of X402_TREASURY_ADDRESS_{BASE,ARBITRUM,OPTIMISM,POLYGON}."
+    )

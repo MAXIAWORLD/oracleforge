@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS x402_txs (
     tx_hash      TEXT PRIMARY KEY NOT NULL,
     amount_usdc  REAL NOT NULL,
     path         TEXT NOT NULL,
-    created_at   INTEGER NOT NULL
+    created_at   INTEGER NOT NULL,
+    chain        TEXT NOT NULL DEFAULT 'base'
 );
 
 CREATE INDEX IF NOT EXISTS idx_rate_limit_window
@@ -98,12 +99,30 @@ def _connect(db_path: str | Path) -> sqlite3.Connection:
 _shared_connection: sqlite3.Connection | None = None
 
 
+def _ensure_column(
+    conn: sqlite3.Connection, table: str, column: str, ddl_fragment: str
+) -> None:
+    """Idempotent SQLite `ALTER TABLE ADD COLUMN` guard.
+
+    SQLite has no `ADD COLUMN IF NOT EXISTS` so we introspect the table
+    schema via PRAGMA and only execute the ALTER when the column is
+    missing. Safe to call on every `init_db()` — a no-op on schemas that
+    already include the column.
+    """
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column in existing:
+        return
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl_fragment}")
+    logger.info("[db] Added %s.%s via migration", table, column)
+
+
 def init_db() -> sqlite3.Connection:
     """Open the shared DB connection and apply the schema.
 
     Called from the FastAPI lifespan on startup. Idempotent: safe to call
     multiple times; only opens a new connection if the previous one was
-    closed.
+    closed. Non-destructive migrations (like V1.2's `x402_txs.chain`
+    column) are applied here so older DB files upgrade in place.
     """
     global _shared_connection
     if _shared_connection is not None:
@@ -113,6 +132,14 @@ def init_db() -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = _connect(db_path)
     conn.executescript(_SCHEMA_SQL)
+
+    # V1.2 migration: add `chain` column to pre-existing `x402_txs` tables.
+    # The executescript above creates the column for fresh DBs; this guard
+    # upgrades DBs that were initialized against the Phase 4 schema.
+    _ensure_column(
+        conn, "x402_txs", "chain", "chain TEXT NOT NULL DEFAULT 'base'"
+    )
+
     logger.info("SQLite initialized at %s", db_path)
     _shared_connection = conn
     return conn
@@ -192,8 +219,14 @@ def x402_record_tx(
     tx_hash: str,
     amount_usdc: float,
     path: str,
+    chain: str = "base",
 ) -> bool:
     """Record a verified x402 transaction. Return True on insert, False on replay.
+
+    V1.2: `chain` is recorded alongside the hash so the audit trail shows
+    which EVM network settled the payment. The primary key stays
+    `tx_hash` alone (cf. v1.2 doc, decision D5) because collision across
+    chains is cryptographically negligible.
 
     Uses INSERT OR IGNORE so that concurrent duplicate inserts resolve
     deterministically: the first writer wins, subsequent writers observe a
@@ -205,10 +238,12 @@ def x402_record_tx(
         raise ValueError(f"amount_usdc must be strictly positive, got {amount_usdc}")
     if not path:
         raise ValueError("path must be a non-empty string")
+    if not chain:
+        raise ValueError("chain must be a non-empty string")
 
     cursor = conn.execute(
-        "INSERT OR IGNORE INTO x402_txs (tx_hash, amount_usdc, path, created_at) "
-        "VALUES (?, ?, ?, ?)",
-        (tx_hash, amount_usdc, path, now_unix()),
+        "INSERT OR IGNORE INTO x402_txs (tx_hash, amount_usdc, path, created_at, chain) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (tx_hash, amount_usdc, path, now_unix(), chain),
     )
     return cursor.rowcount == 1
