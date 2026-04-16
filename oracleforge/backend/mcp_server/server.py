@@ -29,7 +29,7 @@ from mcp.server.lowlevel import Server
 from . import tools
 
 SERVER_NAME = "maxia-oracle"
-SERVER_VERSION = "0.1.0"
+SERVER_VERSION = "0.1.4"
 SERVER_INSTRUCTIONS = (
     "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP tools. "
     "Each result is a read-only live data point intended for AI agents that need "
@@ -191,6 +191,25 @@ _TOOL_DEFINITIONS: list[types.Tool] = [
         },
     ),
     types.Tool(
+        name="get_pyth_solana_onchain",
+        description=(
+            "Fetch a single-source price directly from a Pyth on-chain price "
+            "feed account on Solana mainnet (V1.4, shard 0 sponsored feeds). "
+            "Reads the PriceUpdateV2 account maintained by the Pyth Push "
+            "Oracle program and rejects updates that are not fully verified "
+            "by the Wormhole guardian set. Coverage is limited to the curated "
+            "majors (BTC, ETH, SOL, USDT, USDC, WIF, BONK, PYTH, JTO, JUP, "
+            "RAY, EUR, GBP). "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_SCHEMA},
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
         name="health_check",
         description=(
             "Minimal liveness probe for the MAXIA Oracle MCP server. Does not "
@@ -218,6 +237,7 @@ _TOOL_DISPATCH: dict[str, _ToolHandler] = {
     "list_supported_symbols": tools.list_supported_symbols,
     "get_chainlink_onchain": tools.get_chainlink_onchain,
     "get_redstone_price": tools.get_redstone_price,
+    "get_pyth_solana_onchain": tools.get_pyth_solana_onchain,
     "health_check": tools.health_check,
 }
 

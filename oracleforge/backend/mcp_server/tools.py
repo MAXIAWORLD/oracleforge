@@ -35,6 +35,7 @@ from services.oracle import (
     chainlink_oracle,
     price_oracle,
     pyth_oracle,
+    pyth_solana_oracle,
     redstone_oracle,
 )
 from services.oracle.multi_source import collect_sources, compute_divergence
@@ -262,11 +263,14 @@ async def list_supported_symbols() -> dict[str, Any]:
     for syms in chainlink_by_chain.values():
         chainlink_union.update(syms)
 
+    pyth_solana_syms = pyth_solana_oracle.list_supported_symbols()
+
     all_symbols = sorted(
         set(pyth_crypto)
         | set(pyth_equity)
         | chainlink_union
         | set(price_oracle_mints)
+        | set(pyth_solana_syms)
     )
 
     return wrap_with_disclaimer(
@@ -280,6 +284,7 @@ async def list_supported_symbols() -> dict[str, Any]:
                 "chainlink_ethereum": chainlink_by_chain.get("ethereum", []),
                 "chainlink_arbitrum": chainlink_by_chain.get("arbitrum", []),
                 "price_oracle": price_oracle_mints,
+                "pyth_solana": pyth_solana_syms,
             },
         }
     )
@@ -359,7 +364,45 @@ async def get_redstone_price(symbol: str) -> dict[str, Any]:
     return wrap_with_disclaimer(result)
 
 
-# ── 10. health_check ─────────────────────────────────────────────────────────
+# ── 10. get_pyth_solana_onchain (V1.4) ───────────────────────────────────────
+
+
+async def get_pyth_solana_onchain(symbol: str) -> dict[str, Any]:
+    """Fetch an on-chain Pyth price directly from Solana mainnet (V1.4).
+
+    Reads the Price Feed Account for `symbol` on shard 0 of the Pyth Push
+    Oracle program (`pythWSns...`) and decodes the Anchor `PriceUpdateV2`
+    layout inline. Coverage is restricted to the majors sponsored by the
+    Pyth Data Association on shard 0 -- see
+    `pyth_solana_oracle.PYTH_SOLANA_FEEDS`. Unknown symbols are rejected
+    with `symbol not supported on Pyth Solana shard 0`.
+
+    The reader rejects updates with verification_level other than Full,
+    protecting callers from partial-Wormhole-signature attacks.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if not pyth_solana_oracle.has_feed(symbol):
+        return wrap_error(
+            "symbol not supported on Pyth Solana shard 0",
+            symbol=symbol,
+            supported=pyth_solana_oracle.list_supported_symbols(),
+        )
+
+    result = await pyth_solana_oracle.get_pyth_solana_price(symbol)
+    if not isinstance(result, dict) or result.get("error"):
+        return wrap_error(
+            "pyth_solana fetch failed",
+            symbol=symbol,
+            detail=result.get("error") if isinstance(result, dict) else "unexpected",
+        )
+    return wrap_with_disclaimer(result)
+
+
+# ── 11. health_check ─────────────────────────────────────────────────────────
 
 
 async def health_check() -> dict[str, Any]:

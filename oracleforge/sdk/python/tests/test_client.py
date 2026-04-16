@@ -309,6 +309,68 @@ def test_redstone_hits_expected_path() -> None:
     assert result["data"]["source"] == "redstone"
 
 
+def test_pyth_solana_hits_expected_path() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        return _ok(
+            {
+                "data": {
+                    "source": "pyth_solana",
+                    "symbol": "BTC",
+                    "price": 75000.0,
+                    "conf": 12.3,
+                    "confidence_pct": 0.02,
+                    "publish_time": 1_776_000_000,
+                    "age_s": 5,
+                    "stale": False,
+                    "price_account": "4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo",
+                    "posted_slot": 413_000_000,
+                    "exponent": -8,
+                    "feed_id": "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+                },
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        result = c.pyth_solana("BTC")
+    assert captured["path"] == "/api/pyth/solana/BTC"
+    assert result["data"]["source"] == "pyth_solana"
+    assert result["data"]["price"] == 75000.0
+
+
+def test_pyth_solana_404_raises_upstream_error() -> None:
+    import pytest
+
+    from maxia_oracle.exceptions import MaxiaOracleUpstreamError
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            404,
+            json={
+                "error": "symbol not supported on Pyth Solana shard 0",
+                "symbol": "ZZZZ",
+                "supported": ["BTC", "ETH"],
+            },
+        )
+
+    with _client_with(handler) as c:
+        with pytest.raises(MaxiaOracleUpstreamError, match="not supported"):
+            c.pyth_solana("ZZZZ")
+
+
+def test_pyth_solana_rejects_invalid_symbol_client_side() -> None:
+    import pytest
+
+    from maxia_oracle.exceptions import MaxiaOracleValidationError
+
+    with _client_with(lambda _r: _ok({"data": {}, "disclaimer": DISCLAIMER})) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.pyth_solana("bad-sym!")
+
+
 def test_confidence_extracts_divergence_from_price_call() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/price/ETH"

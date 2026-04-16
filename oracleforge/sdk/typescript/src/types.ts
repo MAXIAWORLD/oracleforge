@@ -74,8 +74,10 @@ export interface SymbolsPayload {
     price_oracle: string[];
     /** V1.3 — RedStone has dynamic coverage, always empty here. */
     redstone?: string[];
+    /** V1.4 — Pyth on-chain Solana feeds (shard 0 sponsored). */
+    pyth_solana?: string[];
   };
-  /** V1.3 — human-readable notes for dynamic-coverage sources. */
+  /** V1.3 / V1.4 — human-readable notes for dynamic / curated sources. */
   coverage_notes?: Record<string, string>;
 }
 
@@ -107,5 +109,28 @@ export interface RedstonePayload {
   source: "redstone";
   symbol: string;
   provider: string;
+}
+
+/**
+ * V1.4 — Pyth native Solana on-chain single-source payload.
+ *
+ * Emitted by `GET /api/pyth/solana/{symbol}`. Mirrors
+ * `services/oracle/pyth_solana_oracle.get_pyth_solana_price` on the
+ * backend: the decoded Anchor `PriceUpdateV2` fields with a computed
+ * human-readable price + staleness summary.
+ */
+export interface PythSolanaPayload {
+  price: number;
+  conf: number;
+  confidence_pct: number;
+  publish_time: number;
+  age_s: number;
+  stale: boolean;
+  source: "pyth_solana";
+  symbol: string;
+  price_account: string;
+  posted_slot: number;
+  exponent: number;
+  feed_id: string;
 }
 

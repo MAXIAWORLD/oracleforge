@@ -31,6 +31,7 @@ TOOL_NAMES: Final[tuple[str, ...]] = (
     "maxia_oracle_list_supported_symbols",
     "maxia_oracle_get_chainlink_onchain",
     "maxia_oracle_get_redstone_price",
+    "maxia_oracle_get_pyth_solana_onchain",
     "maxia_oracle_health_check",
 )
 
@@ -147,6 +148,17 @@ def get_all_tools(
         """
         return _fmt(shared.redstone(symbol))
 
+    def maxia_oracle_get_pyth_solana_onchain(symbol: str) -> str:
+        """V1.4 -- Single-source Pyth on-chain Solana read (shard 0 sponsored).
+
+        Reads a Pyth Price Feed Account on Solana mainnet directly (Push
+        Oracle program, shard 0). Rejects partial Wormhole verifications.
+        Coverage: BTC, ETH, SOL, USDT, USDC, WIF, BONK, PYTH, JTO, JUP,
+        RAY, EUR, GBP.
+        Data feed only. Not investment advice. No custody. No KYC.
+        """
+        return _fmt(shared.pyth_solana(symbol))
+
     def maxia_oracle_health_check() -> str:
         """Minimal liveness probe for the MAXIA Oracle backend.
 
@@ -165,6 +177,7 @@ def get_all_tools(
         maxia_oracle_list_supported_symbols,
         maxia_oracle_get_chainlink_onchain,
         maxia_oracle_get_redstone_price,
+        maxia_oracle_get_pyth_solana_onchain,
         maxia_oracle_health_check,
     )
 

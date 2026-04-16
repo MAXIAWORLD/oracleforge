@@ -31,6 +31,7 @@ import type {
   MaxiaOracleClientOptions,
   MaxiaResponse,
   PricePayload,
+  PythSolanaPayload,
   RedstonePayload,
   RegisteredKey,
   SourcesPayload,
@@ -39,7 +40,7 @@ import type {
 
 export const DEFAULT_BASE_URL = "https://oracle.maxiaworld.app";
 export const DEFAULT_TIMEOUT_MS = 15_000;
-export const USER_AGENT = "maxia-oracle-typescript/0.2.0";
+export const USER_AGENT = "maxia-oracle-typescript/0.3.0";
 
 const SYMBOL_PATTERN = /^[A-Z0-9]{1,10}$/;
 const MAX_BATCH_SYMBOLS = 50;
@@ -174,6 +175,22 @@ export class MaxiaOracleClient {
   async redstone(symbol: string): Promise<MaxiaResponse<RedstonePayload>> {
     const cleaned = this.validateSymbol(symbol);
     return this.request<RedstonePayload>("GET", `/api/redstone/${cleaned}`);
+  }
+
+  /**
+   * V1.4 — Single-source Pyth on-chain read (Solana mainnet).
+   *
+   * Returns the Pyth Price Feed Account value for `symbol` on shard 0
+   * of the Pyth Push Oracle program. Coverage is a curated list of
+   * majors (BTC, ETH, SOL, USDT, USDC, WIF, BONK, PYTH, JTO, JUP, RAY,
+   * EUR, GBP). Anything else throws `MaxiaOracleUpstreamError` (404).
+   *
+   * The reader rejects partial Wormhole verifications server-side, so a
+   * successful response always carries a fully-verified update.
+   */
+  async pythSolana(symbol: string): Promise<MaxiaResponse<PythSolanaPayload>> {
+    const cleaned = this.validateSymbol(symbol);
+    return this.request<PythSolanaPayload>("GET", `/api/pyth/solana/${cleaned}`);
   }
 
   /**
@@ -318,10 +335,15 @@ export class MaxiaOracleClient {
         Array.isArray(acceptsRaw) ? acceptsRaw : [],
       );
     }
-    if (status === 404 && message === "no live price available") {
+    if (status === 404) {
+      // Every 404 in the MAXIA Oracle REST surface corresponds to an
+      // upstream-level "this symbol is not available here" answer
+      // (`no live price available`, `symbol has no Chainlink feed on
+      // requested chain`, `symbol not found on redstone`, `symbol not
+      // supported on Pyth Solana shard 0`).
       throw new MaxiaOracleUpstreamError(message);
     }
-    if (status === 400 || status === 422 || status === 404) {
+    if (status === 400 || status === 422) {
       throw new MaxiaOracleValidationError(message);
     }
     if (status === 429) {

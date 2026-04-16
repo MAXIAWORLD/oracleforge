@@ -284,6 +284,57 @@ describe("redstone (V1.3)", () => {
   });
 });
 
+describe("pythSolana (V1.4)", () => {
+  it("hits /api/pyth/solana/{symbol}", async () => {
+    const client = makeClient(async (url) => {
+      expect(url).toBe("http://test.invalid/api/pyth/solana/BTC");
+      return jsonResponse(200, {
+        data: {
+          source: "pyth_solana",
+          symbol: "BTC",
+          price: 75000.0,
+          conf: 12.3,
+          confidence_pct: 0.02,
+          publish_time: 1_776_000_000,
+          age_s: 5,
+          stale: false,
+          price_account: "4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo",
+          posted_slot: 413_000_000,
+          exponent: -8,
+          feed_id: "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    const r = await client.pythSolana("BTC");
+    expect(r.data.source).toBe("pyth_solana");
+    expect(r.data.price).toBe(75000.0);
+    expect(r.data.price_account).toBe("4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo");
+  });
+
+  it("raises UpstreamError on 404", async () => {
+    const client = makeClient(async () =>
+      jsonResponse(404, {
+        error: "symbol not supported on Pyth Solana shard 0",
+        symbol: "ZZZZ",
+        supported: ["BTC", "ETH"],
+      }),
+    );
+    await expect(client.pythSolana("ZZZZ")).rejects.toThrow(
+      MaxiaOracleUpstreamError,
+    );
+  });
+
+  it("rejects invalid symbol client-side", async () => {
+    const client = makeClient(async () => {
+      throw new Error("fetch should not be called");
+    });
+    await expect(client.pythSolana("bad-sym!")).rejects.toThrow(
+      MaxiaOracleValidationError,
+    );
+  });
+});
+
 describe("confidence", () => {
   it("extracts divergence from the price call", async () => {
     const client = makeClient(async (url) => {

@@ -244,6 +244,23 @@ class MaxiaOracleGetRedstoneTool(_MaxiaOracleTool):
         return _fmt(self._get_client().redstone(symbol))
 
 
+class MaxiaOracleGetPythSolanaTool(_MaxiaOracleTool):
+    """V1.4 — Single-source Pyth on-chain Solana read (shard 0 sponsored feeds)."""
+
+    name: str = "maxia_oracle_get_pyth_solana_onchain"
+    description: str = (
+        "Fetch a single-source Pyth price directly from a Solana mainnet "
+        "Price Feed Account (V1.4, shard 0 sponsored feeds). Only fully "
+        "Wormhole-verified updates are returned. Coverage: BTC, ETH, SOL, "
+        "USDT, USDC, WIF, BONK, PYTH, JTO, JUP, RAY, EUR, GBP. "
+        + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = SymbolInput
+
+    def _run(self, symbol: str) -> str:
+        return _fmt(self._get_client().pyth_solana(symbol))
+
+
 class MaxiaOracleHealthCheckTool(_MaxiaOracleTool):
     """Minimal liveness probe on the MAXIA Oracle backend."""
 
@@ -272,6 +289,7 @@ MAXIA_ORACLE_TOOL_CLASSES: Final[tuple[type[_MaxiaOracleTool], ...]] = (
     MaxiaOracleListSupportedSymbolsTool,
     MaxiaOracleGetChainlinkOnchainTool,
     MaxiaOracleGetRedstoneTool,
+    MaxiaOracleGetPythSolanaTool,
     MaxiaOracleHealthCheckTool,
 )
 

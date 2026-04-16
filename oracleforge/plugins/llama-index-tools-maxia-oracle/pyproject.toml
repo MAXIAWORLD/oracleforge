@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "llama-index-tools-maxia-oracle"
-version = "0.2.0"
+version = "0.3.0"
 description = "LlamaIndex tool wrappers for MAXIA Oracle — multi-source price feeds for AI agents. Data feed only."
 readme = "README.md"
 license = "Apache-2.0"

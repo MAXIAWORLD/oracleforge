@@ -18,6 +18,7 @@ from services.oracle import (
     chainlink_oracle,
     price_oracle,
     pyth_oracle,
+    pyth_solana_oracle,
     redstone_oracle,
 )
 
@@ -124,6 +125,21 @@ async def list_sources(key_hash: str = Depends(require_api_key)):
                     ),
                     "circuit_breaker": redstone_oracle.get_metrics()["circuit"],
                 },
+                {
+                    "name": "pyth_solana",
+                    "type": "on_chain_oracle",
+                    "chain": "solana",
+                    "program": pyth_solana_oracle.PUSH_ORACLE_PROGRAM_ID,
+                    "shard": 0,
+                    "feeds": pyth_solana_oracle.list_supported_symbols(),
+                    "coverage_note": (
+                        "On-chain read of Pyth Price Feed Accounts (shard 0 "
+                        "sponsored by the Pyth Data Association). Verified "
+                        "with full Wormhole guardian signatures. Stale > 60s "
+                        "is flagged."
+                    ),
+                    "circuit_breaker": pyth_solana_oracle.get_metrics()["circuit"],
+                },
             ],
         }
     )
@@ -154,6 +170,7 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
     pyth_equity = sorted(pyth_oracle.EQUITY_FEEDS.keys())
     chainlink_by_chain = chainlink_oracle.all_supported_symbols()
     price_oracle_mints = sorted(price_oracle.TOKEN_MINTS.keys())
+    pyth_solana_syms = pyth_solana_oracle.list_supported_symbols()
 
     chainlink_union: set[str] = set()
     for syms in chainlink_by_chain.values():
@@ -164,6 +181,7 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
         | set(pyth_equity)
         | chainlink_union
         | set(price_oracle_mints)
+        | set(pyth_solana_syms)
     )
 
     return wrap_with_disclaimer(
@@ -178,12 +196,18 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
                 "chainlink_arbitrum": chainlink_by_chain.get("arbitrum", []),
                 "price_oracle": price_oracle_mints,
                 "redstone": [],
+                "pyth_solana": pyth_solana_syms,
             },
             "coverage_notes": {
                 "redstone": (
                     "Dynamic coverage — RedStone supports 400+ assets, "
                     "attempted on demand. See https://app.redstone.finance "
                     "for the live list."
+                ),
+                "pyth_solana": (
+                    "On-chain Solana read, shard 0 sponsored feeds only. "
+                    "Coverage is the curated list above -- any other symbol "
+                    "returns 404 on /api/pyth/solana/{symbol}."
                 ),
             },
         }

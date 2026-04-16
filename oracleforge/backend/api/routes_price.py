@@ -17,7 +17,7 @@ from core.auth import X402_KEY_HASH_SENTINEL, require_access
 from core.db import get_db
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
-from services.oracle import chainlink_oracle, pyth_oracle, redstone_oracle
+from services.oracle import chainlink_oracle, pyth_oracle, pyth_solana_oracle, redstone_oracle
 from services.oracle.multi_source import collect_sources, compute_divergence
 
 router = APIRouter(prefix="/api", tags=["price"])
@@ -242,6 +242,57 @@ async def get_redstone_price_route(
             status_code=http_status,
             content=wrap_error(
                 "redstone fetch failed",
+                symbol=symbol,
+                detail=detail,
+            ),
+        )
+    return wrap_with_disclaimer(result)
+
+
+@router.get("/pyth/solana/{symbol}")
+async def get_pyth_solana_price_route(
+    symbol: str, key_hash: str = Depends(require_access)
+):
+    """Return a single-source Pyth price read directly from Solana mainnet (V1.4).
+
+    Reads the Price Feed Account for `symbol` on shard 0 of the Pyth Push
+    Oracle program (`pythWSns...`) and decodes the Anchor `PriceUpdateV2`
+    layout inline. Coverage is restricted to the majors that are sponsored
+    by the Pyth Data Association on shard 0 — see
+    `pyth_solana_oracle.PYTH_SOLANA_FEEDS`. Unknown symbols return 404.
+
+    This route is intentionally independent of the multi-source path (see
+    `/api/price/{symbol}`): Pyth is already reached via Hermes there, and
+    aggregating the same publishers twice would bias the divergence metric.
+    """
+    symbol = symbol.upper()
+    if not _is_valid_symbol(symbol):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=wrap_error("invalid symbol format"),
+        )
+
+    if not pyth_solana_oracle.has_feed(symbol):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=wrap_error(
+                "symbol not supported on Pyth Solana shard 0",
+                symbol=symbol,
+                supported=pyth_solana_oracle.list_supported_symbols(),
+            ),
+        )
+
+    rl = _enforce_rate_limit(key_hash)
+    if rl is not None:
+        return rl
+
+    result = await pyth_solana_oracle.get_pyth_solana_price(symbol)
+    if not isinstance(result, dict) or result.get("error"):
+        detail = result.get("error") if isinstance(result, dict) else "unexpected"
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content=wrap_error(
+                "pyth_solana fetch failed",
                 symbol=symbol,
                 detail=detail,
             ),

@@ -33,9 +33,9 @@ function makeMessage(text: string): Memory {
 }
 
 describe("plugin shape", () => {
-  it("exports 9 actions", () => {
-    expect(maxiaOracleActions).toHaveLength(9);
-    expect(maxiaOraclePlugin.actions).toHaveLength(9);
+  it("exports 10 actions", () => {
+    expect(maxiaOracleActions).toHaveLength(10);
+    expect(maxiaOraclePlugin.actions).toHaveLength(10);
   });
 
   it("every action has name + description + validate + handler", () => {
@@ -154,6 +154,79 @@ describe("GET_REDSTONE_PRICE handler (stubbed client)", () => {
     expect(called).toBe("ETH");
     expect(captured).toContain("RedStone");
     expect(captured).toContain("ETH");
+  });
+});
+
+describe("GET_PYTH_SOLANA_ONCHAIN handler (stubbed client)", () => {
+  const runtime = makeRuntime();
+
+  it("handler forwards the symbol to client.pythSolana", async () => {
+    const action = maxiaOracleActions.find(
+      (a) => a.name === "GET_PYTH_SOLANA_ONCHAIN",
+    )!;
+    let called = "";
+    const stub = {
+      pythSolana: async (sym: string) => {
+        called = sym;
+        return {
+          data: {
+            symbol: sym,
+            price: 75000,
+            age_s: 5,
+            stale: false,
+            price_account: "4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo",
+          },
+          disclaimer: DISCLAIMER,
+        };
+      },
+    };
+    setClientForTests(runtime, stub as unknown as import("@maxia/oracle").MaxiaOracleClient);
+
+    let captured = "";
+    await action.handler(
+      runtime,
+      makeMessage("pyth solana onchain quote on SOL"),
+      undefined,
+      undefined,
+      async ({ text }) => {
+        captured = text;
+      },
+    );
+    expect(called).toBe("SOL");
+    expect(captured).toContain("Pyth Solana on-chain");
+    expect(captured).toContain("SOL");
+    expect(captured).toContain("$75000");
+  });
+
+  it("handler marks stale feed explicitly", async () => {
+    const action = maxiaOracleActions.find(
+      (a) => a.name === "GET_PYTH_SOLANA_ONCHAIN",
+    )!;
+    const stub = {
+      pythSolana: async (sym: string) => ({
+        data: {
+          symbol: sym,
+          price: 1.35,
+          age_s: 500,
+          stale: true,
+          price_account: "G25Tm7UkVruTJ7mcbCxFm45XGWwsH72nJKNGcHEQw1tU",
+        },
+        disclaimer: DISCLAIMER,
+      }),
+    };
+    setClientForTests(runtime, stub as unknown as import("@maxia/oracle").MaxiaOracleClient);
+
+    let captured = "";
+    await action.handler(
+      runtime,
+      makeMessage("pyth solana GBP"),
+      undefined,
+      undefined,
+      async ({ text }) => {
+        captured = text;
+      },
+    );
+    expect(captured).toContain("stale");
   });
 });
 

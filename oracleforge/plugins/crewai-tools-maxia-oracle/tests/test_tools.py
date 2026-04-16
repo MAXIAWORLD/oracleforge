@@ -25,7 +25,7 @@ def _fake(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def test_all_tools_exported() -> None:
-    assert len(MAXIA_ORACLE_TOOL_CLASSES) == 9
+    assert len(MAXIA_ORACLE_TOOL_CLASSES) == 10
 
 
 def test_tool_names_unique_and_namespaced() -> None:
@@ -43,7 +43,7 @@ def test_tool_descriptions_contain_disclaimer() -> None:
 def test_get_all_tools_shares_a_single_client() -> None:
     fake = MagicMock(name="MaxiaOracleClient")
     tools = get_all_tools(client=fake)
-    assert len(tools) == 9
+    assert len(tools) == 10
     for tool in tools:
         assert tool.client is fake
 

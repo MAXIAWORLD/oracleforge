@@ -39,7 +39,7 @@ from .exceptions import (
 
 DEFAULT_BASE_URL: Final[str] = "https://oracle.maxiaworld.app"
 DEFAULT_TIMEOUT_S: Final[float] = 15.0
-USER_AGENT: Final[str] = "maxia-oracle-python/0.1.0"
+USER_AGENT: Final[str] = "maxia-oracle-python/0.3.0"
 
 
 class MaxiaOracleClient:
@@ -227,6 +227,32 @@ class MaxiaOracleClient:
         symbol = self._validate_symbol(symbol)
         return self._request("GET", f"/api/redstone/{symbol}")
 
+    def pyth_solana(self, symbol: str) -> dict[str, Any]:
+        """V1.4 — Single-source Pyth on-chain read (Solana mainnet).
+
+        Returns the Pyth Price Feed Account value for `symbol` on shard 0
+        of the Pyth Push Oracle program. Coverage is a curated list of
+        majors (BTC, ETH, SOL, USDT, USDC, WIF, BONK, PYTH, JTO, JUP,
+        RAY, EUR, GBP). Anything else raises
+        :class:`MaxiaOracleValidationError` (404 surfaced as 400 after
+        server-side rejection) or :class:`MaxiaOracleUpstreamError`.
+
+        The reader rejects partial Wormhole verifications, so the caller
+        always receives a Full-verified update or an error.
+
+        Response shape (inside `data`): ``price``, ``conf``,
+        ``confidence_pct``, ``publish_time``, ``age_s``, ``stale``,
+        ``source``, ``symbol``, ``price_account``, ``posted_slot``,
+        ``exponent``, ``feed_id``.
+
+        Raises:
+            MaxiaOracleValidationError: symbol format invalid.
+            MaxiaOracleUpstreamError: symbol unsupported on shard 0 or
+                RPC pool exhausted.
+        """
+        symbol = self._validate_symbol(symbol)
+        return self._request("GET", f"/api/pyth/solana/{symbol}")
+
     def confidence(self, symbol: str) -> dict[str, Any]:
         """Return the multi-source divergence for a symbol, compact.
 
@@ -348,7 +374,12 @@ class MaxiaOracleClient:
                 message,
                 accepts=body.get("accepts") if isinstance(body, dict) else None,
             )
-        if status == 404 and isinstance(body, dict) and body.get("error") == "no live price available":
+        if status == 404:
+            # Every 404 in the MAXIA Oracle REST surface corresponds to an
+            # upstream-level "this symbol is not available here" answer:
+            # `no live price available` (/api/price), `symbol has no
+            # Chainlink feed on requested chain`, `symbol not found on
+            # redstone`, `symbol not supported on Pyth Solana shard 0`.
             raise MaxiaOracleUpstreamError(message)
         if status == 400 or status == 422:
             raise MaxiaOracleValidationError(message)

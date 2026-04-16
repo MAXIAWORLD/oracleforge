@@ -59,7 +59,7 @@ from .exceptions import (
 )
 
 SERVER_NAME = "maxia-oracle"
-SERVER_VERSION = "0.1.0"
+SERVER_VERSION = "0.3.0"
 SERVER_INSTRUCTIONS = (
     "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP "
     "tools. Data feed only. Not investment advice. No custody. No KYC."
@@ -201,6 +201,36 @@ def _tool_definitions() -> list[types.Tool]:
             },
         ),
         types.Tool(
+            name="get_redstone_price",
+            description=(
+                "Fetch a single-source price directly from the RedStone "
+                "public REST API (V1.3). Dynamic coverage -- 400+ assets. "
+                + _DISCLAIMER_LINE
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {"symbol": _SYMBOL_SCHEMA},
+                "required": ["symbol"],
+                "additionalProperties": False,
+            },
+        ),
+        types.Tool(
+            name="get_pyth_solana_onchain",
+            description=(
+                "Fetch a single-source Pyth price read directly from a "
+                "Solana mainnet Price Feed Account (V1.4, shard 0 sponsored "
+                "feeds). Rejects partial Wormhole verifications. Coverage: "
+                "BTC, ETH, SOL, USDT, USDC, WIF, BONK, PYTH, JTO, JUP, RAY, "
+                "EUR, GBP. " + _DISCLAIMER_LINE
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {"symbol": _SYMBOL_SCHEMA},
+                "required": ["symbol"],
+                "additionalProperties": False,
+            },
+        ),
+        types.Tool(
             name="health_check",
             description=(
                 "Minimal liveness probe for the MAXIA Oracle backend. "
@@ -258,6 +288,12 @@ def _build_dispatch(
             args.get("chain", "base"),
         )
 
+    async def get_redstone_price(args: dict[str, Any]) -> dict[str, Any]:
+        return await asyncio.to_thread(client.redstone, args["symbol"])
+
+    async def get_pyth_solana_onchain(args: dict[str, Any]) -> dict[str, Any]:
+        return await asyncio.to_thread(client.pyth_solana, args["symbol"])
+
     async def health_check(args: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(client.health)
 
@@ -269,6 +305,8 @@ def _build_dispatch(
         "get_confidence": get_confidence,
         "list_supported_symbols": list_supported_symbols,
         "get_chainlink_onchain": get_chainlink_onchain,
+        "get_redstone_price": get_redstone_price,
+        "get_pyth_solana_onchain": get_pyth_solana_onchain,
         "health_check": health_check,
     }
 
