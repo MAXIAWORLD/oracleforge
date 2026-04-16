@@ -36,11 +36,13 @@ import type {
   RegisteredKey,
   SourcesPayload,
   SymbolsPayload,
+  UniswapChain,
+  UniswapTwapPayload,
 } from "./types.js";
 
 export const DEFAULT_BASE_URL = "https://oracle.maxiaworld.app";
 export const DEFAULT_TIMEOUT_MS = 15_000;
-export const USER_AGENT = "maxia-oracle-typescript/0.3.0";
+export const USER_AGENT = "maxia-oracle-typescript/0.4.0";
 
 const SYMBOL_PATTERN = /^[A-Z0-9]{1,10}$/;
 const MAX_BATCH_SYMBOLS = 50;
@@ -51,6 +53,11 @@ const MAX_BATCH_SYMBOLS = 50;
  */
 export type ChainlinkChain = "base" | "ethereum" | "arbitrum";
 const SUPPORTED_CHAINS: readonly ChainlinkChain[] = ["base", "ethereum", "arbitrum"];
+
+/** V1.5 — EVM chains supported by the Uniswap v3 TWAP reader. */
+const TWAP_SUPPORTED_CHAINS: readonly UniswapChain[] = ["base", "ethereum"];
+const TWAP_MIN_WINDOW_S = 60;
+const TWAP_MAX_WINDOW_S = 86_400;
 
 export class MaxiaOracleClient {
   private readonly apiKey: string | undefined;
@@ -194,6 +201,32 @@ export class MaxiaOracleClient {
   }
 
   /**
+   * V1.5 — Uniswap v3 time-weighted average price (TWAP) on-chain.
+   *
+   * Reads a curated high-liquidity Uniswap v3 pool on `chain`
+   * (`"base"` or `"ethereum"`) and returns the TWAP computed from
+   * `observe(uint32[])` over `windowSeconds`. Default window is 30
+   * minutes; range is [60, 86400].
+   *
+   * Coverage: ETH on base + ethereum, BTC on ethereum. Extending the
+   * list is a server-side change -- see `docs/v1.5_uniswap_twap.md`.
+   */
+  async twap(
+    symbol: string,
+    chain: UniswapChain = "ethereum",
+    windowSeconds: number = 1800,
+  ): Promise<MaxiaResponse<UniswapTwapPayload>> {
+    const cleanedSymbol = this.validateSymbol(symbol);
+    const cleanedChain = this.validateTwapChain(chain);
+    const cleanedWindow = this.validateTwapWindow(windowSeconds);
+    return this.request<UniswapTwapPayload>(
+      "GET",
+      `/api/twap/${cleanedSymbol}`,
+      { query: { chain: cleanedChain, window: String(cleanedWindow) } },
+    );
+  }
+
+  /**
    * Compact multi-source divergence for a symbol ("do the sources agree?").
    *
    * Built on top of `price()` — returns the symbol, the source count and
@@ -237,6 +270,31 @@ export class MaxiaOracleClient {
       );
     }
     return cleaned;
+  }
+
+  private validateTwapChain(chain: string): UniswapChain {
+    if (typeof chain !== "string") {
+      throw new MaxiaOracleValidationError("chain must be a string");
+    }
+    const cleaned = chain.trim().toLowerCase() as UniswapChain;
+    if (!TWAP_SUPPORTED_CHAINS.includes(cleaned)) {
+      throw new MaxiaOracleValidationError(
+        `chain must be one of ${TWAP_SUPPORTED_CHAINS.join(", ")} for twap(), got ${chain}`,
+      );
+    }
+    return cleaned;
+  }
+
+  private validateTwapWindow(windowSeconds: number): number {
+    if (!Number.isInteger(windowSeconds)) {
+      throw new MaxiaOracleValidationError("windowSeconds must be an integer");
+    }
+    if (windowSeconds < TWAP_MIN_WINDOW_S || windowSeconds > TWAP_MAX_WINDOW_S) {
+      throw new MaxiaOracleValidationError(
+        `windowSeconds must be within [${TWAP_MIN_WINDOW_S}, ${TWAP_MAX_WINDOW_S}], got ${windowSeconds}`,
+      );
+    }
+    return windowSeconds;
   }
 
   private buildHeaders(auth: boolean, hasBody: boolean): Record<string, string> {

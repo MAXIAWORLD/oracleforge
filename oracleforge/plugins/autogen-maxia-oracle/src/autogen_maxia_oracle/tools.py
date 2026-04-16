@@ -32,6 +32,7 @@ TOOL_NAMES: Final[tuple[str, ...]] = (
     "maxia_oracle_get_chainlink_onchain",
     "maxia_oracle_get_redstone_price",
     "maxia_oracle_get_pyth_solana_onchain",
+    "maxia_oracle_get_twap_onchain",
     "maxia_oracle_health_check",
 )
 
@@ -159,6 +160,19 @@ def get_all_tools(
         """
         return _fmt(shared.pyth_solana(symbol))
 
+    def maxia_oracle_get_twap_onchain(
+        symbol: str, chain: str = "ethereum", window_s: int = 1800,
+    ) -> str:
+        """V1.5 -- Uniswap v3 time-weighted average price on-chain.
+
+        Reads a curated high-liquidity Uniswap v3 pool on `chain`
+        ('base' or 'ethereum') and returns the TWAP over `window_s`
+        seconds (default 1800 = 30 min, range 60-86400). Coverage:
+        ETH on base/ethereum, BTC on ethereum.
+        Data feed only. Not investment advice. No custody. No KYC.
+        """
+        return _fmt(shared.twap(symbol, chain=chain, window_s=window_s))
+
     def maxia_oracle_health_check() -> str:
         """Minimal liveness probe for the MAXIA Oracle backend.
 
@@ -178,6 +192,7 @@ def get_all_tools(
         maxia_oracle_get_chainlink_onchain,
         maxia_oracle_get_redstone_price,
         maxia_oracle_get_pyth_solana_onchain,
+        maxia_oracle_get_twap_onchain,
         maxia_oracle_health_check,
     )
 

@@ -371,6 +371,62 @@ def test_pyth_solana_rejects_invalid_symbol_client_side() -> None:
             c.pyth_solana("bad-sym!")
 
 
+def test_twap_hits_expected_path_and_propagates_chain_window() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["chain"] = request.url.params.get("chain", "")
+        captured["window"] = request.url.params.get("window", "")
+        return _ok(
+            {
+                "data": {
+                    "source": "uniswap_v3",
+                    "symbol": "ETH",
+                    "chain": "ethereum",
+                    "price": 2341.0,
+                    "avg_tick": 198735,
+                    "window_s": 3600,
+                    "tick_cumulatives": [1, 2],
+                    "pool": "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+                    "fee_bps": 5,
+                    "token0": "USDC",
+                    "token1": "WETH",
+                },
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        result = c.twap("ETH", chain="ethereum", window_s=3600)
+    assert captured["path"] == "/api/twap/ETH"
+    assert captured["chain"] == "ethereum"
+    assert captured["window"] == "3600"
+    assert result["data"]["source"] == "uniswap_v3"
+
+
+def test_twap_rejects_bad_chain_locally() -> None:
+    import pytest
+
+    from maxia_oracle.exceptions import MaxiaOracleValidationError
+
+    with _client_with(lambda _r: _ok({"data": {}, "disclaimer": DISCLAIMER})) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.twap("ETH", chain="solana")
+
+
+def test_twap_rejects_window_out_of_range_locally() -> None:
+    import pytest
+
+    from maxia_oracle.exceptions import MaxiaOracleValidationError
+
+    with _client_with(lambda _r: _ok({"data": {}, "disclaimer": DISCLAIMER})) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.twap("ETH", chain="ethereum", window_s=5)
+        with pytest.raises(MaxiaOracleValidationError):
+            c.twap("ETH", chain="ethereum", window_s=10**9)
+
+
 def test_confidence_extracts_divergence_from_price_call() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path == "/api/price/ETH"

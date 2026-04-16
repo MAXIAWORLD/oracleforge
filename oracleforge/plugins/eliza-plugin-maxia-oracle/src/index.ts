@@ -21,11 +21,12 @@ import { getPricesBatchAction } from "./actions/get-prices-batch.js";
 import { getPythSolanaOnchainAction } from "./actions/get-pyth-solana-onchain.js";
 import { getRedstonePriceAction } from "./actions/get-redstone-price.js";
 import { getSourcesStatusAction } from "./actions/get-sources-status.js";
+import { getTwapOnchainAction } from "./actions/get-twap-onchain.js";
 import { healthCheckAction } from "./actions/health-check.js";
 import { listSupportedSymbolsAction } from "./actions/list-supported-symbols.js";
 import type { Action, Plugin } from "./types.js";
 
-export const PLUGIN_VERSION = "0.2.0";
+export const PLUGIN_VERSION = "0.3.0";
 
 export const maxiaOracleActions: readonly Action[] = [
   getPriceAction,
@@ -37,6 +38,7 @@ export const maxiaOracleActions: readonly Action[] = [
   getChainlinkOnchainAction,
   getRedstonePriceAction,
   getPythSolanaOnchainAction,
+  getTwapOnchainAction,
   healthCheckAction,
 ] as const;
 

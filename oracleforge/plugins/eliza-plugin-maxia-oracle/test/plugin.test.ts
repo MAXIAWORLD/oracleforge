@@ -33,9 +33,9 @@ function makeMessage(text: string): Memory {
 }
 
 describe("plugin shape", () => {
-  it("exports 10 actions", () => {
-    expect(maxiaOracleActions).toHaveLength(10);
-    expect(maxiaOraclePlugin.actions).toHaveLength(10);
+  it("exports 11 actions", () => {
+    expect(maxiaOracleActions).toHaveLength(11);
+    expect(maxiaOraclePlugin.actions).toHaveLength(11);
   });
 
   it("every action has name + description + validate + handler", () => {
@@ -227,6 +227,96 @@ describe("GET_PYTH_SOLANA_ONCHAIN handler (stubbed client)", () => {
       },
     );
     expect(captured).toContain("stale");
+  });
+});
+
+describe("GET_TWAP_ONCHAIN handler (stubbed client)", () => {
+  const runtime = makeRuntime();
+
+  it("forwards symbol + default chain + default window", async () => {
+    const action = maxiaOracleActions.find(
+      (a) => a.name === "GET_TWAP_ONCHAIN",
+    )!;
+    const captured: { sym?: string; chain?: string; window?: number } = {};
+    const stub = {
+      twap: async (sym: string, chain: string, window: number) => {
+        captured.sym = sym;
+        captured.chain = chain;
+        captured.window = window;
+        return {
+          data: {
+            source: "uniswap_v3",
+            symbol: sym,
+            chain,
+            price: 2341.0,
+            avg_tick: 198735,
+            window_s: window,
+            tick_cumulatives: [1, 2],
+            pool: "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+            fee_bps: 5,
+            token0: "USDC",
+            token1: "WETH",
+          },
+          disclaimer: DISCLAIMER,
+        };
+      },
+    };
+    setClientForTests(runtime, stub as unknown as import("@maxia/oracle").MaxiaOracleClient);
+
+    let text = "";
+    await action.handler(
+      runtime,
+      makeMessage("uniswap twap on ETH"),
+      undefined,
+      undefined,
+      async ({ text: t }) => {
+        text = t;
+      },
+    );
+    expect(captured).toEqual({ sym: "ETH", chain: "ethereum", window: 1800 });
+    expect(text).toContain("Uniswap v3 TWAP ETH");
+    expect(text).toContain("ethereum");
+    expect(text).toContain("$2341");
+  });
+
+  it("picks up a non-default chain + window from the prompt", async () => {
+    const action = maxiaOracleActions.find(
+      (a) => a.name === "GET_TWAP_ONCHAIN",
+    )!;
+    const captured: { chain?: string; window?: number } = {};
+    const stub = {
+      twap: async (sym: string, chain: string, window: number) => {
+        captured.chain = chain;
+        captured.window = window;
+        return {
+          data: {
+            source: "uniswap_v3",
+            symbol: sym,
+            chain,
+            price: 2341.0,
+            avg_tick: 0,
+            window_s: window,
+            tick_cumulatives: [1, 2],
+            pool: "0x",
+            fee_bps: 5,
+            token0: "WETH",
+            token1: "USDC",
+          },
+          disclaimer: DISCLAIMER,
+        };
+      },
+    };
+    setClientForTests(runtime, stub as unknown as import("@maxia/oracle").MaxiaOracleClient);
+
+    await action.handler(
+      runtime,
+      makeMessage("twap ETH on base over 1 hour"),
+      undefined,
+      undefined,
+      async () => {},
+    );
+    expect(captured.chain).toBe("base");
+    expect(captured.window).toBe(3600);
   });
 });
 

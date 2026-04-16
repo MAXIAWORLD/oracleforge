@@ -29,7 +29,7 @@ from mcp.server.lowlevel import Server
 from . import tools
 
 SERVER_NAME = "maxia-oracle"
-SERVER_VERSION = "0.1.4"
+SERVER_VERSION = "0.1.5"
 SERVER_INSTRUCTIONS = (
     "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP tools. "
     "Each result is a read-only live data point intended for AI agents that need "
@@ -210,6 +210,43 @@ _TOOL_DEFINITIONS: list[types.Tool] = [
         },
     ),
     types.Tool(
+        name="get_twap_onchain",
+        description=(
+            "Fetch a Uniswap v3 time-weighted average price (TWAP) read "
+            "directly from a curated high-liquidity pool on Base or "
+            "Ethereum mainnet (V1.5). Default 30-minute window, configurable "
+            "from 60 s to 24 h. Returns an independently verifiable number: "
+            "any caller can replay observe() on the same pool to reproduce it. "
+            "Coverage: ETH on base/ethereum, BTC on ethereum. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "symbol": _SYMBOL_SCHEMA,
+                "chain": {
+                    "type": "string",
+                    "enum": ["base", "ethereum"],
+                    "default": "ethereum",
+                    "description": (
+                        "EVM chain on which to read the Uniswap v3 pool."
+                    ),
+                },
+                "window_s": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 86400,
+                    "default": 1800,
+                    "description": (
+                        "TWAP window in seconds. Default 1800 (30 minutes)."
+                    ),
+                },
+            },
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
         name="health_check",
         description=(
             "Minimal liveness probe for the MAXIA Oracle MCP server. Does not "
@@ -238,6 +275,7 @@ _TOOL_DISPATCH: dict[str, _ToolHandler] = {
     "get_chainlink_onchain": tools.get_chainlink_onchain,
     "get_redstone_price": tools.get_redstone_price,
     "get_pyth_solana_onchain": tools.get_pyth_solana_onchain,
+    "get_twap_onchain": tools.get_twap_onchain,
     "health_check": tools.health_check,
 }
 

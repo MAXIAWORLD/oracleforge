@@ -37,6 +37,7 @@ from services.oracle import (
     pyth_oracle,
     pyth_solana_oracle,
     redstone_oracle,
+    uniswap_v3_oracle,
 )
 from services.oracle.multi_source import collect_sources, compute_divergence
 
@@ -264,6 +265,10 @@ async def list_supported_symbols() -> dict[str, Any]:
         chainlink_union.update(syms)
 
     pyth_solana_syms = pyth_solana_oracle.list_supported_symbols()
+    uniswap_by_chain = uniswap_v3_oracle.all_supported_symbols()
+    uniswap_union: set[str] = set()
+    for syms in uniswap_by_chain.values():
+        uniswap_union.update(syms)
 
     all_symbols = sorted(
         set(pyth_crypto)
@@ -271,6 +276,7 @@ async def list_supported_symbols() -> dict[str, Any]:
         | chainlink_union
         | set(price_oracle_mints)
         | set(pyth_solana_syms)
+        | uniswap_union
     )
 
     return wrap_with_disclaimer(
@@ -285,6 +291,8 @@ async def list_supported_symbols() -> dict[str, Any]:
                 "chainlink_arbitrum": chainlink_by_chain.get("arbitrum", []),
                 "price_oracle": price_oracle_mints,
                 "pyth_solana": pyth_solana_syms,
+                "uniswap_v3_base": uniswap_by_chain.get("base", []),
+                "uniswap_v3_ethereum": uniswap_by_chain.get("ethereum", []),
             },
         }
     )
@@ -402,7 +410,70 @@ async def get_pyth_solana_onchain(symbol: str) -> dict[str, Any]:
     return wrap_with_disclaimer(result)
 
 
-# ── 11. health_check ─────────────────────────────────────────────────────────
+# ── 11. get_twap_onchain (V1.5) ──────────────────────────────────────────────
+
+
+async def get_twap_onchain(
+    symbol: str,
+    chain: str = uniswap_v3_oracle.DEFAULT_CHAIN,
+    window_s: int = uniswap_v3_oracle.DEFAULT_WINDOW_S,
+) -> dict[str, Any]:
+    """Fetch a Uniswap v3 time-weighted average price (TWAP) on-chain (V1.5).
+
+    Reads `observe(uint32[])` on a curated, high-liquidity pool and
+    returns the TWAP computed from the slope of tickCumulatives over
+    `window_s` seconds. Coverage: ETH on Base/Ethereum + BTC on
+    Ethereum (see `uniswap_v3_oracle.UNISWAP_V3_POOLS`).
+
+    The underlying math is deterministic and independently verifiable:
+    any caller can replay the same observe() call on any Ethereum or
+    Base RPC and compute the same number.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    if not isinstance(chain, str):
+        return wrap_error("chain must be a string")
+    if not isinstance(window_s, int) or isinstance(window_s, bool):
+        return wrap_error("window_s must be an integer")
+
+    symbol = symbol.strip().upper()
+    chain = chain.strip().lower()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if chain not in uniswap_v3_oracle.SUPPORTED_CHAINS:
+        return wrap_error(
+            "unsupported chain",
+            chain=chain,
+            supported=list(uniswap_v3_oracle.SUPPORTED_CHAINS),
+        )
+    if window_s < uniswap_v3_oracle.MIN_WINDOW_S or window_s > uniswap_v3_oracle.MAX_WINDOW_S:
+        return wrap_error(
+            "window_s out of range",
+            window_s=window_s,
+            min_window_s=uniswap_v3_oracle.MIN_WINDOW_S,
+            max_window_s=uniswap_v3_oracle.MAX_WINDOW_S,
+        )
+    if not uniswap_v3_oracle.has_pool(symbol, chain):
+        supported = uniswap_v3_oracle.all_supported_symbols().get(chain, [])
+        return wrap_error(
+            "no Uniswap v3 pool configured for this symbol on this chain",
+            symbol=symbol,
+            chain=chain,
+            supported=supported,
+        )
+
+    result = await uniswap_v3_oracle.get_twap_price(symbol, chain=chain, window_s=window_s)
+    if not isinstance(result, dict) or result.get("error"):
+        return wrap_error(
+            "uniswap_v3 fetch failed",
+            symbol=symbol,
+            chain=chain,
+            detail=result.get("error") if isinstance(result, dict) else "unexpected",
+        )
+    return wrap_with_disclaimer(result)
+
+
+# ── 12. health_check ─────────────────────────────────────────────────────────
 
 
 async def health_check() -> dict[str, Any]:

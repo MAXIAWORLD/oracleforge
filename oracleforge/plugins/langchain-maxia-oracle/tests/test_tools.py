@@ -23,6 +23,7 @@ from langchain_maxia_oracle import (
     MaxiaOracleGetPythSolanaTool,
     MaxiaOracleGetRedstoneTool,
     MaxiaOracleGetSourcesStatusTool,
+    MaxiaOracleGetTwapTool,
     MaxiaOracleHealthCheckTool,
     MaxiaOracleListSupportedSymbolsTool,
     get_all_tools,
@@ -34,7 +35,7 @@ def _fake_response(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def test_all_tools_exported() -> None:
-    assert len(MAXIA_ORACLE_TOOL_CLASSES) == 10
+    assert len(MAXIA_ORACLE_TOOL_CLASSES) == 11
     expected = {
         MaxiaOracleGetPriceTool,
         MaxiaOracleGetPricesBatchTool,
@@ -45,6 +46,7 @@ def test_all_tools_exported() -> None:
         MaxiaOracleGetChainlinkOnchainTool,
         MaxiaOracleGetRedstoneTool,
         MaxiaOracleGetPythSolanaTool,
+        MaxiaOracleGetTwapTool,
         MaxiaOracleHealthCheckTool,
     }
     assert set(MAXIA_ORACLE_TOOL_CLASSES) == expected
@@ -72,7 +74,7 @@ def test_tool_descriptions_contain_disclaimer() -> None:
 def test_get_all_tools_shares_a_single_client() -> None:
     fake = MagicMock(name="MaxiaOracleClient")
     tools = get_all_tools(client=fake)
-    assert len(tools) == 10
+    assert len(tools) == 11
     for tool in tools:
         assert tool.client is fake, (
             "get_all_tools must inject the same client instance into every tool"

@@ -39,7 +39,7 @@ from .exceptions import (
 
 DEFAULT_BASE_URL: Final[str] = "https://oracle.maxiaworld.app"
 DEFAULT_TIMEOUT_S: Final[float] = 15.0
-USER_AGENT: Final[str] = "maxia-oracle-python/0.3.0"
+USER_AGENT: Final[str] = "maxia-oracle-python/0.4.0"
 
 
 class MaxiaOracleClient:
@@ -227,6 +227,42 @@ class MaxiaOracleClient:
         symbol = self._validate_symbol(symbol)
         return self._request("GET", f"/api/redstone/{symbol}")
 
+    def twap(
+        self,
+        symbol: str,
+        chain: str = "ethereum",
+        window_s: int = 1800,
+    ) -> dict[str, Any]:
+        """V1.5 — Uniswap v3 time-weighted average price (TWAP) on-chain.
+
+        Reads a curated high-liquidity Uniswap v3 pool on ``chain``
+        (``"base"`` or ``"ethereum"``) and returns the TWAP computed
+        from ``observe(uint32[])`` over ``window_s`` seconds. Default
+        window is 30 minutes; range is [60, 86400].
+
+        Coverage: ETH on base + ethereum, BTC on ethereum. Extending
+        the list requires a server-side audit -- see
+        ``docs/v1.5_uniswap_twap.md``.
+
+        Response (inside ``data``): ``price``, ``avg_tick``, ``window_s``,
+        ``tick_cumulatives``, ``chain``, ``pool``, ``fee_bps``,
+        ``token0``, ``token1``, ``source``, ``symbol``.
+
+        Raises:
+            MaxiaOracleValidationError: symbol format, chain not in
+                {"base", "ethereum"}, or window_s out of range.
+            MaxiaOracleUpstreamError: pair not configured on that chain
+                or upstream unreachable.
+        """
+        symbol = self._validate_symbol(symbol)
+        chain = self._validate_twap_chain(chain)
+        self._validate_twap_window(window_s)
+        return self._request(
+            "GET",
+            f"/api/twap/{symbol}",
+            params={"chain": chain, "window": window_s},
+        )
+
     def pyth_solana(self, symbol: str) -> dict[str, Any]:
         """V1.4 — Single-source Pyth on-chain read (Solana mainnet).
 
@@ -278,6 +314,11 @@ class MaxiaOracleClient:
     _SUPPORTED_CHAINS: Final[frozenset[str]] = frozenset(
         {"base", "ethereum", "arbitrum"}
     )
+    _TWAP_SUPPORTED_CHAINS: Final[frozenset[str]] = frozenset(
+        {"base", "ethereum"}
+    )
+    _TWAP_MIN_WINDOW_S: Final[int] = 60
+    _TWAP_MAX_WINDOW_S: Final[int] = 86400
 
     def _validate_chain(self, chain: str) -> str:
         if not isinstance(chain, str):
@@ -288,6 +329,28 @@ class MaxiaOracleClient:
                 f"chain must be one of {sorted(self._SUPPORTED_CHAINS)}, got {chain!r}"
             )
         return cleaned
+
+    def _validate_twap_chain(self, chain: str) -> str:
+        if not isinstance(chain, str):
+            raise MaxiaOracleValidationError("chain must be a string")
+        cleaned = chain.strip().lower()
+        if cleaned not in self._TWAP_SUPPORTED_CHAINS:
+            raise MaxiaOracleValidationError(
+                f"chain must be one of {sorted(self._TWAP_SUPPORTED_CHAINS)} for twap(), "
+                f"got {chain!r}"
+            )
+        return cleaned
+
+    def _validate_twap_window(self, window_s: int) -> int:
+        if not isinstance(window_s, int) or isinstance(window_s, bool):
+            raise MaxiaOracleValidationError("window_s must be an integer")
+        if window_s < self._TWAP_MIN_WINDOW_S or window_s > self._TWAP_MAX_WINDOW_S:
+            raise MaxiaOracleValidationError(
+                f"window_s must be within "
+                f"[{self._TWAP_MIN_WINDOW_S}, {self._TWAP_MAX_WINDOW_S}], "
+                f"got {window_s}"
+            )
+        return window_s
 
     def _validate_symbol(self, symbol: str) -> str:
         if not isinstance(symbol, str):

@@ -19,6 +19,7 @@ export {
 } from "./client.js";
 
 export type { ChainlinkChain } from "./client.js";
+export type { UniswapChain } from "./types.js";
 
 export {
   MaxiaOracleAuthError,
@@ -40,6 +41,7 @@ export type {
   PricePayload,
   PriceSource,
   PythSolanaPayload,
+  UniswapTwapPayload,
   RedstonePayload,
   RegisteredKey,
   SourcesPayload,

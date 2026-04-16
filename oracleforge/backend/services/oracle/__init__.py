@@ -3,6 +3,7 @@
 Modules:
     pyth_oracle         — Pyth Network Hermes API + SSE streaming (crypto + equities)
     pyth_solana_oracle  — Pyth native Solana on-chain (V1.4, Price Feed Accounts shard 0)
+    uniswap_v3_oracle   — Uniswap v3 TWAP on-chain (V1.5, Base + Ethereum)
     chainlink_oracle    — Chainlink on-chain (Base + Ethereum + Arbitrum)
     redstone_oracle     — RedStone public REST (V1.3, 4th upstream)
     price_oracle        — Helius DAS + CoinPaprika + CoinGecko + Yahoo Finance

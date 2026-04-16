@@ -26,6 +26,9 @@ DISCLAIMER: Final[str] = (
 # V1.1: EVM chains supported by the Chainlink on-chain reader.
 ChainLiteral = Literal["base", "ethereum", "arbitrum"]
 
+# V1.5: EVM chains supported by the Uniswap v3 TWAP reader.
+TwapChainLiteral = Literal["base", "ethereum"]
+
 
 def _fmt(data: Any) -> str:
     if isinstance(data, (dict, list)):
@@ -76,6 +79,27 @@ class ChainlinkInput(BaseModel):
             "'base' (default, for backward compatibility), 'ethereum', "
             "or 'arbitrum'."
         ),
+    )
+
+
+class TwapInput(BaseModel):
+    """Single-asset Uniswap v3 TWAP input with chain + window (V1.5)."""
+
+    symbol: str = Field(
+        description=(
+            "Asset ticker, 1 to 10 uppercase alphanumeric characters "
+            "(e.g. 'ETH', 'BTC')."
+        ),
+    )
+    chain: TwapChainLiteral = Field(
+        default="ethereum",
+        description="EVM chain on which to read the Uniswap v3 pool.",
+    )
+    window_s: int = Field(
+        default=1800,
+        ge=60,
+        le=86400,
+        description="TWAP window in seconds. Default 1800 (30 min), range 60-86400.",
     )
 
 
@@ -232,6 +256,23 @@ class MaxiaOracleGetPythSolanaTool(_MaxiaOracleTool):
         return _fmt(self._get_client().pyth_solana(symbol))
 
 
+class MaxiaOracleGetTwapTool(_MaxiaOracleTool):
+    """V1.5 — Uniswap v3 time-weighted average price (TWAP) on-chain."""
+
+    name: str = "maxia_oracle_get_twap_onchain"
+    description: str = (
+        "Fetch a Uniswap v3 time-weighted average price (TWAP) on-chain "
+        "(V1.5). Reads curated high-liquidity pools on Base or Ethereum "
+        "with a caller-chosen window (60 s to 24 h, default 30 min). "
+        "Coverage: ETH on base/ethereum, BTC on ethereum. "
+        + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = TwapInput
+
+    def _run(self, symbol: str, chain: str = "ethereum", window_s: int = 1800) -> str:
+        return _fmt(self._get_client().twap(symbol, chain=chain, window_s=window_s))
+
+
 class MaxiaOracleHealthCheckTool(_MaxiaOracleTool):
     name: str = "maxia_oracle_health_check"
     description: str = (
@@ -259,6 +300,7 @@ MAXIA_ORACLE_TOOL_CLASSES: Final[tuple[type[_MaxiaOracleTool], ...]] = (
     MaxiaOracleGetChainlinkOnchainTool,
     MaxiaOracleGetRedstoneTool,
     MaxiaOracleGetPythSolanaTool,
+    MaxiaOracleGetTwapTool,
     MaxiaOracleHealthCheckTool,
 )
 

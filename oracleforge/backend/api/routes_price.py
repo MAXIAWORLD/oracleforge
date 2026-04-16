@@ -17,7 +17,13 @@ from core.auth import X402_KEY_HASH_SENTINEL, require_access
 from core.db import get_db
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
-from services.oracle import chainlink_oracle, pyth_oracle, pyth_solana_oracle, redstone_oracle
+from services.oracle import (
+    chainlink_oracle,
+    pyth_oracle,
+    pyth_solana_oracle,
+    redstone_oracle,
+    uniswap_v3_oracle,
+)
 from services.oracle.multi_source import collect_sources, compute_divergence
 
 router = APIRouter(prefix="/api", tags=["price"])
@@ -25,6 +31,7 @@ router = APIRouter(prefix="/api", tags=["price"])
 _SYMBOL_REGEX = re.compile(r"^[A-Z0-9]{1,10}$")
 _MAX_BATCH_SYMBOLS = 50
 _CHAIN_PATTERN = r"^(base|ethereum|arbitrum)$"
+_TWAP_CHAIN_PATTERN = r"^(base|ethereum)$"
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -294,6 +301,75 @@ async def get_pyth_solana_price_route(
             content=wrap_error(
                 "pyth_solana fetch failed",
                 symbol=symbol,
+                detail=detail,
+            ),
+        )
+    return wrap_with_disclaimer(result)
+
+
+@router.get("/twap/{symbol}")
+async def get_twap_price_route(
+    symbol: str,
+    chain: str = Query(
+        "ethereum",
+        pattern=_TWAP_CHAIN_PATTERN,
+        description="EVM chain on which to read the Uniswap v3 pool.",
+    ),
+    window: int = Query(
+        uniswap_v3_oracle.DEFAULT_WINDOW_S,
+        ge=uniswap_v3_oracle.MIN_WINDOW_S,
+        le=uniswap_v3_oracle.MAX_WINDOW_S,
+        description=(
+            "TWAP window in seconds. Default 1800 (30 minutes). "
+            "Range: 60 - 86400."
+        ),
+    ),
+    key_hash: str = Depends(require_access),
+):
+    """V1.5 - Uniswap v3 time-weighted average price (TWAP) for `symbol`.
+
+    Reads tickCumulatives from a curated, high-TVL Uniswap v3 pool on
+    the requested EVM chain and returns the human-readable price
+    computed from the slope over `window` seconds. Independently
+    verifiable on-chain by any EVM client calling `observe()` on the
+    same pool.
+
+    Coverage is intentionally narrow (high-liquidity pairs only -- ETH on
+    Base/Ethereum + BTC on Ethereum). Listing more pairs requires a
+    manual audit per `docs/v1.5_uniswap_twap.md`.
+    """
+    symbol = symbol.upper()
+    if not _is_valid_symbol(symbol):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=wrap_error("invalid symbol format"),
+        )
+
+    if not uniswap_v3_oracle.has_pool(symbol, chain):
+        supported = uniswap_v3_oracle.all_supported_symbols().get(chain, [])
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=wrap_error(
+                "no Uniswap v3 pool configured for this symbol on this chain",
+                symbol=symbol,
+                chain=chain,
+                supported=supported,
+            ),
+        )
+
+    rl = _enforce_rate_limit(key_hash)
+    if rl is not None:
+        return rl
+
+    result = await uniswap_v3_oracle.get_twap_price(symbol, chain=chain, window_s=window)
+    if not isinstance(result, dict) or result.get("error"):
+        detail = result.get("error") if isinstance(result, dict) else "unexpected"
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content=wrap_error(
+                "uniswap_v3 fetch failed",
+                symbol=symbol,
+                chain=chain,
                 detail=detail,
             ),
         )

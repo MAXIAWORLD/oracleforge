@@ -59,7 +59,7 @@ from .exceptions import (
 )
 
 SERVER_NAME = "maxia-oracle"
-SERVER_VERSION = "0.3.0"
+SERVER_VERSION = "0.4.0"
 SERVER_INSTRUCTIONS = (
     "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP "
     "tools. Data feed only. Not investment advice. No custody. No KYC."
@@ -231,6 +231,35 @@ def _tool_definitions() -> list[types.Tool]:
             },
         ),
         types.Tool(
+            name="get_twap_onchain",
+            description=(
+                "Fetch a Uniswap v3 time-weighted average price (TWAP) "
+                "read directly from a curated high-liquidity pool on Base "
+                "or Ethereum mainnet (V1.5). Default 30-minute window, "
+                "configurable from 60 s to 24 h. Coverage: ETH on "
+                "base/ethereum, BTC on ethereum. " + _DISCLAIMER_LINE
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": _SYMBOL_SCHEMA,
+                    "chain": {
+                        "type": "string",
+                        "enum": ["base", "ethereum"],
+                        "default": "ethereum",
+                    },
+                    "window_s": {
+                        "type": "integer",
+                        "minimum": 60,
+                        "maximum": 86400,
+                        "default": 1800,
+                    },
+                },
+                "required": ["symbol"],
+                "additionalProperties": False,
+            },
+        ),
+        types.Tool(
             name="health_check",
             description=(
                 "Minimal liveness probe for the MAXIA Oracle backend. "
@@ -294,6 +323,14 @@ def _build_dispatch(
     async def get_pyth_solana_onchain(args: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(client.pyth_solana, args["symbol"])
 
+    async def get_twap_onchain(args: dict[str, Any]) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            client.twap,
+            args["symbol"],
+            args.get("chain", "ethereum"),
+            args.get("window_s", 1800),
+        )
+
     async def health_check(args: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(client.health)
 
@@ -307,6 +344,7 @@ def _build_dispatch(
         "get_chainlink_onchain": get_chainlink_onchain,
         "get_redstone_price": get_redstone_price,
         "get_pyth_solana_onchain": get_pyth_solana_onchain,
+        "get_twap_onchain": get_twap_onchain,
         "health_check": health_check,
     }
 

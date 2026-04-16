@@ -22,12 +22,13 @@ from .tools import (
     MaxiaOracleGetPythSolanaTool,
     MaxiaOracleGetRedstoneTool,
     MaxiaOracleGetSourcesStatusTool,
+    MaxiaOracleGetTwapTool,
     MaxiaOracleHealthCheckTool,
     MaxiaOracleListSupportedSymbolsTool,
     get_all_tools,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "__version__",
@@ -42,6 +43,7 @@ __all__ = [
     "MaxiaOracleGetChainlinkOnchainTool",
     "MaxiaOracleGetRedstoneTool",
     "MaxiaOracleGetPythSolanaTool",
+    "MaxiaOracleGetTwapTool",
     "MaxiaOracleHealthCheckTool",
     "get_all_tools",
 ]

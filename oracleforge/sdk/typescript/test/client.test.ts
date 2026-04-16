@@ -284,6 +284,71 @@ describe("redstone (V1.3)", () => {
   });
 });
 
+describe("twap (V1.5)", () => {
+  it("hits /api/twap/{symbol} with chain + window query params", async () => {
+    let capturedUrl = "";
+    const client = makeClient(async (url) => {
+      capturedUrl = url;
+      return jsonResponse(200, {
+        data: {
+          source: "uniswap_v3",
+          symbol: "ETH",
+          chain: "ethereum",
+          price: 2341.0,
+          avg_tick: 198735,
+          window_s: 3600,
+          tick_cumulatives: [1, 2],
+          pool: "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640",
+          fee_bps: 5,
+          token0: "USDC",
+          token1: "WETH",
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    const r = await client.twap("ETH", "ethereum", 3600);
+    expect(capturedUrl).toContain("/api/twap/ETH");
+    expect(capturedUrl).toContain("chain=ethereum");
+    expect(capturedUrl).toContain("window=3600");
+    expect(r.data.source).toBe("uniswap_v3");
+    expect(r.data.window_s).toBe(3600);
+  });
+
+  it("rejects invalid chain client-side", async () => {
+    const client = makeClient(async () => {
+      throw new Error("fetch should not be called");
+    });
+    await expect(client.twap("ETH", "solana" as never)).rejects.toThrow(
+      MaxiaOracleValidationError,
+    );
+  });
+
+  it("rejects window_s out of range client-side", async () => {
+    const client = makeClient(async () => {
+      throw new Error("fetch should not be called");
+    });
+    await expect(client.twap("ETH", "ethereum", 5)).rejects.toThrow(
+      MaxiaOracleValidationError,
+    );
+    await expect(client.twap("ETH", "ethereum", 10 ** 9)).rejects.toThrow(
+      MaxiaOracleValidationError,
+    );
+  });
+
+  it("raises UpstreamError on 404 (pair not configured)", async () => {
+    const client = makeClient(async () =>
+      jsonResponse(404, {
+        error: "no Uniswap v3 pool configured for this symbol on this chain",
+        symbol: "BTC",
+        chain: "base",
+      }),
+    );
+    await expect(client.twap("BTC", "base")).rejects.toThrow(
+      MaxiaOracleUpstreamError,
+    );
+  });
+});
+
 describe("pythSolana (V1.4)", () => {
   it("hits /api/pyth/solana/{symbol}", async () => {
     const client = makeClient(async (url) => {

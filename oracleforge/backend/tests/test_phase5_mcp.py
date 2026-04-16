@@ -82,6 +82,7 @@ _EXPECTED_TOOL_NAMES = {
     "get_chainlink_onchain",
     "get_redstone_price",
     "get_pyth_solana_onchain",
+    "get_twap_onchain",
     "health_check",
 }
 
@@ -103,13 +104,13 @@ async def _call_handler(
 
 
 def test_tool_definitions_has_expected_tools(session_app) -> None:
-    """V1.0 shipped 8 tools. V1.3 added get_redstone_price (9). V1.4 adds
-    get_pyth_solana_onchain for a total of 10. See
-    docs/v1.4_pyth_solana_receiver.md.
+    """V1.0 shipped 8. V1.3 added get_redstone_price (9). V1.4 added
+    get_pyth_solana_onchain (10). V1.5 adds get_twap_onchain (11).
+    See docs/v1.5_uniswap_twap.md.
     """
     from mcp_server.server import _TOOL_DEFINITIONS  # noqa: PLC0415
 
-    assert len(_TOOL_DEFINITIONS) == 10
+    assert len(_TOOL_DEFINITIONS) == 11
     assert {t.name for t in _TOOL_DEFINITIONS} == _EXPECTED_TOOL_NAMES
 
 
@@ -154,7 +155,7 @@ def test_build_server_registers_handlers(session_app) -> None:
 
     server = build_server()
     assert server.name == "maxia-oracle"
-    assert server.version == "0.1.4"
+    assert server.version == "0.1.5"
     assert mt.ListToolsRequest in server.request_handlers
     assert mt.CallToolRequest in server.request_handlers
 

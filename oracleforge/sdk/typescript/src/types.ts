@@ -76,6 +76,9 @@ export interface SymbolsPayload {
     redstone?: string[];
     /** V1.4 — Pyth on-chain Solana feeds (shard 0 sponsored). */
     pyth_solana?: string[];
+    /** V1.5 — Uniswap v3 TWAP pools, per chain. */
+    uniswap_v3_base?: string[];
+    uniswap_v3_ethereum?: string[];
   };
   /** V1.3 / V1.4 — human-readable notes for dynamic / curated sources. */
   coverage_notes?: Record<string, string>;
@@ -133,4 +136,29 @@ export interface PythSolanaPayload {
   exponent: number;
   feed_id: string;
 }
+
+/**
+ * V1.5 — Uniswap v3 time-weighted average price (TWAP) single-source payload.
+ *
+ * Emitted by `GET /api/twap/{symbol}?chain=...&window=...`. Mirrors
+ * `services/oracle/uniswap_v3_oracle.get_twap_price` on the backend:
+ * the tick cumulatives read from `observe()` plus the computed human
+ * price and the pool metadata.
+ */
+export interface UniswapTwapPayload {
+  price: number;
+  avg_tick: number;
+  window_s: number;
+  tick_cumulatives: [number, number];
+  chain: "base" | "ethereum";
+  pool: string;
+  fee_bps: number;
+  token0: string;
+  token1: string;
+  source: "uniswap_v3";
+  symbol: string;
+}
+
+/** V1.5 — EVM chains supported by the Uniswap v3 TWAP reader. */
+export type UniswapChain = "base" | "ethereum";
 

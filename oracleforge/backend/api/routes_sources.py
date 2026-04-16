@@ -20,6 +20,7 @@ from services.oracle import (
     pyth_oracle,
     pyth_solana_oracle,
     redstone_oracle,
+    uniswap_v3_oracle,
 )
 
 router = APIRouter(prefix="/api", tags=["sources"])
@@ -140,6 +141,22 @@ async def list_sources(key_hash: str = Depends(require_api_key)):
                     ),
                     "circuit_breaker": pyth_solana_oracle.get_metrics()["circuit"],
                 },
+                {
+                    "name": "uniswap_v3",
+                    "type": "on_chain_twap",
+                    "chains": list(uniswap_v3_oracle.SUPPORTED_CHAINS),
+                    "feeds_per_chain": uniswap_v3_oracle.all_supported_symbols(),
+                    "default_window_s": uniswap_v3_oracle.DEFAULT_WINDOW_S,
+                    "min_window_s": uniswap_v3_oracle.MIN_WINDOW_S,
+                    "max_window_s": uniswap_v3_oracle.MAX_WINDOW_S,
+                    "coverage_note": (
+                        "Time-weighted average price (TWAP) read directly "
+                        "from curated Uniswap v3 pools via observe(). "
+                        "Default 30-minute window on high-liquidity pairs "
+                        "(WETH/USDC 0.05%, WBTC/USDC 0.30%)."
+                    ),
+                    "circuit_breaker": uniswap_v3_oracle.get_metrics()["circuit"],
+                },
             ],
         }
     )
@@ -171,6 +188,10 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
     chainlink_by_chain = chainlink_oracle.all_supported_symbols()
     price_oracle_mints = sorted(price_oracle.TOKEN_MINTS.keys())
     pyth_solana_syms = pyth_solana_oracle.list_supported_symbols()
+    uniswap_by_chain = uniswap_v3_oracle.all_supported_symbols()
+    uniswap_union: set[str] = set()
+    for syms in uniswap_by_chain.values():
+        uniswap_union.update(syms)
 
     chainlink_union: set[str] = set()
     for syms in chainlink_by_chain.values():
@@ -182,6 +203,7 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
         | chainlink_union
         | set(price_oracle_mints)
         | set(pyth_solana_syms)
+        | uniswap_union
     )
 
     return wrap_with_disclaimer(
@@ -197,6 +219,8 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
                 "price_oracle": price_oracle_mints,
                 "redstone": [],
                 "pyth_solana": pyth_solana_syms,
+                "uniswap_v3_base": uniswap_by_chain.get("base", []),
+                "uniswap_v3_ethereum": uniswap_by_chain.get("ethereum", []),
             },
             "coverage_notes": {
                 "redstone": (
@@ -208,6 +232,12 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
                     "On-chain Solana read, shard 0 sponsored feeds only. "
                     "Coverage is the curated list above -- any other symbol "
                     "returns 404 on /api/pyth/solana/{symbol}."
+                ),
+                "uniswap_v3": (
+                    "Time-weighted average price (TWAP) from curated "
+                    "high-liquidity Uniswap v3 pools. Default window 30 min. "
+                    "Coverage limited to audited pairs -- any other symbol "
+                    "returns 404 on /api/twap/{symbol}."
                 ),
             },
         }
