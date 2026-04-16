@@ -43,6 +43,13 @@ export const USER_AGENT = "maxia-oracle-typescript/0.1.0";
 const SYMBOL_PATTERN = /^[A-Z0-9]{1,10}$/;
 const MAX_BATCH_SYMBOLS = 50;
 
+/**
+ * EVM chains supported by the Chainlink on-chain reader (V1.1).
+ * `base` is the default for strict backward compatibility with V1.0.
+ */
+export type ChainlinkChain = "base" | "ethereum" | "arbitrum";
+const SUPPORTED_CHAINS: readonly ChainlinkChain[] = ["base", "ethereum", "arbitrum"];
+
 export class MaxiaOracleClient {
   private readonly apiKey: string | undefined;
   private readonly baseUrl: string;
@@ -133,12 +140,26 @@ export class MaxiaOracleClient {
   }
 
   /**
-   * Single-source price directly from the Chainlink feed on Base mainnet.
-   * Bypasses Pyth and the aggregator. Independently verifiable on-chain.
+   * Single-source price directly from a Chainlink on-chain feed.
+   *
+   * V1.1: accepts `chain` = `"base"` (default), `"ethereum"`, or
+   * `"arbitrum"`. Bypasses Pyth and the aggregator. Independently
+   * verifiable on-chain through the corresponding EVM RPC.
+   *
+   * Supported symbols per chain are in
+   * `listSymbols().data.by_source.chainlink_<chain>`.
    */
-  async chainlinkOnchain(symbol: string): Promise<MaxiaResponse<ChainlinkPayload>> {
-    const cleaned = this.validateSymbol(symbol);
-    return this.request<ChainlinkPayload>("GET", `/api/chainlink/${cleaned}`);
+  async chainlinkOnchain(
+    symbol: string,
+    chain: ChainlinkChain = "base",
+  ): Promise<MaxiaResponse<ChainlinkPayload>> {
+    const cleanedSymbol = this.validateSymbol(symbol);
+    const cleanedChain = this.validateChain(chain);
+    return this.request<ChainlinkPayload>(
+      "GET",
+      `/api/chainlink/${cleanedSymbol}`,
+      { query: { chain: cleanedChain } },
+    );
   }
 
   /**
@@ -174,6 +195,19 @@ export class MaxiaOracleClient {
     return cleaned;
   }
 
+  private validateChain(chain: string): ChainlinkChain {
+    if (typeof chain !== "string") {
+      throw new MaxiaOracleValidationError("chain must be a string");
+    }
+    const cleaned = chain.trim().toLowerCase() as ChainlinkChain;
+    if (!SUPPORTED_CHAINS.includes(cleaned)) {
+      throw new MaxiaOracleValidationError(
+        `chain must be one of ${SUPPORTED_CHAINS.join(", ")}, got ${chain}`,
+      );
+    }
+    return cleaned;
+  }
+
   private buildHeaders(auth: boolean, hasBody: boolean): Record<string, string> {
     const headers: Record<string, string> = {
       "User-Agent": USER_AGENT,
@@ -196,12 +230,19 @@ export class MaxiaOracleClient {
   private async request<T>(
     method: "GET" | "POST",
     path: string,
-    options: { auth?: boolean; json?: unknown } = {},
+    options: {
+      auth?: boolean;
+      json?: unknown;
+      query?: Record<string, string>;
+    } = {},
   ): Promise<MaxiaResponse<T>> {
     const auth = options.auth !== false;
     const hasBody = options.json !== undefined;
     const headers = this.buildHeaders(auth, hasBody);
-    const url = `${this.baseUrl}${path}`;
+    const queryString = options.query
+      ? "?" + new URLSearchParams(options.query).toString()
+      : "";
+    const url = `${this.baseUrl}${path}${queryString}`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);

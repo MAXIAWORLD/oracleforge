@@ -17,46 +17,10 @@ module-reload dance and keeps every test fully isolated.
 """
 from __future__ import annotations
 
-import os
-from pathlib import Path
-from typing import Iterator
-
 import pytest
 from fastapi.testclient import TestClient
 
-
-@pytest.fixture(scope="session")
-def session_app(tmp_path_factory: pytest.TempPathFactory):
-    """Session-scoped: import main.py exactly once with a fresh DB path."""
-    db_dir: Path = tmp_path_factory.mktemp("maxia_oracle_db")
-    os.environ["DB_PATH"] = str(db_dir / "test.sqlite")
-    import main  # noqa: PLC0415 — intentional late import after env setup
-    from core.db import init_db  # noqa: PLC0415
-
-    init_db()
-    return main.app
-
-
-@pytest.fixture
-def client(session_app) -> Iterator[TestClient]:
-    """Function-scoped: truncate mutable tables, then hand a TestClient over."""
-    from core.db import get_db  # noqa: PLC0415
-
-    db = get_db()
-    db.execute("DELETE FROM api_keys")
-    db.execute("DELETE FROM rate_limit")
-    db.execute("DELETE FROM register_limit")
-
-    with TestClient(session_app) as c:
-        yield c
-
-
-@pytest.fixture
-def api_key(client: TestClient) -> str:
-    """Register a fresh API key and return the raw value."""
-    response = client.post("/api/register")
-    assert response.status_code == 201, response.text
-    return response.json()["data"]["api_key"]
+# Shared `session_app`, `client`, `api_key` fixtures live in conftest.py.
 
 
 # ── /health ──────────────────────────────────────────────────────────────────
@@ -272,8 +236,9 @@ def test_chainlink_rejects_unsupported_symbol(
     )
     assert r.status_code == 404
     body = r.json()
-    assert body["error"] == "symbol has no Chainlink feed on Base"
+    assert body["error"] == "symbol has no Chainlink feed on requested chain"
     assert body["symbol"] == "DOGE99"
+    assert body["chain"] == "base"
     assert isinstance(body["supported"], list)
     assert "BTC" in body["supported"]
 

@@ -216,20 +216,48 @@ describe("metadata endpoints", () => {
     expect(r.data.all_symbols).toContain("BTC");
   });
 
-  it("chainlinkOnchain calls the right path", async () => {
+  it("chainlinkOnchain calls the right path with default chain=base", async () => {
     const client = makeClient(async (url) => {
-      expect(url).toBe("http://test.invalid/api/chainlink/BTC");
+      expect(url).toBe("http://test.invalid/api/chainlink/BTC?chain=base");
       return jsonResponse(200, {
         data: {
           source: "chainlink_base",
           price: 74000.0,
           contract: "0xabc",
+          chain: "base",
         },
         disclaimer: DISCLAIMER,
       });
     });
     const r = await client.chainlinkOnchain("BTC");
     expect(r.data.source).toBe("chainlink_base");
+  });
+
+  it("chainlinkOnchain forwards chain=ethereum to the backend", async () => {
+    const client = makeClient(async (url) => {
+      expect(url).toBe("http://test.invalid/api/chainlink/BTC?chain=ethereum");
+      return jsonResponse(200, {
+        data: {
+          source: "chainlink_ethereum",
+          price: 73900.0,
+          contract: "0xeth",
+          chain: "ethereum",
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    const r = await client.chainlinkOnchain("BTC", "ethereum");
+    expect(r.data.source).toBe("chainlink_ethereum");
+  });
+
+  it("chainlinkOnchain rejects unsupported chain at validation time", async () => {
+    const client = makeClient(async () =>
+      jsonResponse(200, { data: {}, disclaimer: DISCLAIMER }),
+    );
+    // @ts-expect-error — deliberately passing an invalid chain literal.
+    await expect(client.chainlinkOnchain("BTC", "solana")).rejects.toThrow(
+      /chain must be one of/,
+    );
   });
 });
 

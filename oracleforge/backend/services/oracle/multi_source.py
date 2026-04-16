@@ -75,10 +75,12 @@ async def collect_sources(symbol: str) -> list[dict[str, Any]]:
         tasks.append(
             ("pyth_equity", pyth_oracle.get_pyth_price(pyth_oracle.EQUITY_FEEDS[lookup_eq]))
         )
-    # Chainlink — on-chain Base
-    if symbol in chainlink_oracle.CHAINLINK_FEEDS:
+    # Chainlink — on-chain Base (multi-source aggregator stays Base-only by design:
+    # mixing chains into a single "median" is semantically wrong, same symbol can
+    # legitimately diverge by a few bps across chains because of heartbeat timing).
+    if chainlink_oracle.has_feed(symbol, "base"):
         tasks.append(
-            ("chainlink_base", chainlink_oracle.get_chainlink_price(symbol))
+            ("chainlink_base", chainlink_oracle.get_chainlink_price(symbol, chain="base"))
         )
     # price_oracle — Helius/CoinPaprika/CoinGecko aggregator
     tasks.append(("price_oracle", price_oracle.get_prices([symbol])))

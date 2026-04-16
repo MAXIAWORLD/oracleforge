@@ -186,20 +186,30 @@ class MaxiaOracleClient:
         """
         return self._request("GET", "/api/symbols")
 
-    def chainlink_onchain(self, symbol: str) -> dict[str, Any]:
-        """Return a single-source price directly from the Chainlink feed on Base.
+    def chainlink_onchain(
+        self, symbol: str, chain: str = "base"
+    ) -> dict[str, Any]:
+        """Return a single-source price directly from a Chainlink on-chain feed.
 
-        Forces the on-chain single-source path (bypasses Pyth and the
-        aggregator). Useful for audit or for cross-checking the median
-        returned by `price()`. Supported symbols are in
-        `list_symbols()["data"]["by_source"]["chainlink_base"]`.
+        V1.1: accepts `chain` = `"base"` (default), `"ethereum"`, or
+        `"arbitrum"`. Forces the on-chain single-source path (bypasses
+        Pyth and the aggregator). Useful for audit or for cross-checking
+        the median returned by `price()`, or to read the same value a
+        smart contract on the requested chain will see.
+
+        Supported symbols per chain are in
+        `list_symbols()["data"]["by_source"]["chainlink_<chain>"]`.
 
         Raises:
-            MaxiaOracleValidationError: symbol format or not supported on
-                Chainlink Base.
+            MaxiaOracleValidationError: symbol format invalid, chain not
+                in {base, ethereum, arbitrum}, or symbol not supported on
+                the requested chain.
         """
         symbol = self._validate_symbol(symbol)
-        return self._request("GET", f"/api/chainlink/{symbol}")
+        chain = self._validate_chain(chain)
+        return self._request(
+            "GET", f"/api/chainlink/{symbol}", params={"chain": chain}
+        )
 
     def confidence(self, symbol: str) -> dict[str, Any]:
         """Return the multi-source divergence for a symbol, compact.
@@ -223,6 +233,19 @@ class MaxiaOracleClient:
     # ── Internals ───────────────────────────────────────────────────────────
 
     _SYMBOL_MAX_LEN = 10
+    _SUPPORTED_CHAINS: Final[frozenset[str]] = frozenset(
+        {"base", "ethereum", "arbitrum"}
+    )
+
+    def _validate_chain(self, chain: str) -> str:
+        if not isinstance(chain, str):
+            raise MaxiaOracleValidationError("chain must be a string")
+        cleaned = chain.strip().lower()
+        if cleaned not in self._SUPPORTED_CHAINS:
+            raise MaxiaOracleValidationError(
+                f"chain must be one of {sorted(self._SUPPORTED_CHAINS)}, got {chain!r}"
+            )
+        return cleaned
 
     def _validate_symbol(self, symbol: str) -> str:
         if not isinstance(symbol, str):
@@ -262,6 +285,7 @@ class MaxiaOracleClient:
         *,
         auth: bool = True,
         json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         try:
             response = self._client.request(
@@ -269,6 +293,7 @@ class MaxiaOracleClient:
                 path,
                 headers=self._build_headers(auth),
                 json=json,
+                params=params,
             )
         except httpx.HTTPError as exc:
             raise MaxiaOracleTransportError(

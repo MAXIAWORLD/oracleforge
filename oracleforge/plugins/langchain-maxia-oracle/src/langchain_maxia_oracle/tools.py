@@ -19,12 +19,16 @@ from typing import Any, Final
 
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, Field
+from typing import Literal
 
 from maxia_oracle import MaxiaOracleClient
 
 DISCLAIMER: Final[str] = (
     "Data feed only. Not investment advice. No custody. No KYC."
 )
+
+# V1.1: EVM chains supported by the Chainlink on-chain reader.
+ChainLiteral = Literal["base", "ethereum", "arbitrum"]
 
 
 def _fmt(data: Any) -> str:
@@ -63,6 +67,25 @@ class SymbolsBatchInput(BaseModel):
 
 class EmptyInput(BaseModel):
     """No input required."""
+
+
+class ChainlinkInput(BaseModel):
+    """Single-asset Chainlink input with optional EVM chain selector (V1.1)."""
+
+    symbol: str = Field(
+        description=(
+            "Asset ticker, 1 to 10 uppercase alphanumeric characters "
+            "(e.g. 'BTC', 'ETH', 'USDC')."
+        ),
+    )
+    chain: ChainLiteral = Field(
+        default="base",
+        description=(
+            "EVM chain on which to read the Chainlink feed. One of "
+            "'base' (default, for backward compatibility), 'ethereum', "
+            "or 'arbitrum'."
+        ),
+    )
 
 
 # ── Tool base class ────────────────────────────────────────────────────────
@@ -187,19 +210,21 @@ class MaxiaOracleListSupportedSymbolsTool(_MaxiaOracleTool):
 
 
 class MaxiaOracleGetChainlinkOnchainTool(_MaxiaOracleTool):
-    """Single-source price straight from a Chainlink feed on Base."""
+    """Single-source price straight from a Chainlink feed on Base / Ethereum / Arbitrum."""
 
     name: str = "maxia_oracle_get_chainlink_onchain"
     description: str = (
-        "Fetch a single-source price directly from the Chainlink on-chain "
-        "feed on Base mainnet. Independently verifiable on-chain; useful to "
-        "cross-check the median returned by get_price. "
+        "Fetch a single-source price directly from a Chainlink on-chain "
+        "feed on the requested EVM chain (base, ethereum, or arbitrum). "
+        "Independently verifiable on-chain; useful to cross-check the "
+        "median returned by get_price or to see the exact value a smart "
+        "contract on that chain will read. "
         + DISCLAIMER
     )
-    args_schema: type[BaseModel] = SymbolInput
+    args_schema: type[BaseModel] = ChainlinkInput
 
-    def _run(self, symbol: str) -> str:
-        return _fmt(self._get_client().chainlink_onchain(symbol))
+    def _run(self, symbol: str, chain: str = "base") -> str:
+        return _fmt(self._get_client().chainlink_onchain(symbol, chain=chain))
 
 
 class MaxiaOracleHealthCheckTool(_MaxiaOracleTool):

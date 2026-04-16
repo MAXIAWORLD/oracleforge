@@ -98,8 +98,24 @@ async def test_chainlink_onchain_tool_dispatches_to_client() -> None:
         {"symbol": "BTC"}, CancellationToken()
     )
 
-    fake.chainlink_onchain.assert_called_once_with("BTC")
+    fake.chainlink_onchain.assert_called_once_with("BTC", chain="base")
     assert "chainlink_base" in result
+
+
+@pytest.mark.asyncio
+async def test_chainlink_onchain_tool_propagates_chain_ethereum() -> None:
+    fake = MagicMock()
+    fake.chainlink_onchain.return_value = _fake(
+        {"symbol": "BTC", "source": "chainlink_ethereum", "chain": "ethereum"}
+    )
+    tools = {t.name: t for t in get_all_tools(client=fake)}
+
+    result = await tools["maxia_oracle_get_chainlink_onchain"].run_json(
+        {"symbol": "BTC", "chain": "ethereum"}, CancellationToken()
+    )
+
+    fake.chainlink_onchain.assert_called_once_with("BTC", chain="ethereum")
+    assert "chainlink_ethereum" in result
 
 
 @pytest.mark.asyncio

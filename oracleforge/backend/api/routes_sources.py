@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
 from core.auth import require_api_key
+from core.config import CHAIN_RPC_URLS
 from core.db import get_db
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
@@ -54,6 +55,18 @@ async def list_sources(key_hash: str = Depends(require_api_key)):
         "coingecko":   price_oracle._cb_coingecko.get_status(),
         "yahoo":       price_oracle._cb_yahoo.get_status(),
     }
+    chainlink_sources = [
+        {
+            "name": f"chainlink_{chain}",
+            "type": "on_chain_oracle",
+            "chain": chain,
+            "endpoint": CHAIN_RPC_URLS[chain][0],
+            "feeds": chainlink_oracle.symbols_for(chain),
+            "update_frequency": "~1h heartbeat or 0.5% deviation",
+            "circuit_breaker": None,
+        }
+        for chain in chainlink_oracle.SUPPORTED_CHAINS
+    ]
     return wrap_with_disclaimer(
         {
             "sources": [
@@ -68,14 +81,7 @@ async def list_sources(key_hash: str = Depends(require_api_key)):
                     "confidence_interval": True,
                     "circuit_breaker": None,
                 },
-                {
-                    "name": "chainlink_base",
-                    "type": "on_chain_oracle",
-                    "endpoint": chainlink_oracle.BASE_RPC_URL,
-                    "feeds": list(chainlink_oracle.CHAINLINK_FEEDS.keys()),
-                    "update_frequency": "~1h heartbeat or 0.5% deviation",
-                    "circuit_breaker": None,
-                },
+                *chainlink_sources,
                 {
                     "name": "helius_das",
                     "type": "rpc_metadata",
@@ -128,13 +134,17 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
 
     pyth_crypto = sorted(pyth_oracle.CRYPTO_FEEDS.keys())
     pyth_equity = sorted(pyth_oracle.EQUITY_FEEDS.keys())
-    chainlink_base = sorted(chainlink_oracle.CHAINLINK_FEEDS.keys())
+    chainlink_by_chain = chainlink_oracle.all_supported_symbols()
     price_oracle_mints = sorted(price_oracle.TOKEN_MINTS.keys())
+
+    chainlink_union: set[str] = set()
+    for syms in chainlink_by_chain.values():
+        chainlink_union.update(syms)
 
     all_symbols = sorted(
         set(pyth_crypto)
         | set(pyth_equity)
-        | set(chainlink_base)
+        | chainlink_union
         | set(price_oracle_mints)
     )
 
@@ -145,7 +155,9 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
             "by_source": {
                 "pyth_crypto": pyth_crypto,
                 "pyth_equity": pyth_equity,
-                "chainlink_base": chainlink_base,
+                "chainlink_base": chainlink_by_chain.get("base", []),
+                "chainlink_ethereum": chainlink_by_chain.get("ethereum", []),
+                "chainlink_arbitrum": chainlink_by_chain.get("arbitrum", []),
                 "price_oracle": price_oracle_mints,
             },
         }

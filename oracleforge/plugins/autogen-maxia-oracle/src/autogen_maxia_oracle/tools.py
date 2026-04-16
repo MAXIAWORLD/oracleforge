@@ -125,14 +125,16 @@ def get_all_tools(
         """
         return _fmt(shared.list_symbols())
 
-    def maxia_oracle_get_chainlink_onchain(symbol: str) -> str:
-        """Fetch a single-source price directly from the Chainlink feed on Base.
+    def maxia_oracle_get_chainlink_onchain(symbol: str, chain: str = "base") -> str:
+        """Fetch a single-source price directly from a Chainlink on-chain feed.
 
-        Independently verifiable on-chain; useful to cross-check the median
-        returned by get_price.
+        V1.1: accepts chain = 'base' (default), 'ethereum', or 'arbitrum'.
+        Independently verifiable on-chain via the corresponding EVM RPC.
+        Useful to cross-check the median returned by get_price or to see
+        the exact value a smart contract on that chain will read.
         Data feed only. Not investment advice. No custody. No KYC.
         """
-        return _fmt(shared.chainlink_onchain(symbol))
+        return _fmt(shared.chainlink_onchain(symbol, chain=chain))
 
     def maxia_oracle_health_check() -> str:
         """Minimal liveness probe for the MAXIA Oracle backend.

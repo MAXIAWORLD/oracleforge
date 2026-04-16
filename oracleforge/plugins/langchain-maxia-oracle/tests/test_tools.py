@@ -122,9 +122,23 @@ def test_chainlink_onchain_tool_dispatches_to_client() -> None:
 
     result = tool.invoke({"symbol": "BTC"})
 
-    fake.chainlink_onchain.assert_called_once_with("BTC")
+    fake.chainlink_onchain.assert_called_once_with("BTC", chain="base")
     parsed = json.loads(result)
     assert parsed["data"]["source"] == "chainlink_base"
+
+
+def test_chainlink_onchain_tool_propagates_chain_ethereum() -> None:
+    fake = MagicMock()
+    fake.chainlink_onchain.return_value = _fake_response(
+        {"symbol": "BTC", "price": 73900.0, "source": "chainlink_ethereum", "chain": "ethereum"}
+    )
+    tool = MaxiaOracleGetChainlinkOnchainTool(client=fake)
+
+    result = tool.invoke({"symbol": "BTC", "chain": "ethereum"})
+
+    fake.chainlink_onchain.assert_called_once_with("BTC", chain="ethereum")
+    parsed = json.loads(result)
+    assert parsed["data"]["chain"] == "ethereum"
 
 
 def test_health_check_tool_has_no_args() -> None:

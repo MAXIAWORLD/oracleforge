@@ -84,8 +84,23 @@ def test_chainlink_onchain_tool_dispatches_to_client() -> None:
 
     output = tools["maxia_oracle_get_chainlink_onchain"].call(symbol="BTC")
 
-    fake.chainlink_onchain.assert_called_once_with("BTC")
+    fake.chainlink_onchain.assert_called_once_with("BTC", chain="base")
     assert "chainlink_base" in output.content
+
+
+def test_chainlink_onchain_tool_propagates_chain_arbitrum() -> None:
+    fake = MagicMock()
+    fake.chainlink_onchain.return_value = _fake(
+        {"symbol": "BTC", "source": "chainlink_arbitrum", "chain": "arbitrum"}
+    )
+    tools = {t.metadata.name: t for t in get_all_tools(client=fake)}
+
+    output = tools["maxia_oracle_get_chainlink_onchain"].call(
+        symbol="BTC", chain="arbitrum"
+    )
+
+    fake.chainlink_onchain.assert_called_once_with("BTC", chain="arbitrum")
+    assert "chainlink_arbitrum" in output.content
 
 
 def test_confidence_tool_dispatches_to_client() -> None:

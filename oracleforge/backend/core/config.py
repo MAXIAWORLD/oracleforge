@@ -248,18 +248,48 @@ def _read_base_min_tx_usdc() -> float:
 BASE_MIN_TX_USDC: Final[float] = _read_base_min_tx_usdc()
 
 
-# Base RPC fallback chain: the env-configured primary first (or public mainnet
-# default), then two independent public endpoints. The verifier will cycle
-# through them in order and return the first response.
+# V1.1 multi-chain RPC fallback pools.
+#
+# For every supported EVM chain we keep an ordered tuple of RPC endpoints:
+# the env-configured primary (or a sensible public default) first, then two
+# independent public fallbacks. The verifier / chainlink reader cycles
+# through them in order and returns the first success. A one-RPC prod
+# config is never acceptable — too many free public RPCs silently rate-
+# limit the second request of a burst, and a cold fallback path is the
+# cheapest resilience money can buy.
 _BASE_RPC_PRIMARY: Final[str] = os.getenv(
     "BASE_RPC_URL", "https://mainnet.base.org"
 ).strip() or "https://mainnet.base.org"
 
-BASE_RPC_URLS: Final[tuple[str, ...]] = (
-    _BASE_RPC_PRIMARY,
-    "https://base.llamarpc.com",
-    "https://base-mainnet.public.blastapi.io",
-)
+_ETHEREUM_RPC_PRIMARY: Final[str] = os.getenv(
+    "ETHEREUM_RPC_URL", "https://eth.llamarpc.com"
+).strip() or "https://eth.llamarpc.com"
+
+_ARBITRUM_RPC_PRIMARY: Final[str] = os.getenv(
+    "ARBITRUM_RPC_URL", "https://arb1.arbitrum.io/rpc"
+).strip() or "https://arb1.arbitrum.io/rpc"
+
+CHAIN_RPC_URLS: Final[dict[str, tuple[str, ...]]] = {
+    "base": (
+        _BASE_RPC_PRIMARY,
+        "https://base.llamarpc.com",
+        "https://base-mainnet.public.blastapi.io",
+    ),
+    "ethereum": (
+        _ETHEREUM_RPC_PRIMARY,
+        "https://ethereum-rpc.publicnode.com",
+        "https://rpc.ankr.com/eth",
+    ),
+    "arbitrum": (
+        _ARBITRUM_RPC_PRIMARY,
+        "https://arbitrum.llamarpc.com",
+        "https://arbitrum-one-rpc.publicnode.com",
+    ),
+}
+
+# Backward-compatibility alias for x402/base_verifier.py (Phase 4).
+# New callers should prefer CHAIN_RPC_URLS["base"].
+BASE_RPC_URLS: Final[tuple[str, ...]] = CHAIN_RPC_URLS["base"]
 
 
 # Coinbase x402 facilitator endpoint. The facilitator decodes the canonical

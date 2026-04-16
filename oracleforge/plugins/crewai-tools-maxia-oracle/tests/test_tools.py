@@ -91,8 +91,21 @@ def test_chainlink_onchain_tool_dispatches_to_client() -> None:
 
     result = tool.run(symbol="BTC")
 
-    fake.chainlink_onchain.assert_called_once_with("BTC")
+    fake.chainlink_onchain.assert_called_once_with("BTC", chain="base")
     assert "chainlink_base" in result
+
+
+def test_chainlink_onchain_tool_propagates_chain_arbitrum() -> None:
+    fake = MagicMock()
+    fake.chainlink_onchain.return_value = _fake(
+        {"symbol": "BTC", "source": "chainlink_arbitrum", "chain": "arbitrum"}
+    )
+    tool = MaxiaOracleGetChainlinkOnchainTool(client=fake)
+
+    result = tool.run(symbol="BTC", chain="arbitrum")
+
+    fake.chainlink_onchain.assert_called_once_with("BTC", chain="arbitrum")
+    assert "chainlink_arbitrum" in result
 
 
 def test_confidence_tool_dispatches_to_client() -> None:

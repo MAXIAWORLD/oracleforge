@@ -132,7 +132,7 @@ async def get_sources_status() -> dict[str, Any]:
     """
     probe_symbol = "BTC"
     pyth_feed = pyth_oracle.CRYPTO_FEEDS.get(probe_symbol)
-    chainlink_probe = probe_symbol if probe_symbol in chainlink_oracle.CHAINLINK_FEEDS else None
+    chainlink_probe = probe_symbol if chainlink_oracle.has_feed(probe_symbol, "base") else None
 
     tasks: list[tuple[str, Any]] = []
     if pyth_feed:
@@ -243,19 +243,24 @@ def _interpret_divergence(div: float) -> str:
 async def list_supported_symbols() -> dict[str, Any]:
     """Return the union of supported symbols across Pyth, Chainlink, price_oracle.
 
-    The result groups symbols by source so the caller can see which
-    tickers will go through a multi-source cross-validation versus
-    single-source only.
+    V1.1: Chainlink is reported per chain (base, ethereum, arbitrum) so
+    callers can see which chains can answer a given symbol. The
+    `all_symbols` union folds every source and every chain into one
+    flat deduplicated list.
     """
     pyth_crypto = sorted(pyth_oracle.CRYPTO_FEEDS.keys())
     pyth_equity = sorted(pyth_oracle.EQUITY_FEEDS.keys())
-    chainlink_base = sorted(chainlink_oracle.CHAINLINK_FEEDS.keys())
+    chainlink_by_chain = chainlink_oracle.all_supported_symbols()
     price_oracle_mints = sorted(price_oracle.TOKEN_MINTS.keys())
+
+    chainlink_union: set[str] = set()
+    for syms in chainlink_by_chain.values():
+        chainlink_union.update(syms)
 
     all_symbols = sorted(
         set(pyth_crypto)
         | set(pyth_equity)
-        | set(chainlink_base)
+        | chainlink_union
         | set(price_oracle_mints)
     )
 
@@ -266,7 +271,9 @@ async def list_supported_symbols() -> dict[str, Any]:
             "by_source": {
                 "pyth_crypto": pyth_crypto,
                 "pyth_equity": pyth_equity,
-                "chainlink_base": chainlink_base,
+                "chainlink_base": chainlink_by_chain.get("base", []),
+                "chainlink_ethereum": chainlink_by_chain.get("ethereum", []),
+                "chainlink_arbitrum": chainlink_by_chain.get("arbitrum", []),
                 "price_oracle": price_oracle_mints,
             },
         }
@@ -276,31 +283,45 @@ async def list_supported_symbols() -> dict[str, Any]:
 # ── 7. get_chainlink_onchain ─────────────────────────────────────────────────
 
 
-async def get_chainlink_onchain(symbol: str) -> dict[str, Any]:
-    """Fetch a price directly from the Chainlink on-chain Base feed.
+async def get_chainlink_onchain(
+    symbol: str, chain: str = "base"
+) -> dict[str, Any]:
+    """Fetch a price directly from a Chainlink on-chain feed.
 
-    Forces Chainlink (bypassing Pyth and the aggregator sources) so the
-    caller gets a quote that is independently verifiable on-chain via
-    the Base mainnet RPC. Useful for audit or for cross-checking the
-    median returned by `get_price`.
+    V1.1: accepts `chain` = base (default), ethereum, or arbitrum. Forces
+    Chainlink (bypassing Pyth and the aggregator sources) so the caller
+    gets a quote that is independently verifiable on-chain via the
+    corresponding EVM RPC. Useful for audit or cross-checking the median
+    returned by `get_price`.
     """
     if not isinstance(symbol, str):
         return wrap_error("symbol must be a string")
+    if not isinstance(chain, str):
+        return wrap_error("chain must be a string")
     symbol = symbol.strip().upper()
+    chain = chain.strip().lower()
     if not _is_valid_symbol(symbol):
         return wrap_error("invalid symbol format", symbol=symbol)
-    if symbol not in chainlink_oracle.CHAINLINK_FEEDS:
+    if chain not in chainlink_oracle.SUPPORTED_CHAINS:
         return wrap_error(
-            "symbol has no Chainlink feed on Base",
+            "unsupported chain",
+            chain=chain,
+            supported=list(chainlink_oracle.SUPPORTED_CHAINS),
+        )
+    if not chainlink_oracle.has_feed(symbol, chain):
+        return wrap_error(
+            "symbol has no Chainlink feed on requested chain",
             symbol=symbol,
-            supported=sorted(chainlink_oracle.CHAINLINK_FEEDS.keys()),
+            chain=chain,
+            supported=chainlink_oracle.symbols_for(chain),
         )
 
-    result = await chainlink_oracle.get_chainlink_price(symbol)
+    result = await chainlink_oracle.get_chainlink_price(symbol, chain=chain)
     if not isinstance(result, dict) or result.get("error"):
         return wrap_error(
             "chainlink fetch failed",
             symbol=symbol,
+            chain=chain,
             detail=result.get("error") if isinstance(result, dict) else "unexpected",
         )
     return wrap_with_disclaimer(result)

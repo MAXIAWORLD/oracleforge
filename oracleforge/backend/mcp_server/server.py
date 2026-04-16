@@ -148,14 +148,27 @@ _TOOL_DEFINITIONS: list[types.Tool] = [
     types.Tool(
         name="get_chainlink_onchain",
         description=(
-            "Fetch a single-source price directly from the Chainlink on-chain "
-            "feed on Base mainnet. Independently verifiable on-chain; useful to "
-            "cross-check the median returned by get_price. "
+            "Fetch a single-source price directly from a Chainlink on-chain "
+            "feed on the requested EVM chain (base, ethereum, or arbitrum). "
+            "Independently verifiable on-chain; useful to cross-check the "
+            "median returned by get_price or to see the exact value a "
+            "smart contract on that chain will read. "
             + _DISCLAIMER_LINE
         ),
         inputSchema={
             "type": "object",
-            "properties": {"symbol": _SYMBOL_SCHEMA},
+            "properties": {
+                "symbol": _SYMBOL_SCHEMA,
+                "chain": {
+                    "type": "string",
+                    "enum": ["base", "ethereum", "arbitrum"],
+                    "default": "base",
+                    "description": (
+                        "EVM chain on which to read the Chainlink feed. "
+                        "Defaults to 'base' for backward compatibility."
+                    ),
+                },
+            },
             "required": ["symbol"],
             "additionalProperties": False,
         },

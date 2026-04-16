@@ -177,13 +177,25 @@ def _tool_definitions() -> list[types.Tool]:
         types.Tool(
             name="get_chainlink_onchain",
             description=(
-                "Fetch a single-source price directly from the Chainlink "
-                "on-chain feed on Base mainnet. Independently verifiable "
-                "on-chain. " + _DISCLAIMER_LINE
+                "Fetch a single-source price directly from a Chainlink "
+                "on-chain feed on the requested EVM chain (base, ethereum, "
+                "or arbitrum). Independently verifiable on-chain. "
+                + _DISCLAIMER_LINE
             ),
             inputSchema={
                 "type": "object",
-                "properties": {"symbol": _SYMBOL_SCHEMA},
+                "properties": {
+                    "symbol": _SYMBOL_SCHEMA,
+                    "chain": {
+                        "type": "string",
+                        "enum": ["base", "ethereum", "arbitrum"],
+                        "default": "base",
+                        "description": (
+                            "EVM chain on which to read the Chainlink feed. "
+                            "Defaults to 'base' for backward compatibility."
+                        ),
+                    },
+                },
                 "required": ["symbol"],
                 "additionalProperties": False,
             },
@@ -240,7 +252,11 @@ def _build_dispatch(
         return await asyncio.to_thread(client.list_symbols)
 
     async def get_chainlink_onchain(args: dict[str, Any]) -> dict[str, Any]:
-        return await asyncio.to_thread(client.chainlink_onchain, args["symbol"])
+        return await asyncio.to_thread(
+            client.chainlink_onchain,
+            args["symbol"],
+            args.get("chain", "base"),
+        )
 
     async def health_check(args: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(client.health)

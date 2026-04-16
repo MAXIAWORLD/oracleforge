@@ -232,15 +232,55 @@ def test_list_symbols_returns_grouped() -> None:
 
 
 def test_chainlink_onchain_calls_right_path() -> None:
+    captured: dict[str, str] = {}
+
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/api/chainlink/BTC"
+        captured["path"] = request.url.path
+        captured["chain"] = request.url.params.get("chain", "")
         return _ok(
-            {"data": {"source": "chainlink_base", "price": 74000.0, "contract": "0xabc"}, "disclaimer": DISCLAIMER}
+            {"data": {"source": "chainlink_base", "price": 74000.0, "contract": "0xabc", "chain": "base"}, "disclaimer": DISCLAIMER}
         )
 
     with _client_with(handler) as c:
         result = c.chainlink_onchain("BTC")
+    assert captured["path"] == "/api/chainlink/BTC"
+    assert captured["chain"] == "base"
     assert result["data"]["source"] == "chainlink_base"
+
+
+def test_chainlink_onchain_propagates_chain_ethereum() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["chain"] = request.url.params.get("chain", "")
+        return _ok(
+            {
+                "data": {
+                    "source": "chainlink_ethereum",
+                    "price": 73900.0,
+                    "contract": "0xeth",
+                    "chain": "ethereum",
+                },
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        result = c.chainlink_onchain("BTC", chain="ethereum")
+    assert captured["path"] == "/api/chainlink/BTC"
+    assert captured["chain"] == "ethereum"
+    assert result["data"]["chain"] == "ethereum"
+
+
+def test_chainlink_onchain_rejects_invalid_chain() -> None:
+    import pytest
+
+    from maxia_oracle.exceptions import MaxiaOracleValidationError
+
+    with _client_with(lambda _r: _ok({"data": {}, "disclaimer": DISCLAIMER})) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.chainlink_onchain("BTC", chain="solana")
 
 
 def test_confidence_extracts_divergence_from_price_call() -> None:

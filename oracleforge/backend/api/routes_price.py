@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -24,6 +24,7 @@ router = APIRouter(prefix="/api", tags=["price"])
 
 _SYMBOL_REGEX = re.compile(r"^[A-Z0-9]{1,10}$")
 _MAX_BATCH_SYMBOLS = 50
+_CHAIN_PATTERN = r"^(base|ethereum|arbitrum)$"
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -153,14 +154,20 @@ async def get_batch_prices_route(
 
 @router.get("/chainlink/{symbol}")
 async def get_chainlink_price_route(
-    symbol: str, key_hash: str = Depends(require_access)
+    symbol: str,
+    chain: str = Query(
+        "base",
+        pattern=_CHAIN_PATTERN,
+        description="EVM chain on which to read the Chainlink feed.",
+    ),
+    key_hash: str = Depends(require_access),
 ):
-    """Return a single-source price directly from the Chainlink feed on Base.
+    """Return a single-source Chainlink on-chain price on the requested chain.
 
-    Mirrors the MCP `get_chainlink_onchain` tool (Phase 5) so SDK callers
-    can force the on-chain single-source path for audit purposes. The
-    symbol must be in `chainlink_oracle.CHAINLINK_FEEDS` — unsupported
-    symbols return 404 with the list of supported tickers.
+    V1.1: the `chain` query parameter selects Base (default), Ethereum or
+    Arbitrum. Default stays `base` for strict backward compatibility with
+    V1.0 clients. Unsupported `symbol` + `chain` combinations return 404
+    with the list of symbols available on the requested chain.
     """
     symbol = symbol.upper()
     if not _is_valid_symbol(symbol):
@@ -169,13 +176,14 @@ async def get_chainlink_price_route(
             content=wrap_error("invalid symbol format"),
         )
 
-    if symbol not in chainlink_oracle.CHAINLINK_FEEDS:
+    if not chainlink_oracle.has_feed(symbol, chain):
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
             content=wrap_error(
-                "symbol has no Chainlink feed on Base",
+                "symbol has no Chainlink feed on requested chain",
                 symbol=symbol,
-                supported=sorted(chainlink_oracle.CHAINLINK_FEEDS.keys()),
+                chain=chain,
+                supported=chainlink_oracle.symbols_for(chain),
             ),
         )
 
@@ -183,13 +191,14 @@ async def get_chainlink_price_route(
     if rl is not None:
         return rl
 
-    result = await chainlink_oracle.get_chainlink_price(symbol)
+    result = await chainlink_oracle.get_chainlink_price(symbol, chain=chain)
     if not isinstance(result, dict) or result.get("error"):
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
             content=wrap_error(
                 "chainlink fetch failed",
                 symbol=symbol,
+                chain=chain,
                 detail=(
                     result.get("error") if isinstance(result, dict) else "unexpected"
                 ),

@@ -18,6 +18,8 @@ export {
   USER_AGENT,
 } from "./client.js";
 
+export type { ChainlinkChain } from "./client.js";
+
 export {
   MaxiaOracleAuthError,
   MaxiaOracleError,
