@@ -33,6 +33,7 @@ TOOL_NAMES: Final[tuple[str, ...]] = (
     "maxia_oracle_get_redstone_price",
     "maxia_oracle_get_pyth_solana_onchain",
     "maxia_oracle_get_twap_onchain",
+    "maxia_oracle_get_price_context",
     "maxia_oracle_health_check",
 )
 
@@ -173,6 +174,10 @@ def get_all_tools(
         """
         return _fmt(shared.twap(symbol, chain=chain, window_s=window_s))
 
+    def maxia_oracle_get_price_context(symbol: str) -> str:
+        """Return price + confidence score (0-100) + anomaly flag + sources agreement in one call (V1.6). Agent-native: everything an LLM agent needs to decide whether to act on a price. Data feed only. Not investment advice. No custody. No KYC."""
+        return _fmt(shared.price_context(symbol))
+
     def maxia_oracle_health_check() -> str:
         """Minimal liveness probe for the MAXIA Oracle backend.
 
@@ -193,6 +198,7 @@ def get_all_tools(
         maxia_oracle_get_redstone_price,
         maxia_oracle_get_pyth_solana_onchain,
         maxia_oracle_get_twap_onchain,
+        maxia_oracle_get_price_context,
         maxia_oracle_health_check,
     )
 

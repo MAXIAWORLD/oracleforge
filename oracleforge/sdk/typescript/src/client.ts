@@ -30,6 +30,7 @@ import type {
   HealthPayload,
   MaxiaOracleClientOptions,
   MaxiaResponse,
+  PriceContextPayload,
   PricePayload,
   PythSolanaPayload,
   RedstonePayload,
@@ -42,7 +43,7 @@ import type {
 
 export const DEFAULT_BASE_URL = "https://oracle.maxiaworld.app";
 export const DEFAULT_TIMEOUT_MS = 15_000;
-export const USER_AGENT = "maxia-oracle-typescript/0.4.0";
+export const USER_AGENT = "maxia-oracle-typescript/0.5.0";
 
 const SYMBOL_PATTERN = /^[A-Z0-9]{1,10}$/;
 const MAX_BATCH_SYMBOLS = 50;
@@ -224,6 +225,18 @@ export class MaxiaOracleClient {
       `/api/twap/${cleanedSymbol}`,
       { query: { chain: cleanedChain, window: String(cleanedWindow) } },
     );
+  }
+
+  /**
+   * V1.6 — Price + confidence score + anomaly flag + sources agreement.
+   *
+   * Agent-native one-call: everything an LLM agent needs to decide whether
+   * to act on a price. Includes `confidence_score` (0-100), `anomaly` flag
+   * with reasons, TWAP deviation, and source outliers.
+   */
+  async priceContext(symbol: string): Promise<MaxiaResponse<PriceContextPayload>> {
+    const cleaned = this.validateSymbol(symbol);
+    return this.request<PriceContextPayload>("GET", `/api/price/${cleaned}/context`);
   }
 
   /**

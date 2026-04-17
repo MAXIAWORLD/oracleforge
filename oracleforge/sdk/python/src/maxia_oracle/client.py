@@ -39,7 +39,7 @@ from .exceptions import (
 
 DEFAULT_BASE_URL: Final[str] = "https://oracle.maxiaworld.app"
 DEFAULT_TIMEOUT_S: Final[float] = 15.0
-USER_AGENT: Final[str] = "maxia-oracle-python/0.4.0"
+USER_AGENT: Final[str] = "maxia-oracle-python/0.5.0"
 
 
 class MaxiaOracleClient:
@@ -288,6 +288,28 @@ class MaxiaOracleClient:
         """
         symbol = self._validate_symbol(symbol)
         return self._request("GET", f"/api/pyth/solana/{symbol}")
+
+    def price_context(self, symbol: str) -> dict[str, Any]:
+        """V1.6 — Price + confidence score + anomaly flag + sources agreement.
+
+        Agent-native one-call: everything an LLM agent needs to decide
+        whether to act on a price. Includes ``confidence_score`` (0-100),
+        ``anomaly`` flag with reasons, TWAP deviation, and source outliers.
+
+        Response shape (inside ``data``): ``symbol``, ``price``,
+        ``confidence_score``, ``anomaly``, ``anomaly_reasons``,
+        ``sources_agreement``, ``source_count``, ``divergence_pct``,
+        ``freshest_age_s``, ``twap_5min``, ``twap_deviation_pct``,
+        ``source_outliers``, ``sources``.
+
+        Raises:
+            MaxiaOracleValidationError: symbol format invalid.
+            MaxiaOracleUpstreamError: every upstream source failed.
+            MaxiaOracleAuthError: missing or invalid API key.
+            MaxiaOracleRateLimitError: daily quota exhausted.
+        """
+        symbol = self._validate_symbol(symbol)
+        return self._request("GET", f"/api/price/{symbol}/context")
 
     def confidence(self, symbol: str) -> dict[str, Any]:
         """Return the multi-source divergence for a symbol, compact.

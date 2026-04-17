@@ -40,6 +40,7 @@ from services.oracle import (
     redstone_oracle,
     uniswap_v3_oracle,
 )
+from services.oracle.intelligence import build_price_context
 from services.oracle.multi_source import collect_sources, compute_divergence
 
 _SYMBOL_REGEX: Final[re.Pattern[str]] = re.compile(r"^[A-Z0-9]{1,10}$")
@@ -474,7 +475,30 @@ async def get_twap_onchain(
     return wrap_with_disclaimer(result)
 
 
-# ── 12. health_check ─────────────────────────────────────────────────────────
+# ── 12. get_price_context (V1.6) ────────────────────────────────────────────
+
+
+async def get_price_context(symbol: str) -> dict[str, Any]:
+    """Return price + confidence score + anomaly flag + sources agreement (V1.6).
+
+    Agent-native one-call: everything an LLM agent needs to decide
+    whether to act on a price. Includes confidence_score (0-100),
+    anomaly flag with reasons, TWAP deviation, and source outliers.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+
+    ctx = await build_price_context(symbol)
+    if ctx is None:
+        return wrap_error("no live price available", symbol=symbol)
+
+    return wrap_with_disclaimer(ctx)
+
+
+# ── 13. health_check ─────────────────────────────────────────────────────────
 
 
 async def health_check() -> dict[str, Any]:

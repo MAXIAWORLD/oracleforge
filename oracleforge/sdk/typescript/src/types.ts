@@ -162,3 +162,23 @@ export interface UniswapTwapPayload {
 /** V1.5 — EVM chains supported by the Uniswap v3 TWAP reader. */
 export type UniswapChain = "base" | "ethereum";
 
+/**
+ * V1.6 — Agent Intelligence Layer: price context with confidence,
+ * anomaly detection, and sources agreement.
+ */
+export interface PriceContextPayload {
+  symbol: string;
+  price: number;
+  confidence_score: number;
+  anomaly: boolean;
+  anomaly_reasons: string[];
+  sources_agreement: "strong" | "good" | "moderate" | "weak" | "single_source";
+  source_count: number;
+  divergence_pct: number;
+  freshest_age_s: number | null;
+  twap_5min: number;
+  twap_deviation_pct: number;
+  source_outliers: Array<{ source: string; deviation_pct: number }>;
+  sources: PriceSource[];
+}
+

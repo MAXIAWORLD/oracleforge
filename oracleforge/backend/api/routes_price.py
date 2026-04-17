@@ -25,6 +25,12 @@ from services.oracle import (
     redstone_oracle,
     uniswap_v3_oracle,
 )
+from services.oracle.intelligence import (
+    build_price_context,
+    classify_agreement,
+    compute_confidence_score,
+    detect_anomaly,
+)
 from services.oracle.multi_source import collect_sources, compute_divergence
 
 router = APIRouter(prefix="/api", tags=["price"])
@@ -102,15 +108,50 @@ async def get_single_price(symbol: str, key_hash: str = Depends(require_access))
     median_price = sorted(prices)[len(prices) // 2]
     divergence_pct = compute_divergence(prices)
 
+    confidence_score = compute_confidence_score(sources, divergence_pct)
+    anomaly_info = detect_anomaly(symbol, median_price, sources)
+    agreement = classify_agreement(divergence_pct, len(sources))
+
     return wrap_with_disclaimer(
         {
             "symbol": symbol,
             "price": round(median_price, 6),
+            "confidence_score": confidence_score,
+            "anomaly": anomaly_info["anomaly"],
+            "sources_agreement": agreement,
             "sources": sources,
             "source_count": len(sources),
             "divergence_pct": divergence_pct,
         }
     )
+
+
+@router.get("/price/{symbol}/context")
+async def get_price_context(symbol: str, key_hash: str = Depends(require_access)):
+    """Return price + confidence score + anomaly flag + agreement label in one call.
+
+    V1.6 agent-native endpoint: everything an LLM agent needs to decide
+    whether to act on a price, in a single tool call.
+    """
+    symbol = symbol.upper()
+    if not _is_valid_symbol(symbol):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=wrap_error("invalid symbol format"),
+        )
+
+    rl = _enforce_rate_limit(key_hash)
+    if rl is not None:
+        return rl
+
+    ctx = await build_price_context(symbol)
+    if ctx is None:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=wrap_error("no live price available", symbol=symbol),
+        )
+
+    return wrap_with_disclaimer(ctx)
 
 
 class BatchRequest(BaseModel):

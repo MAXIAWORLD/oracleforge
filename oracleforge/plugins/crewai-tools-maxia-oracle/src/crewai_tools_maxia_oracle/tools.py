@@ -273,6 +273,23 @@ class MaxiaOracleGetTwapTool(_MaxiaOracleTool):
         return _fmt(self._get_client().twap(symbol, chain=chain, window_s=window_s))
 
 
+class MaxiaOracleGetPriceContextTool(_MaxiaOracleTool):
+    """V1.6 — Price + confidence score + anomaly flag + sources agreement."""
+
+    name: str = "maxia_oracle_get_price_context"
+    description: str = (
+        "Return price + confidence score (0-100) + anomaly flag + sources "
+        "agreement in one call (V1.6). Agent-native: everything an LLM "
+        "agent needs to decide whether to act on a price. Includes TWAP "
+        "deviation, source outliers, and anomaly reasons. "
+        + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = SymbolInput
+
+    def _run(self, symbol: str) -> str:
+        return _fmt(self._get_client().price_context(symbol))
+
+
 class MaxiaOracleHealthCheckTool(_MaxiaOracleTool):
     name: str = "maxia_oracle_health_check"
     description: str = (
@@ -301,6 +318,7 @@ MAXIA_ORACLE_TOOL_CLASSES: Final[tuple[type[_MaxiaOracleTool], ...]] = (
     MaxiaOracleGetRedstoneTool,
     MaxiaOracleGetPythSolanaTool,
     MaxiaOracleGetTwapTool,
+    MaxiaOracleGetPriceContextTool,
     MaxiaOracleHealthCheckTool,
 )
 

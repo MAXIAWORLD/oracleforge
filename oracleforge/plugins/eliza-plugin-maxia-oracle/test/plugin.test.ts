@@ -33,9 +33,9 @@ function makeMessage(text: string): Memory {
 }
 
 describe("plugin shape", () => {
-  it("exports 11 actions", () => {
-    expect(maxiaOracleActions).toHaveLength(11);
-    expect(maxiaOraclePlugin.actions).toHaveLength(11);
+  it("exports 12 actions", () => {
+    expect(maxiaOracleActions).toHaveLength(12);
+    expect(maxiaOraclePlugin.actions).toHaveLength(12);
   });
 
   it("every action has name + description + validate + handler", () => {

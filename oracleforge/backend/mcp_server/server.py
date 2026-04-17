@@ -29,7 +29,7 @@ from mcp.server.lowlevel import Server
 from . import tools
 
 SERVER_NAME = "maxia-oracle"
-SERVER_VERSION = "0.1.5"
+SERVER_VERSION = "0.1.6"
 SERVER_INSTRUCTIONS = (
     "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP tools. "
     "Each result is a read-only live data point intended for AI agents that need "
@@ -247,6 +247,22 @@ _TOOL_DEFINITIONS: list[types.Tool] = [
         },
     ),
     types.Tool(
+        name="get_price_context",
+        description=(
+            "Return price + confidence score (0-100) + anomaly flag + sources "
+            "agreement in one call (V1.6). Agent-native: everything an LLM "
+            "agent needs to decide whether to act on a price. Includes TWAP "
+            "deviation, source outliers, and anomaly reasons. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_SCHEMA},
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
         name="health_check",
         description=(
             "Minimal liveness probe for the MAXIA Oracle MCP server. Does not "
@@ -276,6 +292,7 @@ _TOOL_DISPATCH: dict[str, _ToolHandler] = {
     "get_redstone_price": tools.get_redstone_price,
     "get_pyth_solana_onchain": tools.get_pyth_solana_onchain,
     "get_twap_onchain": tools.get_twap_onchain,
+    "get_price_context": tools.get_price_context,
     "health_check": tools.health_check,
 }
 
