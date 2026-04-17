@@ -2,7 +2,7 @@
 
 LlamaIndex 0.11+ exposes tools via :class:`llama_index.core.tools.FunctionTool`,
 which takes a plain Python callable and introspects its signature to build
-a JSON schema. We build thirteen ``FunctionTool`` instances — one per MAXIA
+a JSON schema. We build fourteen ``FunctionTool`` instances — one per MAXIA
 Oracle SDK method — each closing over a shared
 :class:`maxia_oracle.MaxiaOracleClient` instance.
 
@@ -36,6 +36,7 @@ TOOL_NAMES: Final[tuple[str, ...]] = (
     "maxia_oracle_get_price_context",
     "maxia_oracle_health_check",
     "maxia_oracle_get_metadata",
+    "maxia_oracle_get_price_history",
 )
 
 
@@ -197,6 +198,10 @@ def get_all_tools(
         """
         return _fmt(shared.metadata(symbol))
 
+    def maxia_oracle_get_price_history(symbol: str, range: str = "24h", interval: str | None = None) -> str:
+        """Return historical price snapshots for a symbol (V1.8). Ranges: 24h, 7d, 30d. Intervals: 5m, 1h, 1d. Retention: 30 days. Data feed only. Not investment advice. No custody. No KYC."""
+        return _fmt(shared.price_history(symbol, range_=range, interval=interval))
+
     callables = (
         maxia_oracle_get_price,
         maxia_oracle_get_prices_batch,
@@ -211,6 +216,7 @@ def get_all_tools(
         maxia_oracle_get_price_context,
         maxia_oracle_health_check,
         maxia_oracle_get_metadata,
+        maxia_oracle_get_price_history,
     )
 
     return [

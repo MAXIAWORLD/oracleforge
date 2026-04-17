@@ -33,6 +33,7 @@ from typing import Any, Final
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from services.oracle import (
     chainlink_oracle,
+    history,
     metadata,
     price_cascade,
     price_oracle,
@@ -543,7 +544,45 @@ async def get_asset_metadata(symbol: str) -> dict[str, Any]:
     return wrap_with_disclaimer(result)
 
 
-# ── 14. health_check ─────────────────────────────────────────────────────────
+# ── 14. get_price_history (V1.8) ────────────────────────────────────────────
+
+
+async def get_price_history(
+    symbol: str,
+    range: str = "24h",
+    interval: str | None = None,
+) -> dict[str, Any]:
+    """Return historical price snapshots for a symbol (V1.8).
+
+    The background sampler captures batch prices every 5 minutes.
+    Data is downsampled to the requested interval via averaging.
+    Retention is 30 days.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if range not in history.VALID_RANGES:
+        return wrap_error(
+            "invalid range",
+            range=range,
+            valid=sorted(history.VALID_RANGES),
+        )
+    if interval is not None and interval not in history.VALID_INTERVALS:
+        return wrap_error(
+            "invalid interval",
+            interval=interval,
+            valid=sorted(history.VALID_INTERVALS),
+        )
+
+    result = history.get_history(symbol, range_key=range, interval_key=interval)
+    if result is None:
+        return wrap_error("invalid range or interval combination")
+    return wrap_with_disclaimer(result)
+
+
+# ── 15. health_check ─────────────────────────────────────────────────────────
 
 
 async def health_check() -> dict[str, Any]:

@@ -31,9 +31,10 @@ from core.http_client import close_http_client
 from core.rate_limit import purge_old_windows
 from core.request_id import RequestIDMiddleware, request_id_var
 from core.security import SecurityHeadersMiddleware
+from services.oracle.history import start_sampler, stop_sampler
 from x402.middleware import x402_middleware
 
-API_VERSION: Final[str] = "0.1.7"
+API_VERSION: Final[str] = "0.1.8"
 
 
 class _JSONLogFormatter(logging.Formatter):
@@ -78,8 +79,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Starting MAXIA Oracle %s (env=%s)", API_VERSION, ENV)
     init_db()
     purge_old_windows(get_db())
+    start_sampler()
     yield
     logger.info("Shutting down MAXIA Oracle")
+    stop_sampler()
     try:
         await close_http_client()
     except Exception:

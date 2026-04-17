@@ -351,6 +351,46 @@ class MaxiaOracleGetMetadataTool(_MaxiaOracleTool):
         return _fmt(self._get_client().metadata(symbol))
 
 
+class PriceHistoryInput(BaseModel):
+    """V1.8 — Historical price snapshots input."""
+
+    symbol: str = Field(
+        description=(
+            "Asset ticker, 1 to 10 uppercase alphanumeric characters "
+            "(e.g. 'BTC', 'ETH', 'SOL')."
+        ),
+    )
+    range_: Literal["24h", "7d", "30d"] = Field(
+        default="24h",
+        alias="range",
+        description="Time range. Defaults to '24h'.",
+    )
+    interval: Literal["5m", "1h", "1d"] | None = Field(
+        default=None,
+        description="Bucket interval. Auto-selected if omitted: 24h→5m, 7d→1h, 30d→1d.",
+    )
+
+
+class MaxiaOracleGetPriceHistoryTool(_MaxiaOracleTool):
+    """V1.8 — Historical price snapshots (5-min sampling, 30-day retention)."""
+
+    name: str = "maxia_oracle_get_price_history"
+    description: str = (
+        "Return historical price snapshots for a symbol (V1.8). "
+        "Ranges: 24h, 7d, 30d. Intervals: 5m, 1h, 1d. "
+        "Retention: 30 days. " + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = PriceHistoryInput
+
+    def _run(
+        self,
+        symbol: str,
+        range: str = "24h",
+        interval: str | None = None,
+    ) -> str:
+        return _fmt(self._get_client().price_history(symbol, range_=range, interval=interval))
+
+
 # ── Convenience factory ────────────────────────────────────────────────────
 
 
@@ -368,6 +408,7 @@ MAXIA_ORACLE_TOOL_CLASSES: Final[tuple[type[_MaxiaOracleTool], ...]] = (
     MaxiaOracleGetPriceContextTool,
     MaxiaOracleHealthCheckTool,
     MaxiaOracleGetMetadataTool,
+    MaxiaOracleGetPriceHistoryTool,
 )
 
 

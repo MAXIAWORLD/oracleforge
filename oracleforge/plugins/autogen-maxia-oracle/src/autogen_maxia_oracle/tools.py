@@ -36,6 +36,7 @@ TOOL_NAMES: Final[tuple[str, ...]] = (
     "maxia_oracle_get_price_context",
     "maxia_oracle_health_check",
     "maxia_oracle_get_metadata",
+    "maxia_oracle_get_price_history",
 )
 
 
@@ -57,7 +58,7 @@ def get_all_tools(
     base_url: str | None = None,
     client: MaxiaOracleClient | None = None,
 ) -> list[FunctionTool]:
-    """Instantiate the 13 MAXIA Oracle tools around a single shared client.
+    """Instantiate the 14 MAXIA Oracle tools around a single shared client.
 
     Each returned :class:`FunctionTool` closes over the same client so
     that the httpx connection pool is reused across tool calls.
@@ -197,6 +198,10 @@ def get_all_tools(
         """
         return _fmt(shared.metadata(symbol))
 
+    def maxia_oracle_get_price_history(symbol: str, range: str = "24h", interval: str | None = None) -> str:
+        """Return historical price snapshots for a symbol (V1.8). Ranges: 24h, 7d, 30d. Intervals: 5m, 1h, 1d. Retention: 30 days. Data feed only. Not investment advice. No custody. No KYC."""
+        return _fmt(shared.price_history(symbol, range_=range, interval=interval))
+
     callables = (
         maxia_oracle_get_price,
         maxia_oracle_get_prices_batch,
@@ -211,6 +216,7 @@ def get_all_tools(
         maxia_oracle_get_price_context,
         maxia_oracle_health_check,
         maxia_oracle_get_metadata,
+        maxia_oracle_get_price_history,
     )
 
     return [

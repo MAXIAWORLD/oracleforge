@@ -28,10 +28,13 @@ import type {
   ChainlinkPayload,
   ConfidencePayload,
   HealthPayload,
+  HistoryInterval,
+  HistoryRange,
   MaxiaOracleClientOptions,
   MaxiaResponse,
   MetadataPayload,
   PriceContextPayload,
+  PriceHistoryPayload,
   PricePayload,
   PythSolanaPayload,
   RedstonePayload,
@@ -44,7 +47,7 @@ import type {
 
 export const DEFAULT_BASE_URL = "https://oracle.maxiaworld.app";
 export const DEFAULT_TIMEOUT_MS = 15_000;
-export const USER_AGENT = "maxia-oracle-typescript/0.6.0";
+export const USER_AGENT = "maxia-oracle-typescript/0.7.0";
 
 const SYMBOL_PATTERN = /^[A-Z0-9]{1,10}$/;
 const MAX_BATCH_SYMBOLS = 50;
@@ -250,6 +253,34 @@ export class MaxiaOracleClient {
   async metadata(symbol: string): Promise<MaxiaResponse<MetadataPayload>> {
     const cleaned = this.validateSymbol(symbol);
     return this.request<MetadataPayload>("GET", `/api/metadata/${cleaned}`);
+  }
+
+  /**
+   * V1.8 — Historical price snapshots for a symbol.
+   *
+   * The background sampler captures prices every 5 minutes. Data is
+   * downsampled to the requested interval via averaging. Retention is
+   * 30 days.
+   *
+   * @param symbol - Asset ticker (e.g. "BTC").
+   * @param range - Time range: "24h", "7d", or "30d". Defaults to "24h".
+   * @param interval - Bucket interval: "5m", "1h", or "1d". Auto-selected if omitted.
+   */
+  async priceHistory(
+    symbol: string,
+    range: HistoryRange = "24h",
+    interval?: HistoryInterval,
+  ): Promise<MaxiaResponse<PriceHistoryPayload>> {
+    const cleaned = this.validateSymbol(symbol);
+    const query: Record<string, string> = { range };
+    if (interval !== undefined) {
+      query["interval"] = interval;
+    }
+    return this.request<PriceHistoryPayload>(
+      "GET",
+      `/api/price/${cleaned}/history`,
+      { query },
+    );
   }
 
   /**

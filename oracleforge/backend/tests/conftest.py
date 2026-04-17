@@ -51,6 +51,7 @@ def client(session_app) -> Iterator[TestClient]:
     db.execute("DELETE FROM api_keys")
     db.execute("DELETE FROM rate_limit")
     db.execute("DELETE FROM register_limit")
+    db.execute("DELETE FROM price_snapshots")
 
     with TestClient(session_app) as c:
         yield c

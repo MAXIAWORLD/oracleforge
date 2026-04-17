@@ -59,7 +59,7 @@ from .exceptions import (
 )
 
 SERVER_NAME = "maxia-oracle"
-SERVER_VERSION = "0.5.0"
+SERVER_VERSION = "0.7.0"
 SERVER_INSTRUCTIONS = (
     "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP "
     "tools. Data feed only. Not investment advice. No custody. No KYC."
@@ -275,6 +275,31 @@ def _tool_definitions() -> list[types.Tool]:
             },
         ),
         types.Tool(
+            name="get_price_history",
+            description=(
+                "Return historical price snapshots for a symbol (V1.8). "
+                "Ranges: 24h, 7d, 30d. Intervals: 5m, 1h, 1d. "
+                "Retention: 30 days. " + _DISCLAIMER_LINE
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": _SYMBOL_SCHEMA,
+                    "range": {
+                        "type": "string",
+                        "enum": ["24h", "7d", "30d"],
+                        "default": "24h",
+                    },
+                    "interval": {
+                        "type": "string",
+                        "enum": ["5m", "1h", "1d"],
+                    },
+                },
+                "required": ["symbol"],
+                "additionalProperties": False,
+            },
+        ),
+        types.Tool(
             name="health_check",
             description=(
                 "Minimal liveness probe for the MAXIA Oracle backend. "
@@ -349,6 +374,14 @@ def _build_dispatch(
     async def get_asset_metadata(args: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(client.metadata, args["symbol"])
 
+    async def get_price_history(args: dict[str, Any]) -> dict[str, Any]:
+        return await asyncio.to_thread(
+            client.price_history,
+            args["symbol"],
+            args.get("range", "24h"),
+            args.get("interval"),
+        )
+
     async def health_check(args: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(client.health)
 
@@ -364,6 +397,7 @@ def _build_dispatch(
         "get_pyth_solana_onchain": get_pyth_solana_onchain,
         "get_twap_onchain": get_twap_onchain,
         "get_asset_metadata": get_asset_metadata,
+        "get_price_history": get_price_history,
         "health_check": health_check,
     }
 

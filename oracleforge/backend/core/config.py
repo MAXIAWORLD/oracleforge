@@ -451,6 +451,18 @@ def _build_x402_chain_config() -> dict[str, dict[str, Any]]:
 X402_CHAIN_CONFIG: Final[dict[str, dict[str, Any]]] = _build_x402_chain_config()
 
 
+# ══════════════════════════════════════════════════════════════════════════
+# ── V1.8 Historical Prices configuration ──
+# ══════════════════════════════════════════════════════════════════════════
+
+HISTORY_SAMPLE_INTERVAL_S: Final[int] = int(
+    os.getenv("HISTORY_SAMPLE_INTERVAL_S", "300")
+)
+HISTORY_RETENTION_DAYS: Final[int] = int(
+    os.getenv("HISTORY_RETENTION_DAYS", "30")
+)
+
+
 # Fail fast in non-dev if not a single treasury address is configured.
 # Dev can run with zero treasuries (middleware will 402 every request, but
 # the server still boots so tests run without any wallet setup).

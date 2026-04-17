@@ -39,7 +39,7 @@ from .exceptions import (
 
 DEFAULT_BASE_URL: Final[str] = "https://oracle.maxiaworld.app"
 DEFAULT_TIMEOUT_S: Final[float] = 15.0
-USER_AGENT: Final[str] = "maxia-oracle-python/0.6.0"
+USER_AGENT: Final[str] = "maxia-oracle-python/0.7.0"
 
 
 class MaxiaOracleClient:
@@ -326,6 +326,40 @@ class MaxiaOracleClient:
         """
         symbol = self._validate_symbol(symbol)
         return self._request("GET", f"/api/metadata/{symbol}")
+
+    def price_history(
+        self,
+        symbol: str,
+        range_: str = "24h",
+        interval: str | None = None,
+    ) -> dict[str, Any]:
+        """V1.8 — Return historical price snapshots for a symbol.
+
+        The background sampler captures prices every 5 minutes. Data is
+        downsampled to the requested ``interval`` via averaging. Retention
+        is 30 days.
+
+        Args:
+            symbol: Asset ticker (e.g. ``"BTC"``).
+            range_: Time range: ``"24h"``, ``"7d"``, or ``"30d"``.
+            interval: Bucket interval: ``"5m"``, ``"1h"``, or ``"1d"``.
+                Auto-selected if ``None``: 24h→5m, 7d→1h, 30d→1d.
+
+        Returns:
+            Parsed response dict with ``data.datapoints`` list of
+            ``{timestamp, price, samples}``, ``data.count``, ``data.range``,
+            ``data.interval``, ``data.oldest_available``.
+
+        Raises:
+            MaxiaOracleValidationError: invalid symbol/range/interval.
+        """
+        symbol = self._validate_symbol(symbol)
+        params: dict[str, Any] = {"range": range_}
+        if interval is not None:
+            params["interval"] = interval
+        return self._request(
+            "GET", f"/api/price/{symbol}/history", params=params
+        )
 
     def confidence(self, symbol: str) -> dict[str, Any]:
         """Return the multi-source divergence for a symbol, compact.

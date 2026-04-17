@@ -68,7 +68,12 @@ class TestConfidenceScore:
 # ── detect_anomaly ───────────────────────────────────────────────────────────
 
 class TestDetectAnomaly:
-    def test_no_anomaly_when_twap_insufficient(self):
+    @patch("services.oracle.intelligence.pyth_oracle.check_twap_deviation")
+    def test_no_anomaly_when_twap_insufficient(self, mock_twap):
+        mock_twap.return_value = {
+            "ok": True, "twap": 0, "deviation_pct": 0,
+            "reason": "insufficient_data",
+        }
         sources = [{"price": 100.0, "name": "src1"}]
         result = detect_anomaly("BTC", 100.0, sources)
         assert result["anomaly"] is False
@@ -317,4 +322,4 @@ class TestMCPServerToolList:
 
     def test_total_tool_count(self):
         from mcp_server.server import _TOOL_DEFINITIONS
-        assert len(_TOOL_DEFINITIONS) == 13
+        assert len(_TOOL_DEFINITIONS) == 14

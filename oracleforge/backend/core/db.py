@@ -70,6 +70,17 @@ CREATE INDEX IF NOT EXISTS idx_register_limit_window
 
 CREATE INDEX IF NOT EXISTS idx_x402_txs_created_at
     ON x402_txs (created_at);
+
+CREATE TABLE IF NOT EXISTS price_snapshots (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol      TEXT NOT NULL,
+    price       REAL NOT NULL,
+    source_count INTEGER NOT NULL DEFAULT 1,
+    sampled_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshots_lookup
+    ON price_snapshots (symbol, sampled_at);
 """
 
 
@@ -247,3 +258,74 @@ def x402_record_tx(
         (tx_hash, amount_usdc, path, now_unix(), chain),
     )
     return cursor.rowcount == 1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── V1.8 price history helpers ──
+# ══════════════════════════════════════════════════════════════════════════
+
+_MAX_DATAPOINTS: Final[int] = 2000
+
+
+def insert_price_snapshots(
+    conn: sqlite3.Connection,
+    rows: list[tuple[str, float, int]],
+) -> int:
+    """Bulk-insert price snapshots. Each tuple is (symbol, price, source_count).
+
+    Returns the number of rows inserted.
+    """
+    if not rows:
+        return 0
+    ts = now_unix()
+    conn.executemany(
+        "INSERT INTO price_snapshots (symbol, price, source_count, sampled_at) "
+        "VALUES (?, ?, ?, ?)",
+        [(sym, price, sc, ts) for sym, price, sc in rows],
+    )
+    return len(rows)
+
+
+def query_price_history(
+    conn: sqlite3.Connection,
+    symbol: str,
+    since: int,
+    bucket_s: int,
+) -> list[dict[str, float | int]]:
+    """Return downsampled price history as a list of {timestamp, price, samples}.
+
+    Groups raw snapshots into buckets of `bucket_s` seconds and averages.
+    """
+    rows = conn.execute(
+        "SELECT (sampled_at / ?) * ? AS bucket_time, "
+        "       ROUND(AVG(price), 6) AS avg_price, "
+        "       COUNT(*) AS samples "
+        "FROM price_snapshots "
+        "WHERE symbol = ? AND sampled_at >= ? "
+        "GROUP BY bucket_time "
+        "ORDER BY bucket_time "
+        "LIMIT ?",
+        (bucket_s, bucket_s, symbol, since, _MAX_DATAPOINTS),
+    ).fetchall()
+    return [
+        {"timestamp": row[0], "price": row[1], "samples": row[2]}
+        for row in rows
+    ]
+
+
+def oldest_snapshot_ts(conn: sqlite3.Connection, symbol: str) -> int | None:
+    """Return the oldest sampled_at for a symbol, or None if no data."""
+    row = conn.execute(
+        "SELECT MIN(sampled_at) FROM price_snapshots WHERE symbol = ?",
+        (symbol,),
+    ).fetchone()
+    return row[0] if row and row[0] is not None else None
+
+
+def purge_old_snapshots(conn: sqlite3.Connection, retention_days: int) -> int:
+    """Delete snapshots older than `retention_days`. Returns rows deleted."""
+    cutoff = now_unix() - retention_days * 86400
+    cursor = conn.execute(
+        "DELETE FROM price_snapshots WHERE sampled_at < ?", (cutoff,)
+    )
+    return cursor.rowcount

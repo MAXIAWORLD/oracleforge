@@ -183,6 +183,27 @@ export interface PriceContextPayload {
 }
 
 /**
+ * V1.8 — Historical price snapshots.
+ */
+export interface PriceHistoryDatapoint {
+  timestamp: number;
+  price: number;
+  samples: number;
+}
+
+export type HistoryRange = "24h" | "7d" | "30d";
+export type HistoryInterval = "5m" | "1h" | "1d";
+
+export interface PriceHistoryPayload {
+  symbol: string;
+  range: HistoryRange;
+  interval: HistoryInterval;
+  datapoints: PriceHistoryDatapoint[];
+  count: number;
+  oldest_available: number | null;
+}
+
+/**
  * V1.7 — Asset metadata from CoinGecko (market cap, volume, supply).
  */
 export interface MetadataPayload {

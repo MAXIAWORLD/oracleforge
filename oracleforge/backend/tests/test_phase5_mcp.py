@@ -85,6 +85,7 @@ _EXPECTED_TOOL_NAMES = {
     "get_twap_onchain",
     "get_price_context",
     "get_asset_metadata",
+    "get_price_history",
     "health_check",
 }
 
@@ -112,7 +113,7 @@ def test_tool_definitions_has_expected_tools(session_app) -> None:
     """
     from mcp_server.server import _TOOL_DEFINITIONS  # noqa: PLC0415
 
-    assert len(_TOOL_DEFINITIONS) == 13
+    assert len(_TOOL_DEFINITIONS) == 14
     assert {t.name for t in _TOOL_DEFINITIONS} == _EXPECTED_TOOL_NAMES
 
 
@@ -157,7 +158,7 @@ def test_build_server_registers_handlers(session_app) -> None:
 
     server = build_server()
     assert server.name == "maxia-oracle"
-    assert server.version == "0.1.7"
+    assert server.version == "0.1.8"
     assert mt.ListToolsRequest in server.request_handlers
     assert mt.CallToolRequest in server.request_handlers
 

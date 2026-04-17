@@ -19,6 +19,7 @@ from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
 from services.oracle import (
     chainlink_oracle,
+    history,
     metadata,
     price_cascade,
     pyth_oracle,
@@ -172,6 +173,59 @@ async def get_price_context(symbol: str, key_hash: str = Depends(require_access)
         )
 
     return wrap_with_disclaimer(ctx)
+
+
+_VALID_RANGES = frozenset(history.VALID_RANGES)
+_VALID_INTERVALS = frozenset(history.VALID_INTERVALS)
+
+
+@router.get("/price/{symbol}/history")
+async def get_price_history_route(
+    symbol: str,
+    range: str = Query("24h", alias="range", description="Time range: 24h, 7d, or 30d."),
+    interval: str | None = Query(None, description="Bucket interval: 5m, 1h, or 1d. Auto-selected if omitted."),
+    key_hash: str = Depends(require_access),
+):
+    """V1.8 — Return historical price snapshots for a symbol.
+
+    The background sampler captures multi-source prices every 5 minutes.
+    Data is downsampled to the requested interval via averaging. Retention
+    is 30 days.
+    """
+    symbol = symbol.upper()
+    if not _is_valid_symbol(symbol):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=wrap_error("invalid symbol format"),
+        )
+    if range not in _VALID_RANGES:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=wrap_error(
+                "invalid range",
+                valid=sorted(_VALID_RANGES),
+            ),
+        )
+    if interval is not None and interval not in _VALID_INTERVALS:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=wrap_error(
+                "invalid interval",
+                valid=sorted(_VALID_INTERVALS),
+            ),
+        )
+
+    rl = _enforce_rate_limit(key_hash)
+    if rl is not None:
+        return rl
+
+    result = history.get_history(symbol, range_key=range, interval_key=interval)
+    if result is None:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=wrap_error("invalid range or interval combination"),
+        )
+    return wrap_with_disclaimer(result)
 
 
 class BatchRequest(BaseModel):

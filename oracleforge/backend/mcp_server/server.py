@@ -29,7 +29,7 @@ from mcp.server.lowlevel import Server
 from . import tools
 
 SERVER_NAME = "maxia-oracle"
-SERVER_VERSION = "0.1.7"
+SERVER_VERSION = "0.1.8"
 SERVER_INSTRUCTIONS = (
     "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP tools. "
     "Each result is a read-only live data point intended for AI agents that need "
@@ -279,6 +279,39 @@ _TOOL_DEFINITIONS: list[types.Tool] = [
         },
     ),
     types.Tool(
+        name="get_price_history",
+        description=(
+            "Return historical price snapshots for a symbol (V1.8). "
+            "The background sampler captures prices every 5 minutes. "
+            "Data is downsampled to the requested interval via averaging. "
+            "Retention: 30 days. Ranges: 24h, 7d, 30d. "
+            "Intervals: 5m, 1h, 1d (auto-selected if omitted). "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "symbol": _SYMBOL_SCHEMA,
+                "range": {
+                    "type": "string",
+                    "enum": ["24h", "7d", "30d"],
+                    "default": "24h",
+                    "description": "Time range for history. Defaults to '24h'.",
+                },
+                "interval": {
+                    "type": "string",
+                    "enum": ["5m", "1h", "1d"],
+                    "description": (
+                        "Bucket interval for downsampling. "
+                        "Auto-selected if omitted: 24h→5m, 7d→1h, 30d→1d."
+                    ),
+                },
+            },
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
         name="health_check",
         description=(
             "Minimal liveness probe for the MAXIA Oracle MCP server. Does not "
@@ -310,6 +343,7 @@ _TOOL_DISPATCH: dict[str, _ToolHandler] = {
     "get_twap_onchain": tools.get_twap_onchain,
     "get_price_context": tools.get_price_context,
     "get_asset_metadata": tools.get_asset_metadata,
+    "get_price_history": tools.get_price_history,
     "health_check": tools.health_check,
 }
 

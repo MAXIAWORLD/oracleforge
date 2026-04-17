@@ -19,6 +19,7 @@ import { getConfidenceAction } from "./actions/get-confidence.js";
 import { getAssetMetadataAction } from "./actions/get-asset-metadata.js";
 import { getPriceAction } from "./actions/get-price.js";
 import { getPriceContextAction } from "./actions/get-price-context.js";
+import { getPriceHistoryAction } from "./actions/get-price-history.js";
 import { getPricesBatchAction } from "./actions/get-prices-batch.js";
 import { getPythSolanaOnchainAction } from "./actions/get-pyth-solana-onchain.js";
 import { getRedstonePriceAction } from "./actions/get-redstone-price.js";
@@ -42,6 +43,7 @@ export const maxiaOracleActions: readonly Action[] = [
   getPythSolanaOnchainAction,
   getTwapOnchainAction,
   getPriceContextAction,
+  getPriceHistoryAction,
   getAssetMetadataAction,
   healthCheckAction,
 ] as const;
