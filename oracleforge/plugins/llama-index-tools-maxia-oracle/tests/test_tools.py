@@ -17,7 +17,7 @@ def _fake(payload: dict[str, Any]) -> dict[str, Any]:
 def test_all_tools_exported() -> None:
     fake = MagicMock()
     tools = get_all_tools(client=fake)
-    assert len(tools) == 12
+    assert len(tools) == 13
     for tool in tools:
         assert isinstance(tool, FunctionTool)
 

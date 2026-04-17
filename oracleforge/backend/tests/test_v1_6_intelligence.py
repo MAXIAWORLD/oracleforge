@@ -317,4 +317,4 @@ class TestMCPServerToolList:
 
     def test_total_tool_count(self):
         from mcp_server.server import _TOOL_DEFINITIONS
-        assert len(_TOOL_DEFINITIONS) == 12
+        assert len(_TOOL_DEFINITIONS) == 13

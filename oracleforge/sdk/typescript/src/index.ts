@@ -38,6 +38,7 @@ export type {
   HealthPayload,
   MaxiaOracleClientOptions,
   MaxiaResponse,
+  MetadataPayload,
   PricePayload,
   PriceSource,
   PythSolanaPayload,

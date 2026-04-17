@@ -182,3 +182,22 @@ export interface PriceContextPayload {
   sources: PriceSource[];
 }
 
+/**
+ * V1.7 — Asset metadata from CoinGecko (market cap, volume, supply).
+ */
+export interface MetadataPayload {
+  symbol: string;
+  name: string;
+  market_cap_usd: number | null;
+  volume_24h_usd: number | null;
+  price_change_24h_pct: number | null;
+  circulating_supply: number | null;
+  total_supply: number | null;
+  max_supply: number | null;
+  market_cap_rank: number | null;
+  ath_usd: number | null;
+  atl_usd: number | null;
+  last_updated: string | null;
+  source: "coingecko";
+}
+

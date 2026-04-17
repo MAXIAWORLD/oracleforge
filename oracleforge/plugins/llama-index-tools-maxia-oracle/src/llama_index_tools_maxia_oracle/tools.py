@@ -2,7 +2,7 @@
 
 LlamaIndex 0.11+ exposes tools via :class:`llama_index.core.tools.FunctionTool`,
 which takes a plain Python callable and introspects its signature to build
-a JSON schema. We build eight ``FunctionTool`` instances — one per MAXIA
+a JSON schema. We build thirteen ``FunctionTool`` instances — one per MAXIA
 Oracle SDK method — each closing over a shared
 :class:`maxia_oracle.MaxiaOracleClient` instance.
 
@@ -35,6 +35,7 @@ TOOL_NAMES: Final[tuple[str, ...]] = (
     "maxia_oracle_get_twap_onchain",
     "maxia_oracle_get_price_context",
     "maxia_oracle_health_check",
+    "maxia_oracle_get_metadata",
 )
 
 
@@ -56,7 +57,7 @@ def get_all_tools(
     base_url: str | None = None,
     client: MaxiaOracleClient | None = None,
 ) -> list[FunctionTool]:
-    """Instantiate the 8 MAXIA Oracle tools around a single shared client.
+    """Instantiate the 13 MAXIA Oracle tools around a single shared client.
 
     Each returned :class:`FunctionTool` closes over the same client so
     that the httpx connection pool is reused across tool calls.
@@ -187,6 +188,15 @@ def get_all_tools(
         """
         return _fmt(shared.health())
 
+    def maxia_oracle_get_metadata(symbol: str) -> str:
+        """V1.7 — Fetch asset metadata from CoinGecko.
+
+        Returns market cap, 24h volume, circulating supply, market rank,
+        all-time high (ATH) and all-time low (ATL) for the given symbol.
+        Data feed only. Not investment advice. No custody. No KYC.
+        """
+        return _fmt(shared.metadata(symbol))
+
     callables = (
         maxia_oracle_get_price,
         maxia_oracle_get_prices_batch,
@@ -200,6 +210,7 @@ def get_all_tools(
         maxia_oracle_get_twap_onchain,
         maxia_oracle_get_price_context,
         maxia_oracle_health_check,
+        maxia_oracle_get_metadata,
     )
 
     return [

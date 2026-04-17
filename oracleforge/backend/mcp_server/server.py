@@ -29,7 +29,7 @@ from mcp.server.lowlevel import Server
 from . import tools
 
 SERVER_NAME = "maxia-oracle"
-SERVER_VERSION = "0.1.6"
+SERVER_VERSION = "0.1.7"
 SERVER_INSTRUCTIONS = (
     "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP tools. "
     "Each result is a read-only live data point intended for AI agents that need "
@@ -263,6 +263,22 @@ _TOOL_DEFINITIONS: list[types.Tool] = [
         },
     ),
     types.Tool(
+        name="get_asset_metadata",
+        description=(
+            "Fetch asset metadata from CoinGecko: market cap, 24h volume, "
+            "circulating supply, total supply, max supply, market cap rank, "
+            "ATH, ATL, and 24h price change. Coverage: ~80 crypto assets "
+            "with CoinGecko mapping. Forex and equities are not covered. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {"symbol": _SYMBOL_SCHEMA},
+            "required": ["symbol"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
         name="health_check",
         description=(
             "Minimal liveness probe for the MAXIA Oracle MCP server. Does not "
@@ -293,6 +309,7 @@ _TOOL_DISPATCH: dict[str, _ToolHandler] = {
     "get_pyth_solana_onchain": tools.get_pyth_solana_onchain,
     "get_twap_onchain": tools.get_twap_onchain,
     "get_price_context": tools.get_price_context,
+    "get_asset_metadata": tools.get_asset_metadata,
     "health_check": tools.health_check,
 }
 

@@ -30,6 +30,7 @@ import type {
   HealthPayload,
   MaxiaOracleClientOptions,
   MaxiaResponse,
+  MetadataPayload,
   PriceContextPayload,
   PricePayload,
   PythSolanaPayload,
@@ -43,7 +44,7 @@ import type {
 
 export const DEFAULT_BASE_URL = "https://oracle.maxiaworld.app";
 export const DEFAULT_TIMEOUT_MS = 15_000;
-export const USER_AGENT = "maxia-oracle-typescript/0.5.0";
+export const USER_AGENT = "maxia-oracle-typescript/0.6.0";
 
 const SYMBOL_PATTERN = /^[A-Z0-9]{1,10}$/;
 const MAX_BATCH_SYMBOLS = 50;
@@ -237,6 +238,18 @@ export class MaxiaOracleClient {
   async priceContext(symbol: string): Promise<MaxiaResponse<PriceContextPayload>> {
     const cleaned = this.validateSymbol(symbol);
     return this.request<PriceContextPayload>("GET", `/api/price/${cleaned}/context`);
+  }
+
+  /**
+   * V1.7 — Asset metadata from CoinGecko (market cap, volume, supply).
+   *
+   * Coverage: ~80 crypto assets with CoinGecko mapping. Forex and
+   * equity symbols are not covered. Unknown symbols throw
+   * `MaxiaOracleUpstreamError` (404).
+   */
+  async metadata(symbol: string): Promise<MaxiaResponse<MetadataPayload>> {
+    const cleaned = this.validateSymbol(symbol);
+    return this.request<MetadataPayload>("GET", `/api/metadata/${cleaned}`);
   }
 
   /**

@@ -17,6 +17,7 @@ from .tools import (
     MaxiaOracleGetCacheStatsTool,
     MaxiaOracleGetChainlinkOnchainTool,
     MaxiaOracleGetConfidenceTool,
+    MaxiaOracleGetMetadataTool,
     MaxiaOracleGetPriceContextTool,
     MaxiaOracleGetPriceTool,
     MaxiaOracleGetPricesBatchTool,
@@ -29,7 +30,7 @@ from .tools import (
     get_all_tools,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     "__version__",
@@ -46,6 +47,7 @@ __all__ = [
     "MaxiaOracleGetPythSolanaTool",
     "MaxiaOracleGetTwapTool",
     "MaxiaOracleGetPriceContextTool",
+    "MaxiaOracleGetMetadataTool",
     "MaxiaOracleHealthCheckTool",
     "get_all_tools",
 ]

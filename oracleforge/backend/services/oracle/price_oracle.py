@@ -188,6 +188,34 @@ _cache_stats = {"hits": 0, "misses": 0}
 
 logger.info("Initialise — Helius DAS API + Yahoo Finance + CoinGecko + fallback (cache 60s)")
 
+# CoinGecko ID mapping — hoisted to module level for reuse by metadata.py (V1.7).
+SYM_TO_COINGECKO: dict[str, str] = {
+    "SOL": "solana", "USDC": "usd-coin", "USDT": "tether", "BONK": "bonk",
+    "JUP": "jupiter-exchange-solana", "RAY": "raydium", "WIF": "dogwifcoin",
+    "RENDER": "render-token", "HNT": "helium", "TRUMP": "official-trump",
+    "PYTH": "pyth-network", "W": "wormhole", "ETH": "ethereum", "BTC": "bitcoin",
+    "ORCA": "orca", "JTO": "jito-governance-token", "TNSR": "tensor",
+    "MEW": "cat-in-a-dogs-world", "POPCAT": "popcat", "MOBILE": "helium-mobile",
+    "MNDE": "marinade", "MSOL": "msol", "JITOSOL": "jito-staked-sol",
+    "BSOL": "blazestake-staked-sol", "DRIFT": "drift-protocol",
+    "KMNO": "kamino", "PENGU": "pudgy-penguins", "AI16Z": "ai16z",
+    "FARTCOIN": "fartcoin", "GRASS": "grass", "ZEUS": "zeus-network",
+    "NOSOL": "nosana", "SAMO": "samoyedcoin", "STEP": "step-finance",
+    "BOME": "book-of-meme", "SLERF": "slerf", "MPLX": "metaplex",
+    "INF": "infinity-by-sanctum", "PNUT": "peanut-the-squirrel",
+    "GOAT": "goatseus-maximus",
+    "LINK": "chainlink", "UNI": "uniswap", "AAVE": "aave",
+    "LDO": "lido-dao", "VIRTUAL": "virtual-protocol", "OLAS": "autonolas",
+    "FET": "artificial-superintelligence-alliance", "PEPE": "pepe",
+    "DOGE": "dogecoin", "SHIB": "shiba-inu",
+    "XRP": "ripple", "AVAX": "avalanche-2", "MATIC": "matic-network",
+    "TAO": "bittensor", "AKT": "akash-network", "AIOZ": "aioz-network",
+    "ARB": "arbitrum", "OP": "optimism", "TIA": "celestia",
+    "INJ": "injective-protocol", "STX": "blockstack", "SUI": "sui",
+    "APT": "aptos", "SEI": "sei-network", "NEAR": "near",
+    "FIL": "filecoin", "AR": "arweave", "ONDO": "ondo-finance",
+}
+
 
 async def _fetch_yahoo_stock_prices() -> dict:
     """Fetch real-time stock prices from Yahoo Finance (free, no API key)."""
@@ -396,32 +424,6 @@ async def get_prices(symbols: list | None = None) -> dict:
             logger.error(f"CoinPaprika error: {e}")
 
     # Source 3: CoinGecko (fallback si CoinPaprika n'a pas tout)
-    SYM_TO_COINGECKO = {
-        "SOL": "solana", "USDC": "usd-coin", "USDT": "tether", "BONK": "bonk",
-        "JUP": "jupiter-exchange-solana", "RAY": "raydium", "WIF": "dogwifcoin",
-        "RENDER": "render-token", "HNT": "helium", "TRUMP": "official-trump",
-        "PYTH": "pyth-network", "W": "wormhole", "ETH": "ethereum", "BTC": "bitcoin",
-        "ORCA": "orca", "JTO": "jito-governance-token", "TNSR": "tensor",
-        "MEW": "cat-in-a-dogs-world", "POPCAT": "popcat", "MOBILE": "helium-mobile",
-        "MNDE": "marinade", "MSOL": "msol", "JITOSOL": "jito-staked-sol",
-        "BSOL": "blazestake-staked-sol", "DRIFT": "drift-protocol",
-        "KMNO": "kamino", "PENGU": "pudgy-penguins", "AI16Z": "ai16z",
-        "FARTCOIN": "fartcoin", "GRASS": "grass", "ZEUS": "zeus-network",
-        "NOSOL": "nosana", "SAMO": "samoyedcoin", "STEP": "step-finance",
-        "BOME": "book-of-meme", "SLERF": "slerf", "MPLX": "metaplex",
-        "INF": "infinity-by-sanctum", "PNUT": "peanut-the-squirrel",
-        "GOAT": "goatseus-maximus",
-        "LINK": "chainlink", "UNI": "uniswap", "AAVE": "aave",
-        "LDO": "lido-dao", "VIRTUAL": "virtual-protocol", "OLAS": "autonolas",
-        "FET": "artificial-superintelligence-alliance", "PEPE": "pepe",
-        "DOGE": "dogecoin", "SHIB": "shiba-inu",
-        "XRP": "ripple", "AVAX": "avalanche-2", "MATIC": "matic-network",
-        "TAO": "bittensor", "AKT": "akash-network", "AIOZ": "aioz-network",
-        "ARB": "arbitrum", "OP": "optimism", "TIA": "celestia",
-        "INJ": "injective-protocol", "STX": "blockstack", "SUI": "sui",
-        "APT": "aptos", "SEI": "sei-network", "NEAR": "near",
-        "FIL": "filecoin", "AR": "arweave", "ONDO": "ondo-finance",
-    }
     if missing_crypto:
         cg_ids = [SYM_TO_COINGECKO[s] for s in missing_crypto if s in SYM_TO_COINGECKO]
         if cg_ids and not _cb_coingecko.is_open:

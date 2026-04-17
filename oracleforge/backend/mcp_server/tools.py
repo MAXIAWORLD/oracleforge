@@ -33,6 +33,7 @@ from typing import Any, Final
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from services.oracle import (
     chainlink_oracle,
+    metadata,
     price_cascade,
     price_oracle,
     pyth_oracle,
@@ -45,6 +46,7 @@ from services.oracle.multi_source import collect_sources, compute_divergence
 
 _SYMBOL_REGEX: Final[re.Pattern[str]] = re.compile(r"^[A-Z0-9]{1,10}$")
 _MAX_BATCH_SYMBOLS: Final[int] = 50
+_FOREX_SYMBOLS: Final[frozenset[str]] = frozenset({"EUR", "GBP"})
 
 
 def _is_valid_symbol(symbol: str) -> bool:
@@ -68,6 +70,17 @@ async def get_price(symbol: str) -> dict[str, Any]:
     if not _is_valid_symbol(symbol):
         return wrap_error("invalid symbol format", symbol=symbol)
 
+    # V1.7 — Forex symbols dispatch directly to Pyth Solana.
+    if symbol in _FOREX_SYMBOLS:
+        result = await pyth_solana_oracle.get_pyth_solana_price(symbol)
+        if not isinstance(result, dict) or result.get("error"):
+            return wrap_error(
+                "forex price fetch failed",
+                symbol=symbol,
+                detail=result.get("error") if isinstance(result, dict) else "unexpected",
+            )
+        return wrap_with_disclaimer({**result, "asset_class": "forex"})
+
     sources = await collect_sources(symbol)
     if not sources:
         return wrap_error("no live price available", symbol=symbol)
@@ -80,6 +93,7 @@ async def get_price(symbol: str) -> dict[str, Any]:
         {
             "symbol": symbol,
             "price": round(median_price, 6),
+            "asset_class": "crypto",
             "sources": sources,
             "source_count": len(sources),
             "divergence_pct": divergence_pct,
@@ -498,7 +512,38 @@ async def get_price_context(symbol: str) -> dict[str, Any]:
     return wrap_with_disclaimer(ctx)
 
 
-# ── 13. health_check ─────────────────────────────────────────────────────────
+# ── 13. get_asset_metadata (V1.7) ───────────────────────────────────────────
+
+
+async def get_asset_metadata(symbol: str) -> dict[str, Any]:
+    """Fetch asset metadata from CoinGecko (market cap, volume, supply) (V1.7).
+
+    Coverage: ~80 crypto assets with a CoinGecko ID mapping. Forex and
+    equity symbols are not covered. Unknown symbols return an error dict.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if not metadata.has_metadata(symbol):
+        return wrap_error(
+            "no metadata available for this symbol",
+            symbol=symbol,
+            supported_count=len(metadata.supported_symbols()),
+        )
+
+    result = await metadata.get_metadata(symbol)
+    if not isinstance(result, dict) or result.get("error"):
+        return wrap_error(
+            "metadata fetch failed",
+            symbol=symbol,
+            detail=result.get("error") if isinstance(result, dict) else "unexpected",
+        )
+    return wrap_with_disclaimer(result)
+
+
+# ── 14. health_check ─────────────────────────────────────────────────────────
 
 
 async def health_check() -> dict[str, Any]:

@@ -33,7 +33,7 @@ from core.request_id import RequestIDMiddleware, request_id_var
 from core.security import SecurityHeadersMiddleware
 from x402.middleware import x402_middleware
 
-API_VERSION: Final[str] = "0.1.6"
+API_VERSION: Final[str] = "0.1.7"
 
 
 class _JSONLogFormatter(logging.Formatter):

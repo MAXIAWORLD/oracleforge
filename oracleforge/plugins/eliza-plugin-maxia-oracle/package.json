@@ -1,6 +1,6 @@
 {
   "name": "eliza-plugin-maxia-oracle",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "ElizaOS plugin for the MAXIA Oracle price feed. Data feed only. Not investment advice. No custody. No KYC.",
   "license": "Apache-2.0",
   "author": "MAXIA <ceo@maxiaworld.app>",

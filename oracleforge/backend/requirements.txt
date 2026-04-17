@@ -27,9 +27,10 @@ uvicorn[standard]==0.39.0
 pydantic==2.13.0
 
 # Phase 5 — Model Context Protocol server (stdio + HTTP SSE).
-# Pulls starlette 1.0 transitively, which forced the fastapi 0.116 → 0.135
-# upgrade above. Keep these two pins in sync.
+# mcp 1.27 can pull starlette 1.0 which breaks FastAPI 0.135 (removed
+# on_startup). Pin starlette <1.0 explicitly until FastAPI catches up.
 mcp==1.27.0
+starlette>=0.52.0,<1.0.0
 
 # ── Tests ────────────────────────────────────────────────────────────────────
 

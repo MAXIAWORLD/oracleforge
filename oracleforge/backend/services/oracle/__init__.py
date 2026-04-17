@@ -11,6 +11,8 @@
 Other modules:
     price_cascade       — Multi-source fallback chains (stock, crypto, batch)
     multi_source        — Cross-validation aggregator (median + divergence_pct)
+    intelligence        — Confidence score, anomaly detection, context (V1.6)
+    metadata            — CoinGecko asset metadata (market cap, volume, ATH…) (V1.7)
 
 Public entrypoints (stable across phases):
     pyth_oracle.get_pyth_price(feed_id)              — single Pyth feed (Hermes)

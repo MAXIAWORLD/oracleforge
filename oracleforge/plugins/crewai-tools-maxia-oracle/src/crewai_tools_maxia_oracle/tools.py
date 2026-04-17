@@ -1,9 +1,9 @@
 """CrewAI tool wrappers for the MAXIA Oracle Python SDK.
 
 Each tool subclasses :class:`crewai.tools.BaseTool` and delegates to a
-shared :class:`maxia_oracle.MaxiaOracleClient` instance. The eight tools
-exposed here mirror the eight MCP tools of the MAXIA Oracle server and
-the eight non-register methods of the Python SDK.
+shared :class:`maxia_oracle.MaxiaOracleClient` instance. The thirteen tools
+exposed here mirror the MCP tools of the MAXIA Oracle server and
+the non-register methods of the Python SDK.
 
 Data feed only. Not investment advice. No custody. No KYC.
 """
@@ -304,6 +304,20 @@ class MaxiaOracleHealthCheckTool(_MaxiaOracleTool):
         return _fmt(self._get_client().health())
 
 
+class MaxiaOracleGetMetadataTool(_MaxiaOracleTool):
+    """V1.7 — CoinGecko asset metadata (market cap, volume, supply, rank, ATH/ATL)."""
+
+    name: str = "maxia_oracle_get_metadata"
+    description: str = (
+        "Fetch asset metadata from CoinGecko (market cap, volume, supply, rank, ATH/ATL). "
+        + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = SymbolInput
+
+    def _run(self, symbol: str) -> str:
+        return _fmt(self._get_client().metadata(symbol))
+
+
 # ── Convenience factory ────────────────────────────────────────────────────
 
 
@@ -320,6 +334,7 @@ MAXIA_ORACLE_TOOL_CLASSES: Final[tuple[type[_MaxiaOracleTool], ...]] = (
     MaxiaOracleGetTwapTool,
     MaxiaOracleGetPriceContextTool,
     MaxiaOracleHealthCheckTool,
+    MaxiaOracleGetMetadataTool,
 )
 
 
@@ -328,7 +343,7 @@ def get_all_tools(
     base_url: str | None = None,
     client: MaxiaOracleClient | None = None,
 ) -> list[BaseTool]:
-    """Instantiate the 8 MAXIA Oracle tools around a single shared client."""
+    """Instantiate the 13 MAXIA Oracle tools around a single shared client."""
     shared = client if client is not None else MaxiaOracleClient(
         api_key=api_key,
         base_url=base_url,

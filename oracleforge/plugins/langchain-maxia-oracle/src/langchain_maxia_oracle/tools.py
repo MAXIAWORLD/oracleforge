@@ -1,9 +1,9 @@
 """LangChain tool wrappers for the MAXIA Oracle Python SDK.
 
 Each tool subclasses :class:`langchain_core.tools.BaseTool` and delegates
-to a shared :class:`maxia_oracle.MaxiaOracleClient` instance. The eight
-tools exposed here mirror the eight MCP tools of the MAXIA Oracle server
-and the eight non-register methods of the Python SDK.
+to a shared :class:`maxia_oracle.MaxiaOracleClient` instance. The thirteen
+tools exposed here mirror the MCP tools of the MAXIA Oracle server
+and the non-register methods of the Python SDK.
 
 The tools are deliberately synchronous. ``BaseTool`` falls back to running
 ``_run`` in a thread for ``ainvoke``, which is correct for the blocking
@@ -337,6 +337,20 @@ class MaxiaOracleHealthCheckTool(_MaxiaOracleTool):
         return _fmt(self._get_client().health())
 
 
+class MaxiaOracleGetMetadataTool(_MaxiaOracleTool):
+    """V1.7 — CoinGecko asset metadata (market cap, volume, supply, rank, ATH/ATL)."""
+
+    name: str = "maxia_oracle_get_metadata"
+    description: str = (
+        "Fetch asset metadata from CoinGecko (market cap, volume, supply, rank, ATH/ATL). "
+        + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = SymbolInput
+
+    def _run(self, symbol: str) -> str:
+        return _fmt(self._get_client().metadata(symbol))
+
+
 # ── Convenience factory ────────────────────────────────────────────────────
 
 
@@ -353,6 +367,7 @@ MAXIA_ORACLE_TOOL_CLASSES: Final[tuple[type[_MaxiaOracleTool], ...]] = (
     MaxiaOracleGetTwapTool,
     MaxiaOracleGetPriceContextTool,
     MaxiaOracleHealthCheckTool,
+    MaxiaOracleGetMetadataTool,
 )
 
 
@@ -380,7 +395,7 @@ def get_all_tools(
     Returns
     -------
     list[BaseTool]
-        All 8 MAXIA Oracle tools, ready to pass to a LangChain agent.
+        All 13 MAXIA Oracle tools, ready to pass to a LangChain agent.
     """
     shared = client if client is not None else MaxiaOracleClient(
         api_key=api_key,

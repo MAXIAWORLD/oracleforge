@@ -39,7 +39,7 @@ from .exceptions import (
 
 DEFAULT_BASE_URL: Final[str] = "https://oracle.maxiaworld.app"
 DEFAULT_TIMEOUT_S: Final[float] = 15.0
-USER_AGENT: Final[str] = "maxia-oracle-python/0.5.0"
+USER_AGENT: Final[str] = "maxia-oracle-python/0.6.0"
 
 
 class MaxiaOracleClient:
@@ -310,6 +310,22 @@ class MaxiaOracleClient:
         """
         symbol = self._validate_symbol(symbol)
         return self._request("GET", f"/api/price/{symbol}/context")
+
+    def metadata(self, symbol: str) -> dict[str, Any]:
+        """V1.7 — Return asset metadata from CoinGecko.
+
+        Returns market cap, 24h volume, circulating supply, total supply,
+        max supply, market cap rank, ATH, ATL, and 24h price change.
+
+        Coverage: ~80 crypto assets with CoinGecko mapping. Forex and
+        equity symbols are not covered.
+
+        Raises:
+            MaxiaOracleValidationError: symbol format invalid.
+            MaxiaOracleUpstreamError: symbol not available or CoinGecko error.
+        """
+        symbol = self._validate_symbol(symbol)
+        return self._request("GET", f"/api/metadata/{symbol}")
 
     def confidence(self, symbol: str) -> dict[str, Any]:
         """Return the multi-source divergence for a symbol, compact.

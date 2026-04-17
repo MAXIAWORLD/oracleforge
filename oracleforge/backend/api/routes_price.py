@@ -19,6 +19,7 @@ from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
 from services.oracle import (
     chainlink_oracle,
+    metadata,
     price_cascade,
     pyth_oracle,
     pyth_solana_oracle,
@@ -39,6 +40,10 @@ _SYMBOL_REGEX = re.compile(r"^[A-Z0-9]{1,10}$")
 _MAX_BATCH_SYMBOLS = 50
 _CHAIN_PATTERN = r"^(base|ethereum|arbitrum)$"
 _TWAP_CHAIN_PATTERN = r"^(base|ethereum)$"
+
+# V1.7 — Forex symbols that route to Pyth Solana instead of multi_source.
+# Only symbols that are live on Pyth Solana shard 0 (verified V1.4).
+_FOREX_SYMBOLS = frozenset({"EUR", "GBP"})
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -97,6 +102,20 @@ async def get_single_price(symbol: str, key_hash: str = Depends(require_access))
     if rl is not None:
         return rl
 
+    # V1.7 — Forex symbols dispatch directly to Pyth Solana.
+    if symbol in _FOREX_SYMBOLS:
+        result = await pyth_solana_oracle.get_pyth_solana_price(symbol)
+        if not isinstance(result, dict) or result.get("error"):
+            return JSONResponse(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                content=wrap_error(
+                    "forex price fetch failed",
+                    symbol=symbol,
+                    detail=result.get("error") if isinstance(result, dict) else "unexpected",
+                ),
+            )
+        return wrap_with_disclaimer({**result, "asset_class": "forex"})
+
     sources = await collect_sources(symbol)
     if not sources:
         return JSONResponse(
@@ -116,6 +135,7 @@ async def get_single_price(symbol: str, key_hash: str = Depends(require_access))
         {
             "symbol": symbol,
             "price": round(median_price, 6),
+            "asset_class": "crypto",
             "confidence_score": confidence_score,
             "anomaly": anomaly_info["anomaly"],
             "sources_agreement": agreement,
@@ -418,3 +438,45 @@ async def get_twap_price_route(
     return wrap_with_disclaimer(result)
 
 
+@router.get("/metadata/{symbol}")
+async def get_metadata_route(
+    symbol: str, key_hash: str = Depends(require_access)
+):
+    """V1.7 — Return asset metadata from CoinGecko (market cap, volume, supply).
+
+    Coverage: all symbols mapped in ``price_oracle.SYM_TO_COINGECKO`` (~80
+    crypto assets). Forex and equity symbols are not covered (no CoinGecko
+    ID mapping). Unknown symbols return 404.
+    """
+    symbol = symbol.upper()
+    if not _is_valid_symbol(symbol):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=wrap_error("invalid symbol format"),
+        )
+
+    if not metadata.has_metadata(symbol):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=wrap_error(
+                "no metadata available for this symbol",
+                symbol=symbol,
+                supported_count=len(metadata.supported_symbols()),
+            ),
+        )
+
+    rl = _enforce_rate_limit(key_hash)
+    if rl is not None:
+        return rl
+
+    result = await metadata.get_metadata(symbol)
+    if not isinstance(result, dict) or result.get("error"):
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content=wrap_error(
+                "metadata fetch failed",
+                symbol=symbol,
+                detail=result.get("error") if isinstance(result, dict) else "unexpected",
+            ),
+        )
+    return wrap_with_disclaimer(result)

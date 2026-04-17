@@ -59,7 +59,7 @@ from .exceptions import (
 )
 
 SERVER_NAME = "maxia-oracle"
-SERVER_VERSION = "0.4.0"
+SERVER_VERSION = "0.5.0"
 SERVER_INSTRUCTIONS = (
     "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP "
     "tools. Data feed only. Not investment advice. No custody. No KYC."
@@ -260,6 +260,21 @@ def _tool_definitions() -> list[types.Tool]:
             },
         ),
         types.Tool(
+            name="get_asset_metadata",
+            description=(
+                "Fetch asset metadata from CoinGecko: market cap, 24h "
+                "volume, circulating supply, total supply, max supply, "
+                "market cap rank, ATH, ATL, and 24h price change. "
+                "Coverage: ~80 crypto assets. " + _DISCLAIMER_LINE
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {"symbol": _SYMBOL_SCHEMA},
+                "required": ["symbol"],
+                "additionalProperties": False,
+            },
+        ),
+        types.Tool(
             name="health_check",
             description=(
                 "Minimal liveness probe for the MAXIA Oracle backend. "
@@ -331,6 +346,9 @@ def _build_dispatch(
             args.get("window_s", 1800),
         )
 
+    async def get_asset_metadata(args: dict[str, Any]) -> dict[str, Any]:
+        return await asyncio.to_thread(client.metadata, args["symbol"])
+
     async def health_check(args: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(client.health)
 
@@ -345,6 +363,7 @@ def _build_dispatch(
         "get_redstone_price": get_redstone_price,
         "get_pyth_solana_onchain": get_pyth_solana_onchain,
         "get_twap_onchain": get_twap_onchain,
+        "get_asset_metadata": get_asset_metadata,
         "health_check": health_check,
     }
 

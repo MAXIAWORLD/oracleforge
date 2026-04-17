@@ -16,6 +16,7 @@
 import { getCacheStatsAction } from "./actions/get-cache-stats.js";
 import { getChainlinkOnchainAction } from "./actions/get-chainlink-onchain.js";
 import { getConfidenceAction } from "./actions/get-confidence.js";
+import { getAssetMetadataAction } from "./actions/get-asset-metadata.js";
 import { getPriceAction } from "./actions/get-price.js";
 import { getPriceContextAction } from "./actions/get-price-context.js";
 import { getPricesBatchAction } from "./actions/get-prices-batch.js";
@@ -27,7 +28,7 @@ import { healthCheckAction } from "./actions/health-check.js";
 import { listSupportedSymbolsAction } from "./actions/list-supported-symbols.js";
 import type { Action, Plugin } from "./types.js";
 
-export const PLUGIN_VERSION = "0.3.0";
+export const PLUGIN_VERSION = "0.5.0";
 
 export const maxiaOracleActions: readonly Action[] = [
   getPriceAction,
@@ -41,6 +42,7 @@ export const maxiaOracleActions: readonly Action[] = [
   getPythSolanaOnchainAction,
   getTwapOnchainAction,
   getPriceContextAction,
+  getAssetMetadataAction,
   healthCheckAction,
 ] as const;
 
