@@ -135,7 +135,6 @@ _SOLANA_RPC_CUSTOM: Final[str] = os.getenv("SOLANA_RPC", "")
 
 # Public fallbacks (always appended last, never log URLs that contain api-key=)
 _PUBLIC_RPC_FALLBACKS: Final[tuple[str, ...]] = (
-    "https://rpc.ankr.com/solana",
     "https://api.mainnet-beta.solana.com",
     "https://solana-mainnet.rpc.extrnode.com",
 )

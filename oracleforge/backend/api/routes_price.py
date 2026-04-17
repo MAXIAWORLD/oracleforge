@@ -19,6 +19,7 @@ from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
 from services.oracle import (
     chainlink_oracle,
+    price_cascade,
     pyth_oracle,
     pyth_solana_oracle,
     redstone_oracle,
@@ -149,7 +150,7 @@ async def get_batch_prices_route(
     if rl is not None:
         return rl
 
-    results = await pyth_oracle.get_batch_prices(body.symbols)
+    results = await price_cascade.get_batch_prices(body.symbols)
     return wrap_with_disclaimer(
         {
             "count": len(results),

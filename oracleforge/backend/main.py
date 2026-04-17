@@ -15,9 +15,10 @@ secrets are validated at import time, process refuses to start otherwise
 """
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import AsyncIterator, Final
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -28,15 +29,46 @@ from core.db import close_db, get_db, init_db
 from core.disclaimer import wrap_error
 from core.http_client import close_http_client
 from core.rate_limit import purge_old_windows
+from core.request_id import RequestIDMiddleware, request_id_var
 from core.security import SecurityHeadersMiddleware
 from x402.middleware import x402_middleware
 
-API_VERSION = "0.1.0"
+API_VERSION: Final[str] = "0.1.5"
 
-logging.basicConfig(
-    level=LOG_LEVEL,
-    format="%(asctime)s %(levelname)-5s %(name)s — %(message)s",
-)
+
+class _JSONLogFormatter(logging.Formatter):
+    """Structured JSON log formatter for prod — one JSON object per line."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        entry = {
+            "ts": self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+            "request_id": request_id_var.get("-"),
+        }
+        if record.exc_info and record.exc_info[0]:
+            entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entry, ensure_ascii=False)
+
+
+class _RequestIDFilter(logging.Filter):
+    """Injects request_id into every LogRecord for text-format logs."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = request_id_var.get("-")  # type: ignore[attr-defined]
+        return True
+
+
+_handler = logging.StreamHandler()
+_handler.addFilter(_RequestIDFilter())
+if IS_PROD:
+    _handler.setFormatter(_JSONLogFormatter())
+else:
+    _handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)-5s %(name)s [%(request_id)s] — %(message)s")
+    )
+logging.basicConfig(level=LOG_LEVEL, handlers=[_handler], force=True)
 logger = logging.getLogger("maxia_oracle.main")
 
 
@@ -73,17 +105,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Security headers middleware must be registered BEFORE any other middleware
-# that modifies the response, so its setdefault() calls run last.
+# Middleware registration order: last-added = outermost (runs first).
+# Request flow: RequestID → x402 → SecurityHeaders → routes.
 app.add_middleware(SecurityHeadersMiddleware, api_version=API_VERSION)
-
-
-# x402 Phase 4 middleware — Base mainnet direct-sale payment path.
-# Registered via the function-based middleware decorator so Starlette wraps
-# it AFTER the security-headers ASGI middleware above. The x402 handler
-# reads `request.url.path` and either emits a 402 challenge, verifies a
-# payment, or passes through unchanged for non-priced paths.
 app.middleware("http")(x402_middleware)
+app.add_middleware(RequestIDMiddleware)
 
 
 # ── Routers ─────────────────────────────────────────────────────────────────

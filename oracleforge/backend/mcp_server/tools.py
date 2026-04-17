@@ -33,6 +33,7 @@ from typing import Any, Final
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from services.oracle import (
     chainlink_oracle,
+    price_cascade,
     price_oracle,
     pyth_oracle,
     pyth_solana_oracle,
@@ -116,7 +117,7 @@ async def get_prices_batch(symbols: list[str]) -> dict[str, Any]:
         if sym not in cleaned:
             cleaned.append(sym)
 
-    results = await pyth_oracle.get_batch_prices(cleaned)
+    results = await price_cascade.get_batch_prices(cleaned)
     return wrap_with_disclaimer(
         {
             "requested": len(cleaned),

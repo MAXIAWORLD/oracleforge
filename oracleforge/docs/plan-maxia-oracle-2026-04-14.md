@@ -480,10 +480,14 @@ oracleforge/
 | Phase 6 — SDK + plugins | 2 jours |
 | Phase 7 — Deploy VPS | 1 jour |
 | Phase 8 — Landing page | 1 jour |
+| V1.6 — Agent Intelligence Layer | 3 jours |
+| V1.7 — Data Enrichment (Forex + Metadata) | 2 jours |
+| V1.8 — Historical Prices | 3 jours |
+| V1.9 — Alerts & Streaming | 4 jours |
 | Phase 9 — Distribution | 3 jours |
-| **Total** | **17 jours actifs (~3-4 semaines)** |
+| **Total** | **29 jours actifs (~5-6 semaines)** |
 
-**Compte sur 3-4 semaines, pas 6.** Gain massif vs plan original grâce à la réutilisation MAXIA V12.
+**V1.1→V1.5 DONE (12 jours). V1.6→V1.9 = 12 jours restants avant Phase 9.**
 
 ---
 
@@ -524,6 +528,125 @@ Ajouté 16 avril 2026 après pesée pour/contre EVM vs Solana (cf. mémoire `pro
 - Lecture directe de pools Uniswap v3 sur Base et Ethereum pour obtenir le prix TWAP 30min que verra un smart contract au moment d'une tx.
 - **Gain** : killer feature pour agents DeFi qui commit des tx trading autonomes.
 - **Coût** : calcul TWAP non-trivial (decode sqrtPriceX96, gestion ticks, etc.).
+
+### V1.6 — Agent Intelligence Layer (Confidence Score + Anomaly + Context) — 3 jours
+
+Ajouté 17 avril 2026 — features "agent-native" qui n'existent chez AUCUN oracle concurrent. Positionnement : "oracle conçu POUR les agents AI, pas juste une API prix".
+
+**A. Confidence Score unifié (0-100)** — score composite calculé à partir de :
+- Nombre de sources disponibles pour ce symbole (0-6)
+- Divergence inter-sources (divergence_pct existant)
+- Âge du prix le plus récent (staleness)
+- État des circuit breakers concernés
+- Spread confidence Pyth (confidence_pct existant)
+
+Exposé dans CHAQUE réponse `/api/price/{symbol}` comme champ additionnel `confidence_score`. Un agent lit un nombre et sait s'il peut agir. Formule transparente documentée.
+
+**B. "Price with Context" endpoint** — `GET /api/price/{symbol}/context` :
+Retourne en un seul appel tout ce qu'un agent a besoin pour décider :
+```json
+{
+  "price": 74800.0,
+  "confidence_score": 92,
+  "anomaly": false,
+  "direction_1h": "up",
+  "volatility_24h_pct": 2.3,
+  "sources_agreement": "strong",
+  "twap_5min": 74780.0,
+  "twap_deviation_pct": 0.03
+}
+```
+Dépend de A et C. Un seul appel au lieu de 5. Killer feature pour LLM tool-calling (1 call = décision).
+
+**C. Anomaly Flag** — utilise le TWAP rolling 5min DÉJÀ implémenté dans `pyth_oracle.py` (`check_twap_deviation`) mais pas exposé dans l'API. Si spot dévie >5% du TWAP 5min OU si une source diverge >10% du median → `anomaly: true` dans la réponse `/api/price/{symbol}`. L'agent sait qu'il ne faut pas agir sur ce prix.
+
+**Scope technique :**
+- Backend : nouveau module `services/oracle/intelligence.py` (~200L), extension `routes_price.py`, nouvelle route `/context`
+- Pas de stockage nécessaire (tout calculé en temps réel à partir des données existantes)
+- SDK : `client.price_context(symbol)` (Python + TS), méthode 12
+- Plugins : `MaxiaOracleGetPriceContextTool` (12e tool, 5 plugins)
+- MCP : `get_price_context` (12e tool)
+- Tests : ~20 nouveaux
+
+### V1.7 — Data Enrichment (Forex + Metadata) — 2 jours
+
+**3. Forex unification** — les feeds Pyth EUR/USD, GBP/USD, JPY/USD sont dans `pyth_solana_oracle` (V1.4) mais pas accessibles via `/api/price/EUR`. Unifié : `/api/price/EUR` route automatiquement vers Pyth Solana pour les paires forex. L'agent n'a pas à savoir quel endpoint appeler.
+
+Implémentation : `routes_price.py` détecte les tickers forex (EUR, GBP, JPY, CHF, AUD, CAD — liste fixe) et dispatch vers `pyth_solana_oracle` au lieu de `multi_source.collect_sources`. Flag `asset_class: "forex"` dans la réponse.
+
+**4. Asset metadata** — CoinGecko retourne DÉJÀ `market_cap`, `total_volume`, `circulating_supply` dans ses réponses, mais `price_oracle.py` ne les transmet pas. Enrichir `get_prices()` pour conserver ces champs. Nouvel endpoint `GET /api/metadata/{symbol}` dédié :
+```json
+{
+  "symbol": "BTC",
+  "market_cap": 1480000000000,
+  "volume_24h": 32000000000,
+  "circulating_supply": 19800000,
+  "ath": 109000,
+  "price_change_24h_pct": -1.2
+}
+```
+
+**Scope technique :**
+- Backend : extension `price_oracle.py` (pass-through metadata CoinGecko), nouvelle route `routes_price.py`, dispatcher forex dans `routes_price.py`
+- SDK : `client.metadata(symbol)` (Python + TS)
+- Plugins : `MaxiaOracleGetMetadataTool` (13e tool)
+- MCP : `get_asset_metadata` (13e tool)
+- Tests : ~15 nouveaux
+
+### V1.8 — Historical Prices — 3 jours
+
+**1. Prix historiques** — le manque le plus criant pour un agent AI qui analyse des tendances.
+
+**Architecture :**
+- Nouveau module `services/oracle/price_history.py` (~300L)
+- Table SQLite `price_snapshots (symbol TEXT, ts INTEGER, price REAL, source TEXT)` avec index composite `(symbol, ts)`
+- Background task (lifespan) : sample les prix toutes les 5 minutes via `price_cascade.get_batch_prices` pour les ~18 feeds actifs. ~5200 lignes/jour, ~160k lignes/mois — SQLite tient largement
+- Rétention configurable via `HISTORY_RETENTION_DAYS` (default 90)
+- Purge quotidienne des vieilles entrées dans le lifespan startup
+
+**Endpoint :** `GET /api/price/{symbol}/history?range=24h|7d|30d&interval=5m|1h|1d`
+- `range=24h` + `interval=5m` → ~288 points
+- `range=7d` + `interval=1h` → ~168 points
+- `range=30d` + `interval=1d` → 30 points
+
+**Scope technique :**
+- Backend : `price_history.py`, migration DB dans `core/db.py`, background task dans `main.py` lifespan, route dans `routes_price.py`
+- SDK : `client.price_history(symbol, range, interval)` (Python + TS)
+- Plugins : `MaxiaOracleGetPriceHistoryTool` (14e tool)
+- MCP : `get_price_history` (14e tool)
+- Tests : ~25 nouveaux (sampling, purge, range query, edge cases)
+
+### V1.9 — Alerts & Streaming — 4 jours
+
+**5. Price alerts** — `POST /api/alerts` pour créer une condition :
+```json
+{
+  "symbol": "BTC",
+  "condition": "below",
+  "threshold": 70000,
+  "callback_url": "https://my-agent.com/webhook"
+}
+```
+- Table SQLite `price_alerts (id, api_key_hash, symbol, condition, threshold, callback_url, active, created_at, triggered_at)`
+- Check intégré dans la boucle de sampling V1.8 (toutes les 5 min)
+- Quand condition remplie : POST webhook + marquer `triggered_at`
+- Pas de spam : une alerte se trigger UNE fois puis se désactive
+- Quota : max 10 alertes actives par clé API
+- `GET /api/alerts` list, `DELETE /api/alerts/{id}` supprimer
+
+**2. SSE streaming** — `GET /api/prices/stream?symbols=BTC,ETH,SOL` (SSE, auth via X-API-Key query param) :
+- Pyth Hermes expose un SSE natif — on le relaie en filtrant les symboles demandés
+- Un tick SSE toutes les ~1-3 secondes par symbole actif
+- Chaque tick inclut `confidence_score` (V1.6) et `anomaly` flag
+- Rate limit : 1 stream par clé API, max 10 symboles par stream
+- Timeout auto après 1h sans reconnexion (économise serveur)
+
+**Scope technique :**
+- Backend : `services/oracle/alerts.py` (~200L), `services/oracle/price_stream.py` (~250L relaie Hermes SSE), routes dans `routes_price.py`, migration DB alerts
+- SDK : `client.create_alert(...)`, `client.list_alerts()`, `client.delete_alert(id)` (Python + TS). Streaming : hors SDK sync Python (SSE = async natif), `client.streamPrices(symbols, callback)` en TS
+- Plugins : `MaxiaOracleCreateAlertTool`, `MaxiaOracleListAlertsTool` (15e/16e tools)
+- MCP : `create_price_alert`, `list_price_alerts` (15e/16e tools)
+- Tests : ~30 nouveaux
 
 ### V2 — x402 Solana custom (si x402 spec reste EVM-only) — 5 jours
 

@@ -1,46 +1,24 @@
-"""MAXIA Oracle — Pyth Network price oracle (Hermes API + SSE streaming).
+"""MAXIA Oracle — Pyth Network Hermes price layer.
 
-Real-time prices via Pyth Network Hermes (free, no API key).
+Pure Pyth Hermes integration: feed definitions, single-price fetch, cache,
+staleness/confidence checks, TWAP, and on-chain verification.
+
+Cascade functions (get_stock_price, get_crypto_price, get_batch_prices,
+get_stock_price_finnhub) live in price_cascade.py to avoid a circular
+import with price_oracle.py (audit H1/H2 fix).
 
 Extracted from MAXIA V12/backend/trading/pyth_oracle.py on 2026-04-14.
-
-Surgeries applied vs the V12 original (validated by Alexis 2026-04-14):
-    B. All 6 lazy imports of `FALLBACK_PRICES` from price_oracle removed, plus
-       `start_fallback_refresh` / `_fallback_refresh_loop` / `_fallback_refresh_task`.
-       Functions that used it (get_stock_price, get_crypto_price, get_batch_prices)
-       now return an explicit error instead of a stale static price.
-    C. CandleBuilder + `_process_candle_tick` + `get_recent_candles` +
-       `_universal_candle_feeder` + `_candle_builders` + `_candle_subscribers`
-       removed. MAXIA Oracle V1 has no dashboard, no OHLCV consumer.
-    D. `check_stock_peg()` and `/oracle/peg-check/{symbol}` route removed —
-       specific to tokenized securities (xStocks depeg detection).
-    E. `check_oracle_health_alert()` + its dedicated constants removed —
-       depended on `infra.alerts` (Telegram). `_is_market_open()` is kept
-       because `api_market_status` still uses it.
-    F. Second `tokenized_stocks` lazy import (in `api_price_live` fallback)
-       removed. After this, `grep tokenized_stocks` on MAXIA Oracle = 0.
-
-Strategy (equity cascade, see get_stock_price):
-    1. Pyth Hermes        — <400ms, confidence interval
-    2. Finnhub            — free tier 60 req/min
-    3. CoinGecko          — via price_oracle.get_price()
-    4. Yahoo Finance      — via price_oracle.get_stock_prices()
-    5. (no static fallback — Surgery B)
 """
 import asyncio
 import logging
 import os
 import time
-from typing import Optional
 
 import httpx
 
 from core.errors import safe_error
 
 logger = logging.getLogger("pyth_oracle")
-
-# ── Finnhub API (3rd equity source) ──
-FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
 
 
 # ── Constantes Pyth Hermes ──
@@ -144,13 +122,10 @@ _oracle_metrics = {
     "confidence_rejected": 0,
     "circuit_opens": 0,
     "fallback_used": 0,
-    "stream_events": 0,       # P5: prix recus via SSE
-    "last_stream_event_ts": 0, # P5: heartbeat monitoring
     "latency_samples": [],
     "started_at": time.time(),
 }
 _METRICS_MAX_SAMPLES = 100
-_HEARTBEAT_ALERT_S = 60  # P5: alerter si aucun event SSE depuis 60s
 
 # Feed IDs Pyth pour les actions (confirmes sur hermes.pyth.network)
 # Stocks sans feed Pyth connu (mars 2026) :
@@ -202,9 +177,6 @@ _price_cache: dict = {}  # {feed_id: {"data": {...}, "ts": float}}
 _CACHE_TTL_NORMAL = 5   # secondes — mode normal (suffisant pour tokenized stocks)
 _CACHE_TTL_HFT = 1      # secondes — mode HFT (fetch quasi-live)
 _CACHE_MAX = 100         # Limite max d'entrees en cache pour eviter fuite memoire
-
-# Streaming: prix live Pyth via SSE (server-sent events) pour les clients HFT
-_streaming_prices: dict = {}  # {feed_id: {"price": float, "ts": float}} mis a jour par le stream
 
 # ── Shared HTTP client — singleton from core.http_client (Phase 4 Step 5) ──
 # The old per-module pool has been replaced with the process-wide singleton
@@ -272,15 +244,9 @@ async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
     _oracle_metrics["total_requests"] += 1
     _req_start = time.time()
 
-    # 1) Streaming price (si le stream background tourne, latence <1s)
     now = time.time()
-    streamed = _streaming_prices.get(feed_id)
-    if streamed and now - streamed["ts"] < 2:
-        _oracle_metrics["successful"] += 1
-        _track_latency(_req_start)
-        return streamed["data"]
 
-    # 2) Cache HTTP (TTL selon mode)
+    # Cache HTTP (TTL selon mode)
     cache_ttl = _CACHE_TTL_HFT if hft else _CACHE_TTL_NORMAL
     cached = _price_cache.get(feed_id)
     if cached and now - cached["ts"] < cache_ttl:
@@ -288,11 +254,18 @@ async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
 
     try:
         client = await _get_http()
-        # Hermes V2 endpoint — /v2/updates/price/latest avec ids[]
-        resp = await client.get(
-            f"{HERMES_URL}/v2/updates/price/latest",
-            params={"ids[]": f"0x{feed_id}"},
-        )
+        # Hermes V2 endpoint — 1 retry on transient timeout (audit fix)
+        try:
+            resp = await client.get(
+                f"{HERMES_URL}/v2/updates/price/latest",
+                params={"ids[]": f"0x{feed_id}"},
+            )
+        except httpx.TimeoutException:
+            await asyncio.sleep(0.5)
+            resp = await client.get(
+                f"{HERMES_URL}/v2/updates/price/latest",
+                params={"ids[]": f"0x{feed_id}"},
+            )
 
         if resp.status_code != 200:
             return {"error": f"Hermes HTTP {resp.status_code}", "source": "pyth"}
@@ -378,7 +351,7 @@ async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
 
     except httpx.TimeoutException:
         _track_latency(_req_start)
-        return {"error": "Pyth Hermes timeout", "source": "pyth"}
+        return {"error": "Pyth Hermes timeout (after retry)", "source": "pyth"}
     except Exception as e:
         _track_latency(_req_start)
         return {"error": safe_error("Pyth Hermes fetch failed", e, logger), "source": "pyth"}
@@ -426,558 +399,6 @@ async def verify_price_onchain(feed_id: str, expected_price: float, max_age_s: i
                 "deviation_pct": round(deviation, 2), "age_s": age_s, "source": "pyth_hermes_hft"}
     except Exception as e:
         return {"verified": False, "error": safe_error("Pyth on-chain verification failed", e, logger)}
-
-
-async def get_stock_price_finnhub(symbol: str) -> dict:
-    """Recupere le prix d'une action via Finnhub API (free tier: 60 req/min).
-
-    Args:
-        symbol: Ticker de l'action (AAPL, TSLA, etc.)
-
-    Returns:
-        {"price": float, "source": "finnhub", "confidence": 0, "publish_time": int}
-        ou {"error": "..."} en cas d'echec
-    """
-    if not FINNHUB_API_KEY:
-        return {"error": "FINNHUB_API_KEY not set", "source": "finnhub"}
-
-    sym = symbol.upper()
-    try:
-        client = await _get_http()
-        resp = await client.get(
-            "https://finnhub.io/api/v1/quote",
-            params={"symbol": sym, "token": FINNHUB_API_KEY},
-        )
-        if resp.status_code != 200:
-            return {"error": f"Finnhub HTTP {resp.status_code}", "source": "finnhub"}
-
-        data = resp.json()
-        # Finnhub retourne c=current, t=timestamp, h=high, l=low, o=open, pc=prev close
-        price = data.get("c", 0)
-        timestamp = data.get("t", 0)
-
-        if not price or price <= 0:
-            return {"error": "Finnhub returned no price", "source": "finnhub"}
-
-        return {
-            "price": round(float(price), 6),
-            "confidence": 0,
-            "publish_time": int(timestamp) if timestamp else int(time.time()),
-            "source": "finnhub",
-            "symbol": sym,
-        }
-    except httpx.TimeoutException:
-        return {"error": "Finnhub timeout", "source": "finnhub"}
-    except Exception as e:
-        return {"error": safe_error("Finnhub fetch failed", e, logger), "source": "finnhub"}
-
-
-async def get_stock_price(symbol: str) -> dict:
-    """Fetch an equity price via Pyth -> Finnhub -> CoinGecko -> Yahoo cascade.
-
-    Surgery B (2026-04-14): the former "source 5: static fallback" was removed.
-    When every live source fails, this function returns {"error": ...} instead
-    of a stale March-2026 hardcoded value.
-
-    Args:
-        symbol: Equity ticker (AAPL, TSLA, NVDA, ...)
-
-    Returns:
-        On success: {"price": float, "confidence": float, "source": "pyth"|"finnhub"|"coingecko"|"yahoo", "symbol": str, ...}
-        On failure: {"error": "all sources unavailable", "sources_tried": [...], "symbol": str}
-    """
-    sym = symbol.upper()
-    # Alias GOOGL -> GOOG (Pyth uses GOOG)
-    if sym == "GOOGL":
-        sym = "GOOG"
-    sources_tried: list[str] = []
-
-    # ── Source 1: Pyth Hermes (best — real-time + confidence interval) ──
-    feed_id = EQUITY_FEEDS.get(sym)
-    if feed_id:
-        sources_tried.append("pyth")
-        result = await get_pyth_price(feed_id)
-        if "error" not in result and result.get("price", 0) > 0:
-            result["symbol"] = symbol.upper()
-            if result.get("stale"):
-                logger.warning(f"STALE stock price for {sym} (age={result.get('age_s')}s), falling back")
-            else:
-                return result
-
-    # ── Source 2: Finnhub (free tier 60 req/min) ──
-    sources_tried.append("finnhub")
-    finnhub_result = await get_stock_price_finnhub(symbol)
-    if "error" not in finnhub_result and finnhub_result.get("price", 0) > 0:
-        return finnhub_result
-
-    # ── Source 3: CoinGecko via price_oracle ──
-    try:
-        from .price_oracle import get_price as cg_get_price
-        sources_tried.append("coingecko")
-        price = await cg_get_price(symbol.upper())
-        if price and price > 0:
-            return {
-                "price": price,
-                "confidence": 0,
-                "publish_time": int(time.time()),
-                "source": "coingecko",
-                "symbol": symbol.upper(),
-            }
-    except Exception:
-        pass
-
-    # ── Source 4: Yahoo Finance via price_oracle ──
-    try:
-        from .price_oracle import get_stock_prices as yahoo_get_stocks
-        sources_tried.append("yahoo")
-        yahoo_prices = await yahoo_get_stocks()
-        yahoo_data = yahoo_prices.get(symbol.upper(), {})
-        if yahoo_data.get("price", 0) > 0:
-            return {
-                "price": yahoo_data["price"],
-                "confidence": 0,
-                "publish_time": int(time.time()),
-                "source": yahoo_data.get("source", "yahoo"),
-                "symbol": symbol.upper(),
-            }
-    except Exception:
-        pass
-
-    return {
-        "error": "all sources unavailable",
-        "sources_tried": sources_tried,
-        "symbol": symbol.upper(),
-    }
-
-
-async def get_crypto_price(symbol: str) -> dict:
-    """Fetch a crypto price via Pyth -> CoinGecko cascade.
-
-    Surgery B (2026-04-14): the static fallback branch was removed. When both
-    Pyth and CoinGecko fail, this function returns {"error": ...}.
-
-    Args:
-        symbol: Crypto ticker (BTC, ETH, SOL, ...)
-
-    Returns:
-        On success: {"price": float, "confidence": float, "source": "pyth"|"coingecko", "symbol": str, ...}
-        On failure: {"error": "all sources unavailable", "sources_tried": [...], "symbol": str}
-    """
-    sym = symbol.upper()
-    sources_tried: list[str] = []
-
-    feed_id = CRYPTO_FEEDS.get(sym)
-    if feed_id:
-        sources_tried.append("pyth")
-        result = await get_pyth_price(feed_id)
-        if "error" not in result and result.get("price", 0) > 0:
-            result["symbol"] = sym
-            if result.get("stale"):
-                logger.warning(f"STALE crypto price for {sym} (age={result.get('age_s')}s), falling back")
-            else:
-                return result
-
-    # Fallback CoinGecko
-    try:
-        from .price_oracle import get_price as cg_get_price
-        sources_tried.append("coingecko")
-        price = await cg_get_price(sym)
-        if price and price > 0:
-            return {
-                "price": price,
-                "confidence": 0,
-                "publish_time": int(time.time()),
-                "source": "coingecko",
-                "symbol": sym,
-            }
-    except Exception:
-        pass
-
-    return {
-        "error": "all sources unavailable",
-        "sources_tried": sources_tried,
-        "symbol": sym,
-    }
-
-
-async def get_batch_prices(symbols: list[str]) -> dict:
-    """Recupere les prix de plusieurs symboles en un seul appel Hermes.
-
-    Hermes supporte ids[] multiple — un seul HTTP call pour N feeds.
-    Les symboles sans feed Pyth sont recuperes via CoinGecko.
-
-    Args:
-        symbols: Liste de tickers (ex: ["AAPL", "TSLA", "BTC", "SOL"])
-
-    Returns:
-        {symbol: {"price": float, "confidence": float, "source": str}}
-    """
-    results = {}
-    now = time.time()
-
-    # Separer les symboles avec/sans feed Pyth
-    pyth_symbols = {}  # {symbol: feed_id}
-    fallback_symbols = []
-
-    for sym in symbols:
-        s = sym.upper()
-        # Alias GOOGL -> GOOG
-        lookup = "GOOG" if s == "GOOGL" else s
-        feed_id = ALL_FEEDS.get(lookup)
-        if feed_id:
-            # Verifier si en cache
-            cached = _price_cache.get(feed_id)
-            if cached and now - cached["ts"] < _CACHE_TTL_NORMAL:
-                results[s] = cached["data"].copy()
-                results[s]["symbol"] = s
-            else:
-                pyth_symbols[s] = feed_id
-        else:
-            fallback_symbols.append(s)
-
-    # Batch fetch Pyth (un seul appel HTTP)
-    if pyth_symbols:
-        try:
-            client = await _get_http()
-            ids_str = "&".join(f"ids[]=0x{fid}" for fid in pyth_symbols.values())
-            resp = await client.get(
-                f"{HERMES_URL}/v2/updates/price/latest?{ids_str}",
-            )
-
-            if resp.status_code == 200:
-                data = resp.json()
-                parsed = data.get("parsed", [])
-
-                # Map feed_id -> symbole pour retrouver les resultats
-                fid_to_sym = {fid: sym for sym, fid in pyth_symbols.items()}
-
-                for entry in parsed:
-                    entry_id = entry.get("id", "").replace("0x", "")
-                    sym = fid_to_sym.get(entry_id)
-                    if not sym:
-                        continue
-
-                    price_data = entry.get("price", {})
-                    raw_price = int(price_data.get("price", "0"))
-                    exponent = int(price_data.get("expo", "0"))
-                    raw_conf = int(price_data.get("conf", "0"))
-                    publish_time = price_data.get("publish_time", 0)
-
-                    price = raw_price * (10 ** exponent)
-                    confidence = raw_conf * (10 ** exponent)
-
-                    result = {
-                        "price": round(price, 6),
-                        "confidence": round(confidence, 6),
-                        "publish_time": publish_time,
-                        "source": "pyth",
-                        "symbol": sym,
-                    }
-
-                    results[sym] = result
-                    # Mettre en cache (eviction si limite atteinte)
-                    if len(_price_cache) >= _CACHE_MAX:
-                        oldest_key = next(iter(_price_cache))
-                        del _price_cache[oldest_key]
-                    _price_cache[entry_id] = {"data": result, "ts": now}
-            else:
-                # Si batch echoue, mettre tous les symboles Pyth en fallback
-                fallback_symbols.extend(pyth_symbols.keys())
-
-        except Exception as e:
-            logger.error(f"Batch fetch error: {e}")
-            fallback_symbols.extend(pyth_symbols.keys())
-
-    # Aussi ajouter les symboles Pyth qui n'ont pas ete retournes dans le batch
-    for sym in pyth_symbols:
-        if sym not in results:
-            fallback_symbols.append(sym)
-
-    # Surgery B (2026-04-14): static-fallback branches removed. Symbols where
-    # both Pyth batch and CoinGecko batch failed are simply absent from the
-    # returned dict — callers must treat missing keys as "no live data".
-    if fallback_symbols:
-        try:
-            from .price_oracle import get_prices as cg_get_prices
-            cg_prices = await cg_get_prices(fallback_symbols)
-            for sym in fallback_symbols:
-                if sym in results:
-                    continue
-                cg_data = cg_prices.get(sym)
-                if not cg_data:
-                    continue
-                price = cg_data.get("price")
-                if not price or price <= 0:
-                    continue
-                results[sym] = {
-                    "price": price,
-                    "confidence": 0,
-                    "publish_time": int(time.time()),
-                    "source": cg_data.get("source", "coingecko"),
-                    "symbol": sym,
-                }
-        except Exception as e:
-            logger.error(f"Batch CoinGecko fallback error: {e}")
-
-    return results
-
-
-# Surgery D (2026-04-14): check_stock_peg() removed. It compared a tokenized
-# security (xStock) on-chain price against its underlying equity price via
-# Pyth to flag depegs. This is a trading-specific tool for regulated
-# tokenized-security products and is out of scope for MAXIA Oracle.
-
-
-# Phase 3 decision #7 (2026-04-14): the V12 APIRouter(prefix="/oracle") and
-# its 9 routes (/stock, /crypto, /batch, /feeds, /price/live, /health,
-# /monitoring, /specs, /market-status) were removed. The MAXIA Oracle V1
-# public HTTP surface lives in backend/api/ (Phase 3) and calls the oracle
-# service functions below directly. Keeping the routes would have left
-# ~370 lines of dead code that could accidentally be revived later.
-
-
-def _is_market_open() -> bool:
-    """Return True while the US equity market is in regular trading hours.
-
-    Regular hours: Mon-Fri 9:30-16:00 ET -> 13:30-20:00 UTC (EDT) or
-    14:30-21:00 UTC (EST). We use 13:00-20:30 UTC to cover pre-market but
-    not late after-hours. Used by api_market_status.
-    """
-    from datetime import datetime, timezone
-    utc_now = datetime.now(timezone.utc)
-    if utc_now.weekday() >= 5:
-        return False
-    utc_minutes = utc_now.hour * 60 + utc_now.minute
-    return 780 <= utc_minutes <= 1230
-
-
-# Surgery E (2026-04-14): check_oracle_health_alert() and its dedicated
-# globals (_oracle_alert_last, _ORACLE_ALERT_COOLDOWN,
-# _ORACLE_STALE_ALERT_THRESHOLD) were removed. The function depended on
-# `infra.alerts` (Telegram, not extracted) and was called from a V12
-# background scheduler which MAXIA Oracle does not port. V1 monitoring
-# relies on application logs + api_oracle_health / api_oracle_monitoring
-# HTTP endpoints instead.
-
-
-# ══════════════════════════════════════════
-# Pyth SSE Streaming (prix live <1s latence)
-# ══════════════════════════════════════════
-
-_sse_task: Optional[asyncio.Task] = None
-_sse_subscribers: list = []  # list of asyncio.Queue for WebSocket push
-
-
-async def start_pyth_stream():
-    """Demarre le stream SSE Pyth Hermes pour tous les feeds crypto + equity.
-    Met a jour _streaming_prices en continu. Reconnexion auto."""
-    global _sse_task
-    if _sse_task and not _sse_task.done():
-        return  # Deja en cours
-
-    _sse_task = asyncio.create_task(_pyth_sse_loop())
-    logger.info("[PythStream] SSE streaming started")
-
-
-# Surgery B (2026-04-14): `_fallback_refresh_task`, `start_fallback_refresh()`
-# and `_fallback_refresh_loop()` were removed. They periodically updated the
-# deleted FALLBACK_PRICES dict from live sources.
-
-
-# ── Equity fast poll — 11 Pyth feeds every 2s (HTTP batch, not SSE) ──
-_equity_poll_task: Optional[asyncio.Task] = None
-
-
-async def start_equity_poll():
-    """Poll les 11 equity feeds Pyth toutes les 2s via HTTP batch.
-    Pousse dans _streaming_prices + _sse_subscribers (meme pipeline que le SSE crypto)."""
-    global _equity_poll_task
-    if _equity_poll_task and not _equity_poll_task.done():
-        return
-    _equity_poll_task = asyncio.create_task(_equity_poll_loop())
-    logger.info("[PythEquity] Fast equity poll started (2s, 11 feeds)")
-
-
-async def _equity_poll_loop():
-    """Poll rapide Pyth HTTP pour TOUS les feeds (equity + crypto non-SSE) — batch parallele."""
-    # SSE stream handles SOL/ETH/BTC/USDC. This poll handles everything else + stocks.
-    _sse_symbols = {"SOL", "ETH", "BTC", "USDC"}  # Already streamed via SSE
-    non_sse_crypto = {sym: fid for sym, fid in CRYPTO_FEEDS.items() if sym not in _sse_symbols}
-    all_poll_feeds = {**EQUITY_FEEDS, **non_sse_crypto}
-    logger.info(f"Poll loop started — {len(all_poll_feeds)} feeds ({len(EQUITY_FEEDS)} equity + {len(non_sse_crypto)} crypto, batches of 2)")
-    fid_to_sym = {fid: sym for sym, fid in all_poll_feeds.items()}
-    # Pyth Hermes limite ~3 feeds par requete HTTP — batches de 2 pour etre safe
-    feed_list = list(all_poll_feeds.items())
-    batches = [feed_list[i:i+2] for i in range(0, len(feed_list), 2)]
-    while True:
-        for batch in batches:
-            try:
-                now = time.time()
-                ids_str = "&".join(f"ids[]=0x{fid}" for _, fid in batch)
-                url = f"{HERMES_URL}/v2/updates/price/latest?{ids_str}"
-                async with httpx.AsyncClient(timeout=httpx.Timeout(8)) as eq_client:
-                    resp = await eq_client.get(url)
-                    if resp.status_code != 200:
-                        continue
-                    resp_data = resp.json()
-                for entry in resp_data.get("parsed", []):
-                    fid = entry.get("id", "").replace("0x", "")
-                    sym = fid_to_sym.get(fid, "")
-                    if not sym:
-                        continue
-                    price_data = entry.get("price", {})
-                    raw_price = int(price_data.get("price", "0"))
-                    exponent = int(price_data.get("expo", "0"))
-                    raw_conf = int(price_data.get("conf", "0"))
-                    publish_time = price_data.get("publish_time", 0)
-                    price = raw_price * (10 ** exponent)
-                    confidence = raw_conf * (10 ** exponent)
-                    if price <= 0:
-                        continue
-                    age_s = int(now) - publish_time if publish_time > 0 else 0
-                    conf_pct = (confidence / price * 100) if price > 0 else 0
-                    result = {
-                        "price": round(price, 6), "confidence": round(confidence, 6),
-                        "confidence_pct": round(conf_pct, 4), "publish_time": publish_time,
-                        "age_s": age_s, "stale": False, "wide_confidence": conf_pct > get_confidence_threshold(sym),
-                        "source": "pyth_poll", "symbol": sym,
-                    }
-                    _streaming_prices[fid] = {"data": result, "ts": now}
-                    update_twap(sym, price)
-                    # Surgery C: _process_candle_tick call removed here.
-                    for q in list(_sse_subscribers):
-                        try:
-                            q.put_nowait({"symbol": sym, **result})
-                        except asyncio.QueueFull:
-                            pass
-            except Exception as e:
-                logger.error(f"Equity batch error: {e}")
-            await asyncio.sleep(0.5)  # ~1.5s total across the 11 feed batches
-        await asyncio.sleep(1)
-
-
-async def _pyth_sse_loop():
-    """Boucle SSE Pyth Hermes — reconnexion automatique avec backoff.
-    Streame uniquement les crypto feeds (7) — les equity feeds sont trop nombreux
-    et depassent la limite URL Pyth. Les equities utilisent le polling HTTP."""
-    # Pyth SSE limite ~5 feeds par stream. On prend les 4 critiques pour le trading.
-    _critical = {"SOL", "ETH", "BTC", "USDC"}
-    feed_ids = list(set(v for k, v in CRYPTO_FEEDS.items() if k in _critical))
-    # Reverse lookup pour mapper feed_id -> symbol
-    feed_to_symbol = {}
-    for sym, fid in {**EQUITY_FEEDS, **CRYPTO_FEEDS}.items():
-        feed_to_symbol[fid] = sym
-
-    backoff = 1
-    while True:
-        try:
-            # Client dedie pour SSE (le client partage peut avoir des params qui cassent le stream)
-            ids_params = "&".join(f"ids[]=0x{fid}" for fid in feed_ids)
-            stream_url = f"{HERMES_URL}/v2/updates/price/stream?{ids_params}"
-            # AUD-M6: connect timeout 5s, read timeout None (SSE is long-lived by design)
-            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=120.0, connect=5.0)) as sse_client:
-                async with sse_client.stream("GET", stream_url) as resp:
-                    if resp.status_code != 200:
-                        logger.warning(f"[PythStream] HTTP {resp.status_code}, retrying in {backoff}s")
-                        await asyncio.sleep(backoff)
-                        backoff = min(backoff * 2, 60)
-                        continue
-
-                    backoff = 1  # Reset on success
-                    logger.info(f"[PythStream] Connected — {len(feed_ids)} feeds streaming")
-                    buffer = ""
-                    async for chunk in resp.aiter_text():
-                        buffer += chunk
-                        while "\n\n" in buffer:
-                            event_str, buffer = buffer.split("\n\n", 1)
-                            await _process_sse_event(event_str, feed_to_symbol)
-
-        except asyncio.CancelledError:
-            logger.info("[PythStream] SSE stream cancelled")
-            return
-        except Exception as e:
-            logger.warning(f"[PythStream] Connection lost: {e}, reconnecting in {backoff}s")
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 60)
-
-
-async def _process_sse_event(event_str: str, feed_to_symbol: dict):
-    """Parse un event SSE Pyth et met a jour _streaming_prices."""
-    import json as _json
-    now = time.time()
-
-    for line in event_str.split("\n"):
-        if line.startswith("data:"):
-            try:
-                data = _json.loads(line[5:].strip())
-                for entry in data.get("parsed", []):
-                    feed_id = entry.get("id", "").replace("0x", "")
-                    price_data = entry.get("price", {})
-                    raw_price = int(price_data.get("price", "0"))
-                    exponent = int(price_data.get("expo", "0"))
-                    raw_conf = int(price_data.get("conf", "0"))
-                    publish_time = price_data.get("publish_time", 0)
-
-                    price = raw_price * (10 ** exponent)
-                    confidence = raw_conf * (10 ** exponent)
-
-                    if price <= 0:
-                        continue
-
-                    age_s = int(now) - publish_time if publish_time > 0 else 0
-                    symbol = feed_to_symbol.get(feed_id, "")
-
-                    result = {
-                        "price": round(price, 6),
-                        "confidence": round(confidence, 6),
-                        "confidence_pct": round((confidence / price * 100) if price > 0 else 0, 4),
-                        "publish_time": publish_time,
-                        "age_s": age_s,
-                        "stale": False,  # Stream = toujours frais
-                        "wide_confidence": False,
-                        "source": "pyth_stream",
-                        "symbol": symbol,
-                    }
-
-                    # P2: confidence tieree par asset
-                    conf_threshold = get_confidence_threshold(symbol) if symbol else 2.0
-                    result["wide_confidence"] = result["confidence_pct"] > conf_threshold
-                    result["confidence_threshold"] = conf_threshold
-
-                    _streaming_prices[feed_id] = {"data": result, "ts": now}
-
-                    # P3: TWAP rolling
-                    if symbol:
-                        update_twap(symbol, price)
-
-                    # P5: stream metrics + heartbeat
-                    _oracle_metrics["stream_events"] += 1
-                    _oracle_metrics["last_stream_event_ts"] = now
-
-                    # Surgery C: _process_candle_tick call removed here.
-
-                    # Push aux subscribers WebSocket
-                    for q in list(_sse_subscribers):
-                        try:
-                            q.put_nowait({"symbol": symbol, **result})
-                        except asyncio.QueueFull:
-                            pass  # Client lent, skip
-
-            except Exception:
-                pass  # Malformed SSE event, skip
-
-
-async def stop_pyth_stream():
-    """Arrete le stream SSE."""
-    global _sse_task
-    if _sse_task and not _sse_task.done():
-        _sse_task.cancel()
-        try:
-            await _sse_task
-        except asyncio.CancelledError:
-            pass
-    _sse_task = None
-    logger.info("[PythStream] SSE streaming stopped")
 
 
 logger.info(f"Initialise — {len(EQUITY_FEEDS)} equity + {len(CRYPTO_FEEDS)} crypto feeds via Hermes")

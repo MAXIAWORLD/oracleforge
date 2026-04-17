@@ -392,20 +392,30 @@ class MaxiaOracleClient:
         json: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        try:
-            response = self._client.request(
-                method,
-                path,
-                headers=self._build_headers(auth),
-                json=json,
-                params=params,
-            )
-        except httpx.HTTPError as exc:
-            raise MaxiaOracleTransportError(
-                f"transport error on {method} {path}: {exc}"
-            ) from exc
+        for attempt in range(2):
+            try:
+                response = self._client.request(
+                    method,
+                    path,
+                    headers=self._build_headers(auth),
+                    json=json,
+                    params=params,
+                )
+            except httpx.HTTPError as exc:
+                raise MaxiaOracleTransportError(
+                    f"transport error on {method} {path}: {exc}"
+                ) from exc
 
-        return self._handle_response(response, method=method, path=path)
+            try:
+                return self._handle_response(response, method=method, path=path)
+            except MaxiaOracleRateLimitError:
+                if attempt == 0 and response.status_code == 429:
+                    wait = min(response.headers.get("retry-after", 1), 60)
+                    import time as _time
+                    _time.sleep(float(wait))
+                    continue
+                raise
+        raise MaxiaOracleTransportError(f"exhausted retries on {method} {path}")
 
     def _handle_response(
         self,

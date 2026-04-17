@@ -601,7 +601,7 @@ async def get_stock_prices() -> dict:
     still_missing = [s for s in stocks if s not in result]
     if still_missing:
         try:
-            from .pyth_oracle import get_stock_price_finnhub
+            from .price_cascade import get_stock_price_finnhub
             finnhub_tasks = [get_stock_price_finnhub(sym) for sym in still_missing]
             finnhub_results = await asyncio.gather(*finnhub_tasks, return_exceptions=True)
             for sym, res in zip(still_missing, finnhub_results):

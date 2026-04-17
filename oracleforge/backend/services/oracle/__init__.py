@@ -1,18 +1,22 @@
 """Multi-source price oracle — extracted from MAXIA V12 on 2026-04-14.
 
-Modules:
-    pyth_oracle         — Pyth Network Hermes API + SSE streaming (crypto + equities)
-    pyth_solana_oracle  — Pyth native Solana on-chain (V1.4, Price Feed Accounts shard 0)
-    uniswap_v3_oracle   — Uniswap v3 TWAP on-chain (V1.5, Base + Ethereum)
-    chainlink_oracle    — Chainlink on-chain (Base + Ethereum + Arbitrum)
-    redstone_oracle     — RedStone public REST (V1.3, 4th upstream)
-    price_oracle        — Helius DAS + CoinPaprika + CoinGecko + Yahoo Finance
+6 upstream sources, 4 used for cross-validation in multi_source.collect_sources():
+    ✓ pyth_oracle        — Pyth Network Hermes API (feeds, cache, single-price, TWAP)
+    ✓ chainlink_oracle   — Chainlink on-chain (Base + Ethereum + Arbitrum)
+    ✓ price_oracle       — Helius DAS + CoinPaprika + CoinGecko + Yahoo Finance
+    ✓ redstone_oracle    — RedStone public REST (V1.3, 4th upstream)
+    ✗ pyth_solana_oracle — excluded: same Pyth publishers as Hermes (would bias median)
+    ✗ uniswap_v3_oracle  — excluded: TWAP ≠ spot (would corrupt divergence_pct)
+
+Other modules:
+    price_cascade       — Multi-source fallback chains (stock, crypto, batch)
+    multi_source        — Cross-validation aggregator (median + divergence_pct)
 
 Public entrypoints (stable across phases):
     pyth_oracle.get_pyth_price(feed_id)              — single Pyth feed (Hermes)
-    pyth_oracle.get_batch_prices(symbols)            — Pyth batch (crypto + equity)
-    pyth_oracle.get_crypto_price(symbol)             — Pyth -> CoinGecko cascade
-    pyth_oracle.get_stock_price(symbol)              — Pyth -> Finnhub -> CoinGecko -> Yahoo
+    price_cascade.get_batch_prices(symbols)          — Pyth batch + CoinGecko fallback
+    price_cascade.get_crypto_price(symbol)           — Pyth -> CoinGecko cascade
+    price_cascade.get_stock_price(symbol)            — Pyth -> Finnhub -> CoinGecko -> Yahoo
     pyth_solana_oracle.get_pyth_solana_price(symbol) — on-chain Solana read (V1.4)
     chainlink_oracle.get_chainlink_price()           — on-chain eth_call
     chainlink_oracle.verify_price_chainlink()        — cross-verification

@@ -333,40 +333,51 @@ export class MaxiaOracleClient {
       : "";
     const url = `${this.baseUrl}${path}${queryString}`;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
-    let response: Response;
-    try {
-      response = await this.fetchImpl(url, {
-        method,
-        headers,
-        body: hasBody ? JSON.stringify(options.json) : undefined,
-        signal: controller.signal,
-      });
-    } catch (err) {
+      let response: Response;
+      try {
+        response = await this.fetchImpl(url, {
+          method,
+          headers,
+          body: hasBody ? JSON.stringify(options.json) : undefined,
+          signal: controller.signal,
+        });
+      } catch (err) {
+        clearTimeout(timeoutId);
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new MaxiaOracleTransportError(
+          `transport error on ${method} ${path}: ${msg}`,
+        );
+      }
       clearTimeout(timeoutId);
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new MaxiaOracleTransportError(
-        `transport error on ${method} ${path}: ${msg}`,
-      );
-    }
-    clearTimeout(timeoutId);
 
-    let body: unknown;
-    try {
-      body = await response.json();
-    } catch {
-      throw new MaxiaOracleTransportError(
-        `non-JSON response from ${method} ${path}: status=${response.status}`,
-      );
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        throw new MaxiaOracleTransportError(
+          `non-JSON response from ${method} ${path}: status=${response.status}`,
+        );
+      }
+
+      if (response.ok) {
+        return body as MaxiaResponse<T>;
+      }
+
+      if (response.status === 429 && attempt === 0) {
+        const retryRaw = response.headers.get("retry-after");
+        const waitS = Math.min(retryRaw ? Number(retryRaw) : 1, 60);
+        await new Promise((resolve) => setTimeout(resolve, waitS * 1000));
+        continue;
+      }
+
+      this.raiseTypedError(response.status, body, method, path);
     }
 
-    if (response.ok) {
-      return body as MaxiaResponse<T>;
-    }
-
-    this.raiseTypedError(response.status, body, method, path);
+    throw new MaxiaOracleTransportError(`exhausted retries on ${method} ${path}`);
   }
 
   private raiseTypedError(
