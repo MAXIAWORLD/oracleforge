@@ -582,7 +582,87 @@ async def get_price_history(
     return wrap_with_disclaimer(result)
 
 
-# ── 15. health_check ─────────────────────────────────────────────────────────
+# ── 15. create_price_alert (V1.9) ──────────────────────────────────────────
+
+
+async def create_price_alert(
+    symbol: str,
+    condition: str,
+    threshold: float,
+    callback_url: str,
+) -> dict[str, Any]:
+    """Create a one-shot price alert with a webhook callback (V1.9).
+
+    The alert fires once when the condition is met (checked every ~5 min
+    in the background sampler), POSTs to callback_url, then deactivates.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if condition not in ("above", "below"):
+        return wrap_error("condition must be 'above' or 'below'", condition=condition)
+    if not isinstance(threshold, (int, float)) or threshold <= 0:
+        return wrap_error("threshold must be a positive number")
+    if not isinstance(callback_url, str) or not callback_url:
+        return wrap_error("callback_url is required")
+
+    from services.oracle.alerts import validate_callback_url
+    url_err = validate_callback_url(callback_url)
+    if url_err is not None:
+        return wrap_error(url_err)
+
+    from core.db import create_alert, get_db
+
+    db = get_db()
+    alert_id = create_alert(
+        db,
+        key_hash="__mcp_local__",
+        symbol=symbol,
+        condition=condition,
+        threshold=threshold,
+        callback_url=callback_url,
+    )
+    return wrap_with_disclaimer({
+        "id": alert_id,
+        "symbol": symbol,
+        "condition": condition,
+        "threshold": threshold,
+        "active": True,
+    })
+
+
+# ── 16. list_price_alerts (V1.9) ──────────────────────────────────────────
+
+
+async def list_price_alerts() -> dict[str, Any]:
+    """List all price alerts for the current MCP session (V1.9)."""
+    from core.db import get_db, list_alerts
+
+    db = get_db()
+    alerts = list_alerts(db, "__mcp_local__", active_only=False)
+    return wrap_with_disclaimer({"alerts": alerts, "count": len(alerts)})
+
+
+# ── 17. delete_price_alert (V1.9) ─────────────────────────────────────────
+
+
+async def delete_price_alert(alert_id: int) -> dict[str, Any]:
+    """Delete a price alert by id (V1.9)."""
+    if not isinstance(alert_id, int) or isinstance(alert_id, bool):
+        return wrap_error("alert_id must be an integer")
+
+    from core.db import delete_alert, get_db
+
+    db = get_db()
+    deleted = delete_alert(db, alert_id, "__mcp_local__")
+    if not deleted:
+        return wrap_error("alert not found", alert_id=alert_id)
+    return wrap_with_disclaimer({"deleted": True, "id": alert_id})
+
+
+# ── 18. health_check ─────────────────────────────────────────────────────────
 
 
 async def health_check() -> dict[str, Any]:

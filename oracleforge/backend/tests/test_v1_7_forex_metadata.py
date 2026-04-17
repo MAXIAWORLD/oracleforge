@@ -275,7 +275,7 @@ class TestMCPToolMetadata:
 
     def test_tool_count_is_13(self):
         from mcp_server.server import _TOOL_DEFINITIONS
-        assert len(_TOOL_DEFINITIONS) == 14
+        assert len(_TOOL_DEFINITIONS) == 17
 
     @pytest.mark.asyncio
     async def test_tool_invalid_symbol(self):
@@ -355,4 +355,4 @@ class TestMCPForexDispatch:
 class TestVersionBump:
     def test_server_version_is_0_1_7(self):
         from mcp_server.server import SERVER_VERSION
-        assert SERVER_VERSION == "0.1.8"
+        assert SERVER_VERSION == "0.1.9"

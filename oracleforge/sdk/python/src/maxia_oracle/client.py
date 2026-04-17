@@ -361,6 +361,53 @@ class MaxiaOracleClient:
             "GET", f"/api/price/{symbol}/history", params=params
         )
 
+    # ── V1.9 Alerts ─────────────────────────────────────────────────────────
+
+    def create_alert(
+        self,
+        symbol: str,
+        condition: str,
+        threshold: float,
+        callback_url: str,
+    ) -> dict[str, Any]:
+        """V1.9 — Create a one-shot price alert with a webhook callback.
+
+        Args:
+            symbol: Asset ticker.
+            condition: ``"above"`` or ``"below"``.
+            threshold: Price threshold (positive float).
+            callback_url: HTTPS URL to POST when triggered.
+
+        Returns:
+            Parsed response dict with ``data.id``, ``data.symbol``,
+            ``data.condition``, ``data.threshold``, ``data.active``.
+        """
+        symbol = self._validate_symbol(symbol)
+        if condition not in ("above", "below"):
+            raise MaxiaOracleValidationError("condition must be 'above' or 'below'")
+        if not isinstance(threshold, (int, float)) or threshold <= 0:
+            raise MaxiaOracleValidationError("threshold must be a positive number")
+        return self._request(
+            "POST",
+            "/api/alerts",
+            json={
+                "symbol": symbol,
+                "condition": condition,
+                "threshold": threshold,
+                "callback_url": callback_url,
+            },
+        )
+
+    def list_alerts(self) -> dict[str, Any]:
+        """V1.9 — List all alerts for the authenticated key."""
+        return self._request("GET", "/api/alerts")
+
+    def delete_alert(self, alert_id: int) -> dict[str, Any]:
+        """V1.9 — Delete a price alert by id."""
+        if not isinstance(alert_id, int) or isinstance(alert_id, bool):
+            raise MaxiaOracleValidationError("alert_id must be an integer")
+        return self._request("DELETE", f"/api/alerts/{alert_id}")
+
     def confidence(self, symbol: str) -> dict[str, Any]:
         """Return the multi-source divergence for a symbol, compact.
 

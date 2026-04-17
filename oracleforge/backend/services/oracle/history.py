@@ -47,14 +47,14 @@ _sampler_task: asyncio.Task[None] | None = None
 _PURGE_EVERY_CYCLES: Final[int] = 288  # ~24h at 5min interval
 
 
-async def _sample_once() -> int:
-    """Fetch batch prices and insert snapshots. Returns count inserted."""
+async def _sample_once() -> tuple[int, dict]:
+    """Fetch batch prices and insert snapshots. Returns (count_inserted, results)."""
     from services.oracle import price_cascade
     from services.oracle.pyth_oracle import ALL_FEEDS
 
     symbols = sorted(ALL_FEEDS.keys())
     if not symbols:
-        return 0
+        return 0, {}
 
     results = await price_cascade.get_batch_prices(symbols)
     rows: list[tuple[str, float, int]] = []
@@ -66,7 +66,7 @@ async def _sample_once() -> int:
     if rows:
         db = get_db()
         insert_price_snapshots(db, rows)
-    return len(rows)
+    return len(rows), results
 
 
 async def _sampler_loop() -> None:
@@ -74,9 +74,13 @@ async def _sampler_loop() -> None:
     cycle = 0
     while True:
         try:
-            count = await _sample_once()
+            count, results = await _sample_once()
             if count > 0:
                 logger.debug("Sampled %d price snapshots", count)
+
+            if results:
+                from services.oracle.alerts import check_and_fire_alerts
+                await check_and_fire_alerts(results)
 
             cycle += 1
             if cycle >= _PURGE_EVERY_CYCLES:

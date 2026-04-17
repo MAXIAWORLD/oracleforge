@@ -1,6 +1,6 @@
 {
   "name": "@maxia/oracle",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Multi-source price data feed for AI agents. Data feed only. Not investment advice. No custody. No KYC.",
   "license": "Apache-2.0",
   "author": "MAXIA <ceo@maxiaworld.app>",

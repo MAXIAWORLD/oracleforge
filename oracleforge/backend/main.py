@@ -23,7 +23,7 @@ from typing import AsyncIterator, Final
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from api import routes_health, routes_mcp, routes_price, routes_register, routes_sources
+from api import routes_alerts, routes_health, routes_mcp, routes_price, routes_register, routes_sources
 from core.config import ENV, IS_PROD, LOG_LEVEL
 from core.db import close_db, get_db, init_db
 from core.disclaimer import wrap_error
@@ -34,7 +34,7 @@ from core.security import SecurityHeadersMiddleware
 from services.oracle.history import start_sampler, stop_sampler
 from x402.middleware import x402_middleware
 
-API_VERSION: Final[str] = "0.1.8"
+API_VERSION: Final[str] = "0.1.9"
 
 
 class _JSONLogFormatter(logging.Formatter):
@@ -121,6 +121,7 @@ app.include_router(routes_health.router)
 app.include_router(routes_register.router)
 app.include_router(routes_sources.router)
 app.include_router(routes_price.router)
+app.include_router(routes_alerts.router)
 app.include_router(routes_mcp.router)
 
 # Mount the SSE message receiver as an ASGI sub-application so the MCP SDK

@@ -37,6 +37,9 @@ TOOL_NAMES: Final[tuple[str, ...]] = (
     "maxia_oracle_health_check",
     "maxia_oracle_get_metadata",
     "maxia_oracle_get_price_history",
+    "maxia_oracle_create_alert",
+    "maxia_oracle_list_alerts",
+    "maxia_oracle_delete_alert",
 )
 
 
@@ -58,7 +61,7 @@ def get_all_tools(
     base_url: str | None = None,
     client: MaxiaOracleClient | None = None,
 ) -> list[FunctionTool]:
-    """Instantiate the 14 MAXIA Oracle tools around a single shared client.
+    """Instantiate the 17 MAXIA Oracle tools around a single shared client.
 
     Each returned :class:`FunctionTool` closes over the same client so
     that the httpx connection pool is reused across tool calls.
@@ -202,6 +205,18 @@ def get_all_tools(
         """Return historical price snapshots for a symbol (V1.8). Ranges: 24h, 7d, 30d. Intervals: 5m, 1h, 1d. Retention: 30 days. Data feed only. Not investment advice. No custody. No KYC."""
         return _fmt(shared.price_history(symbol, range_=range, interval=interval))
 
+    def maxia_oracle_create_alert(symbol: str, condition: str, threshold: float, callback_url: str) -> str:
+        """Create a one-shot price alert. Triggers once, POSTs webhook, deactivates. Data feed only. Not investment advice."""
+        return _fmt(shared.create_alert(symbol, condition, threshold, callback_url))
+
+    def maxia_oracle_list_alerts() -> str:
+        """List all price alerts for the current API key. Data feed only. Not investment advice."""
+        return _fmt(shared.list_alerts())
+
+    def maxia_oracle_delete_alert(alert_id: int) -> str:
+        """Delete a price alert by id. Data feed only. Not investment advice."""
+        return _fmt(shared.delete_alert(alert_id))
+
     callables = (
         maxia_oracle_get_price,
         maxia_oracle_get_prices_batch,
@@ -217,6 +232,9 @@ def get_all_tools(
         maxia_oracle_health_check,
         maxia_oracle_get_metadata,
         maxia_oracle_get_price_history,
+        maxia_oracle_create_alert,
+        maxia_oracle_list_alerts,
+        maxia_oracle_delete_alert,
     )
 
     return [

@@ -463,6 +463,27 @@ HISTORY_RETENTION_DAYS: Final[int] = int(
 )
 
 
+# ══════════════════════════════════════════════════════════════════════════
+# ── V1.9 Alerts + Streaming configuration ──
+# ══════════════════════════════════════════════════════════════════════════
+
+ALERTS_MAX_PER_KEY: Final[int] = int(
+    os.getenv("ALERTS_MAX_PER_KEY", "10")
+)
+ALERTS_WEBHOOK_TIMEOUT_S: Final[int] = int(
+    os.getenv("ALERTS_WEBHOOK_TIMEOUT_S", "10")
+)
+STREAM_MAX_SYMBOLS: Final[int] = int(
+    os.getenv("STREAM_MAX_SYMBOLS", "10")
+)
+STREAM_POLL_INTERVAL_S: Final[float] = float(
+    os.getenv("STREAM_POLL_INTERVAL_S", "3")
+)
+STREAM_TIMEOUT_S: Final[int] = int(
+    os.getenv("STREAM_TIMEOUT_S", "3600")
+)
+
+
 # Fail fast in non-dev if not a single treasury address is configured.
 # Dev can run with zero treasuries (middleware will 402 every request, but
 # the server still boots so tests run without any wallet setup).

@@ -24,6 +24,9 @@ import {
   MaxiaOracleValidationError,
 } from "./errors.js";
 import type {
+  AlertDeletePayload,
+  AlertListPayload,
+  AlertPayload,
   BatchPricePayload,
   ChainlinkPayload,
   ConfidencePayload,
@@ -47,7 +50,7 @@ import type {
 
 export const DEFAULT_BASE_URL = "https://oracle.maxiaworld.app";
 export const DEFAULT_TIMEOUT_MS = 15_000;
-export const USER_AGENT = "maxia-oracle-typescript/0.7.0";
+export const USER_AGENT = "maxia-oracle-typescript/0.8.0";
 
 const SYMBOL_PATTERN = /^[A-Z0-9]{1,10}$/;
 const MAX_BATCH_SYMBOLS = 50;
@@ -283,6 +286,41 @@ export class MaxiaOracleClient {
     );
   }
 
+  // ── V1.9 Alerts ─────────────────────────────────────────────────────────
+
+  /** V1.9 — Create a one-shot price alert with a webhook callback. */
+  async createAlert(
+    symbol: string,
+    condition: "above" | "below",
+    threshold: number,
+    callbackUrl: string,
+  ): Promise<MaxiaResponse<AlertPayload>> {
+    const cleaned = this.validateSymbol(symbol);
+    return this.request<AlertPayload>("POST", "/api/alerts", {
+      json: {
+        symbol: cleaned,
+        condition,
+        threshold,
+        callback_url: callbackUrl,
+      },
+    });
+  }
+
+  /** V1.9 — List all alerts for the authenticated key. */
+  async listAlerts(): Promise<MaxiaResponse<AlertListPayload>> {
+    return this.request<AlertListPayload>("GET", "/api/alerts");
+  }
+
+  /** V1.9 — Delete a price alert by id. */
+  async deleteAlert(
+    alertId: number,
+  ): Promise<MaxiaResponse<AlertDeletePayload>> {
+    return this.request<AlertDeletePayload>(
+      "DELETE",
+      `/api/alerts/${alertId}`,
+    );
+  }
+
   /**
    * Compact multi-source divergence for a symbol ("do the sources agree?").
    *
@@ -374,7 +412,7 @@ export class MaxiaOracleClient {
   }
 
   private async request<T>(
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "DELETE",
     path: string,
     options: {
       auth?: boolean;

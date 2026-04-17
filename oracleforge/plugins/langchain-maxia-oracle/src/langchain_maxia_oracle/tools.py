@@ -351,6 +351,17 @@ class MaxiaOracleGetMetadataTool(_MaxiaOracleTool):
         return _fmt(self._get_client().metadata(symbol))
 
 
+class AlertCreateInput(BaseModel):
+    symbol: str = Field(description="Asset ticker (e.g. BTC, ETH).")
+    condition: str = Field(description="Trigger condition: 'above' or 'below'.")
+    threshold: float = Field(description="Price threshold that triggers the alert.")
+    callback_url: str = Field(description="HTTPS webhook URL to POST when triggered.")
+
+
+class AlertIdInput(BaseModel):
+    alert_id: int = Field(description="The id of the alert to delete.")
+
+
 class PriceHistoryInput(BaseModel):
     """V1.8 — Historical price snapshots input."""
 
@@ -391,6 +402,52 @@ class MaxiaOracleGetPriceHistoryTool(_MaxiaOracleTool):
         return _fmt(self._get_client().price_history(symbol, range_=range, interval=interval))
 
 
+class MaxiaOracleCreateAlertTool(_MaxiaOracleTool):
+    """V1.9 — Create a one-shot price alert with a webhook callback."""
+
+    name: str = "maxia_oracle_create_alert"
+    description: str = (
+        "Create a one-shot price alert. Triggers once when condition is met, "
+        "POSTs to callback_url, then deactivates. " + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = AlertCreateInput
+
+    def _run(
+        self,
+        symbol: str,
+        condition: str,
+        threshold: float,
+        callback_url: str,
+    ) -> str:
+        return _fmt(self._get_client().create_alert(symbol, condition, threshold, callback_url))
+
+
+class MaxiaOracleListAlertsTool(_MaxiaOracleTool):
+    """V1.9 — List all price alerts for the authenticated key."""
+
+    name: str = "maxia_oracle_list_alerts"
+    description: str = (
+        "List all price alerts (active and triggered) for the current API key. " + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = EmptyInput
+
+    def _run(self) -> str:
+        return _fmt(self._get_client().list_alerts())
+
+
+class MaxiaOracleDeleteAlertTool(_MaxiaOracleTool):
+    """V1.9 — Delete a price alert by id."""
+
+    name: str = "maxia_oracle_delete_alert"
+    description: str = (
+        "Delete a price alert by its id. " + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = AlertIdInput
+
+    def _run(self, alert_id: int) -> str:
+        return _fmt(self._get_client().delete_alert(alert_id))
+
+
 # ── Convenience factory ────────────────────────────────────────────────────
 
 
@@ -409,6 +466,9 @@ MAXIA_ORACLE_TOOL_CLASSES: Final[tuple[type[_MaxiaOracleTool], ...]] = (
     MaxiaOracleHealthCheckTool,
     MaxiaOracleGetMetadataTool,
     MaxiaOracleGetPriceHistoryTool,
+    MaxiaOracleCreateAlertTool,
+    MaxiaOracleListAlertsTool,
+    MaxiaOracleDeleteAlertTool,
 )
 
 

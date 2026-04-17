@@ -32,6 +32,10 @@ export {
 } from "./errors.js";
 
 export type {
+  AlertDeletePayload,
+  AlertListEntry,
+  AlertListPayload,
+  AlertPayload,
   BatchPricePayload,
   ChainlinkPayload,
   ConfidencePayload,

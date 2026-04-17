@@ -204,6 +204,38 @@ export interface PriceHistoryPayload {
 }
 
 /**
+ * V1.9 — Price alert payload.
+ */
+export interface AlertPayload {
+  id: number;
+  symbol: string;
+  condition: "above" | "below";
+  threshold: number;
+  active: boolean;
+}
+
+export interface AlertListEntry {
+  id: number;
+  symbol: string;
+  condition: "above" | "below";
+  threshold: number;
+  callback_url: string;
+  active: boolean;
+  created_at: number;
+  triggered_at: number | null;
+}
+
+export interface AlertListPayload {
+  alerts: AlertListEntry[];
+  count: number;
+}
+
+export interface AlertDeletePayload {
+  deleted: boolean;
+  id: number;
+}
+
+/**
  * V1.7 — Asset metadata from CoinGecko (market cap, volume, supply).
  */
 export interface MetadataPayload {

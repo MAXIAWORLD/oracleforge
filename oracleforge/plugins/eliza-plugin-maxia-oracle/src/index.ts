@@ -27,9 +27,12 @@ import { getSourcesStatusAction } from "./actions/get-sources-status.js";
 import { getTwapOnchainAction } from "./actions/get-twap-onchain.js";
 import { healthCheckAction } from "./actions/health-check.js";
 import { listSupportedSymbolsAction } from "./actions/list-supported-symbols.js";
+import { createAlertAction } from "./actions/create-alert.js";
+import { listAlertsAction } from "./actions/list-alerts.js";
+import { deleteAlertAction } from "./actions/delete-alert.js";
 import type { Action, Plugin } from "./types.js";
 
-export const PLUGIN_VERSION = "0.5.0";
+export const PLUGIN_VERSION = "0.6.0";
 
 export const maxiaOracleActions: readonly Action[] = [
   getPriceAction,
@@ -46,6 +49,9 @@ export const maxiaOracleActions: readonly Action[] = [
   getPriceHistoryAction,
   getAssetMetadataAction,
   healthCheckAction,
+  createAlertAction,
+  listAlertsAction,
+  deleteAlertAction,
 ] as const;
 
 export const maxiaOraclePlugin: Plugin = {

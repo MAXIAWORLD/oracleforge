@@ -331,6 +331,21 @@ class PriceHistoryInput(BaseModel):
     )
 
 
+class AlertCreateInput(BaseModel):
+    symbol: str = Field(description="Asset ticker to monitor (e.g. 'BTC', 'ETH').")
+    condition: str = Field(
+        description="Trigger condition: 'above' or 'below'.",
+    )
+    threshold: float = Field(description="Price threshold that triggers the alert.")
+    callback_url: str = Field(
+        description="HTTP(S) URL that will receive a POST when the alert fires.",
+    )
+
+
+class AlertIdInput(BaseModel):
+    alert_id: int = Field(description="Unique identifier of the alert to operate on.")
+
+
 class MaxiaOracleGetPriceHistoryTool(_MaxiaOracleTool):
     """V1.8 — Historical price snapshots with configurable range and interval."""
 
@@ -351,6 +366,63 @@ class MaxiaOracleGetPriceHistoryTool(_MaxiaOracleTool):
         return _fmt(self._get_client().price_history(symbol, range_=range, interval=interval))
 
 
+class MaxiaOracleCreateAlertTool(_MaxiaOracleTool):
+    """V1.9 — Create a price alert with a webhook callback."""
+
+    name: str = "maxia_oracle_create_alert"
+    description: str = (
+        "Create a price alert for a symbol (V1.9). Triggers a POST to the "
+        "provided callback_url when the asset price crosses the threshold in "
+        "the specified direction ('above' or 'below'). Returns the created "
+        "alert object including its alert_id. "
+        + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = AlertCreateInput
+
+    def _run(
+        self,
+        symbol: str,
+        condition: str,
+        threshold: float,
+        callback_url: str,
+    ) -> str:
+        return _fmt(
+            self._get_client().create_alert(symbol, condition, threshold, callback_url)
+        )
+
+
+class MaxiaOracleListAlertsTool(_MaxiaOracleTool):
+    """V1.9 — List all active price alerts."""
+
+    name: str = "maxia_oracle_list_alerts"
+    description: str = (
+        "List all active price alerts registered on this API key (V1.9). "
+        "Returns symbol, condition, threshold, callback_url and status for "
+        "each alert. "
+        + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = EmptyInput
+
+    def _run(self) -> str:
+        return _fmt(self._get_client().list_alerts())
+
+
+class MaxiaOracleDeleteAlertTool(_MaxiaOracleTool):
+    """V1.9 — Delete a price alert by ID."""
+
+    name: str = "maxia_oracle_delete_alert"
+    description: str = (
+        "Delete a price alert by its alert_id (V1.9). The alert stops "
+        "monitoring immediately and its callback_url will no longer receive "
+        "notifications. "
+        + DISCLAIMER
+    )
+    args_schema: type[BaseModel] = AlertIdInput
+
+    def _run(self, alert_id: int) -> str:
+        return _fmt(self._get_client().delete_alert(alert_id))
+
+
 # ── Convenience factory ────────────────────────────────────────────────────
 
 
@@ -369,6 +441,9 @@ MAXIA_ORACLE_TOOL_CLASSES: Final[tuple[type[_MaxiaOracleTool], ...]] = (
     MaxiaOracleHealthCheckTool,
     MaxiaOracleGetMetadataTool,
     MaxiaOracleGetPriceHistoryTool,
+    MaxiaOracleCreateAlertTool,
+    MaxiaOracleListAlertsTool,
+    MaxiaOracleDeleteAlertTool,
 )
 
 
@@ -377,7 +452,7 @@ def get_all_tools(
     base_url: str | None = None,
     client: MaxiaOracleClient | None = None,
 ) -> list[BaseTool]:
-    """Instantiate the 14 MAXIA Oracle tools around a single shared client."""
+    """Instantiate the 17 MAXIA Oracle tools around a single shared client."""
     shared = client if client is not None else MaxiaOracleClient(
         api_key=api_key,
         base_url=base_url,

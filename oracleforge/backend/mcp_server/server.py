@@ -29,7 +29,7 @@ from mcp.server.lowlevel import Server
 from . import tools
 
 SERVER_NAME = "maxia-oracle"
-SERVER_VERSION = "0.1.8"
+SERVER_VERSION = "0.1.9"
 SERVER_INSTRUCTIONS = (
     "MAXIA Oracle exposes multi-source crypto and equity price feeds as MCP tools. "
     "Each result is a read-only live data point intended for AI agents that need "
@@ -312,6 +312,69 @@ _TOOL_DEFINITIONS: list[types.Tool] = [
         },
     ),
     types.Tool(
+        name="create_price_alert",
+        description=(
+            "Create a one-shot price alert with a webhook callback (V1.9). "
+            "The alert fires once when the condition is met (checked every "
+            "~5 min), POSTs to callback_url, then deactivates. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "symbol": _SYMBOL_SCHEMA,
+                "condition": {
+                    "type": "string",
+                    "enum": ["above", "below"],
+                    "description": "Trigger when price goes 'above' or 'below' the threshold.",
+                },
+                "threshold": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Price threshold that triggers the alert.",
+                },
+                "callback_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "HTTPS webhook URL to POST when triggered.",
+                },
+            },
+            "required": ["symbol", "condition", "threshold", "callback_url"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
+        name="list_price_alerts",
+        description=(
+            "List all price alerts for the current session (V1.9). "
+            "Shows both active and triggered alerts. "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
+        name="delete_price_alert",
+        description=(
+            "Delete a price alert by its id (V1.9). "
+            + _DISCLAIMER_LINE
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "alert_id": {
+                    "type": "integer",
+                    "description": "The id of the alert to delete.",
+                },
+            },
+            "required": ["alert_id"],
+            "additionalProperties": False,
+        },
+    ),
+    types.Tool(
         name="health_check",
         description=(
             "Minimal liveness probe for the MAXIA Oracle MCP server. Does not "
@@ -344,6 +407,9 @@ _TOOL_DISPATCH: dict[str, _ToolHandler] = {
     "get_price_context": tools.get_price_context,
     "get_asset_metadata": tools.get_asset_metadata,
     "get_price_history": tools.get_price_history,
+    "create_price_alert": tools.create_price_alert,
+    "list_price_alerts": tools.list_price_alerts,
+    "delete_price_alert": tools.delete_price_alert,
     "health_check": tools.health_check,
 }
 

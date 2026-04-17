@@ -86,6 +86,9 @@ _EXPECTED_TOOL_NAMES = {
     "get_price_context",
     "get_asset_metadata",
     "get_price_history",
+    "create_price_alert",
+    "list_price_alerts",
+    "delete_price_alert",
     "health_check",
 }
 
@@ -113,7 +116,7 @@ def test_tool_definitions_has_expected_tools(session_app) -> None:
     """
     from mcp_server.server import _TOOL_DEFINITIONS  # noqa: PLC0415
 
-    assert len(_TOOL_DEFINITIONS) == 14
+    assert len(_TOOL_DEFINITIONS) == 17
     assert {t.name for t in _TOOL_DEFINITIONS} == _EXPECTED_TOOL_NAMES
 
 
@@ -141,7 +144,7 @@ def test_tool_schemas_are_strict_objects(session_app) -> None:
         # Tools that take a symbol must expose a pattern-constrained schema
         if "symbol" in schema["properties"]:
             assert schema["properties"]["symbol"]["pattern"] == "^[A-Z0-9]{1,10}$"
-            assert schema.get("required") == ["symbol"]
+            assert "symbol" in (schema.get("required") or [])
 
 
 def test_server_instructions_include_disclaimer(session_app) -> None:
@@ -158,7 +161,7 @@ def test_build_server_registers_handlers(session_app) -> None:
 
     server = build_server()
     assert server.name == "maxia-oracle"
-    assert server.version == "0.1.8"
+    assert server.version == "0.1.9"
     assert mt.ListToolsRequest in server.request_handlers
     assert mt.CallToolRequest in server.request_handlers
 

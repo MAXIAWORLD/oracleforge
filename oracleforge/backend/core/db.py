@@ -81,6 +81,24 @@ CREATE TABLE IF NOT EXISTS price_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_snapshots_lookup
     ON price_snapshots (symbol, sampled_at);
+
+CREATE TABLE IF NOT EXISTS price_alerts (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    key_hash        TEXT NOT NULL,
+    symbol          TEXT NOT NULL,
+    condition       TEXT NOT NULL,
+    threshold       REAL NOT NULL,
+    callback_url    TEXT NOT NULL,
+    active          INTEGER NOT NULL DEFAULT 1,
+    created_at      INTEGER NOT NULL,
+    triggered_at    INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_active
+    ON price_alerts (active, symbol);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_key
+    ON price_alerts (key_hash, active);
 """
 
 
@@ -329,3 +347,131 @@ def purge_old_snapshots(conn: sqlite3.Connection, retention_days: int) -> int:
         "DELETE FROM price_snapshots WHERE sampled_at < ?", (cutoff,)
     )
     return cursor.rowcount
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── V1.9 price alert helpers ──
+# ══════════════════════════════════════════════════════════════════════════
+
+_VALID_CONDITIONS: Final[frozenset[str]] = frozenset({"above", "below"})
+
+
+def create_alert(
+    conn: sqlite3.Connection,
+    key_hash: str,
+    symbol: str,
+    condition: str,
+    threshold: float,
+    callback_url: str,
+) -> int:
+    """Insert a new price alert. Returns the alert id."""
+    cursor = conn.execute(
+        "INSERT INTO price_alerts "
+        "(key_hash, symbol, condition, threshold, callback_url, active, created_at) "
+        "VALUES (?, ?, ?, ?, ?, 1, ?)",
+        (key_hash, symbol, condition, threshold, callback_url, now_unix()),
+    )
+    return cursor.lastrowid or 0
+
+
+def list_alerts(
+    conn: sqlite3.Connection,
+    key_hash: str,
+    active_only: bool = True,
+) -> list[dict]:
+    """Return all alerts for a key_hash."""
+    where = "key_hash = ? AND active = 1" if active_only else "key_hash = ?"
+    rows = conn.execute(
+        f"SELECT id, symbol, condition, threshold, callback_url, active, "
+        f"created_at, triggered_at FROM price_alerts WHERE {where} "
+        f"ORDER BY created_at DESC",
+        (key_hash,),
+    ).fetchall()
+    return [
+        {
+            "id": r[0],
+            "symbol": r[1],
+            "condition": r[2],
+            "threshold": r[3],
+            "callback_url": r[4],
+            "active": bool(r[5]),
+            "created_at": r[6],
+            "triggered_at": r[7],
+        }
+        for r in rows
+    ]
+
+
+def get_alert(
+    conn: sqlite3.Connection,
+    alert_id: int,
+    key_hash: str,
+) -> dict | None:
+    """Return a single alert if it belongs to key_hash, else None."""
+    row = conn.execute(
+        "SELECT id, symbol, condition, threshold, callback_url, active, "
+        "created_at, triggered_at FROM price_alerts "
+        "WHERE id = ? AND key_hash = ?",
+        (alert_id, key_hash),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "symbol": row[1],
+        "condition": row[2],
+        "threshold": row[3],
+        "callback_url": row[4],
+        "active": bool(row[5]),
+        "created_at": row[6],
+        "triggered_at": row[7],
+    }
+
+
+def delete_alert(
+    conn: sqlite3.Connection,
+    alert_id: int,
+    key_hash: str,
+) -> bool:
+    """Delete an alert. Returns True if a row was deleted."""
+    cursor = conn.execute(
+        "DELETE FROM price_alerts WHERE id = ? AND key_hash = ?",
+        (alert_id, key_hash),
+    )
+    return cursor.rowcount > 0
+
+
+def count_active_alerts(conn: sqlite3.Connection, key_hash: str) -> int:
+    """Return the number of active alerts for a key_hash."""
+    row = conn.execute(
+        "SELECT COUNT(*) FROM price_alerts WHERE key_hash = ? AND active = 1",
+        (key_hash,),
+    ).fetchone()
+    return row[0] if row else 0
+
+
+def get_all_active_alerts(conn: sqlite3.Connection) -> list[dict]:
+    """Return ALL active alerts across all keys (for sampler evaluation)."""
+    rows = conn.execute(
+        "SELECT id, key_hash, symbol, condition, threshold, callback_url "
+        "FROM price_alerts WHERE active = 1"
+    ).fetchall()
+    return [
+        {
+            "id": r[0],
+            "key_hash": r[1],
+            "symbol": r[2],
+            "condition": r[3],
+            "threshold": r[4],
+            "callback_url": r[5],
+        }
+        for r in rows
+    ]
+
+
+def trigger_alert(conn: sqlite3.Connection, alert_id: int) -> None:
+    """Mark an alert as triggered (one-shot: deactivate after trigger)."""
+    conn.execute(
+        "UPDATE price_alerts SET active = 0, triggered_at = ? WHERE id = ?",
+        (now_unix(), alert_id),
+    )

@@ -186,7 +186,7 @@ class TestSampler:
             new_callable=AsyncMock,
             return_value=mock_results,
         ):
-            count = await _sample_once()
+            count, _results = await _sample_once()
 
         assert count == 2
         rows = db.execute("SELECT COUNT(*) FROM price_snapshots").fetchone()[0]
@@ -210,7 +210,7 @@ class TestSampler:
             new_callable=AsyncMock,
             return_value=mock_results,
         ):
-            count = await _sample_once()
+            count, _results = await _sample_once()
 
         assert count == 1
 
@@ -223,7 +223,7 @@ class TestSampler:
             new_callable=AsyncMock,
             return_value={},
         ):
-            count = await _sample_once()
+            count, _results = await _sample_once()
 
         assert count == 0
 
@@ -380,17 +380,17 @@ class TestMCPHistoryTool:
 
 
 class TestMCPToolCount:
-    """V1.8 bumps the MCP tool count from 13 to 14 (+health_check = 15 total)."""
+    """V1.9 bumps the MCP tool count to 17 (14 prior + 3 alert tools)."""
 
-    def test_tool_count_is_15(self, session_app):
+    def test_tool_count(self, session_app):
         from mcp_server.server import _TOOL_DEFINITIONS
 
-        assert len(_TOOL_DEFINITIONS) == 14
+        assert len(_TOOL_DEFINITIONS) == 17
 
-    def test_dispatch_count_is_15(self, session_app):
+    def test_dispatch_count(self, session_app):
         from mcp_server.server import _TOOL_DISPATCH
 
-        assert len(_TOOL_DISPATCH) == 14
+        assert len(_TOOL_DISPATCH) == 17
 
     def test_get_price_history_in_definitions(self, session_app):
         from mcp_server.server import _TOOL_DEFINITIONS
