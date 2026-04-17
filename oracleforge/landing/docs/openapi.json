@@ -1,25 +1,10 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "MAXIA Oracle API",
-    "version": "0.1.0",
-    "description": "Multi-source price feed for AI agents. Data feed only. Not investment advice. No custody. No KYC.",
-    "contact": {
-      "name": "MAXIA",
-      "email": "ceo@maxiaworld.app",
-      "url": "https://oracle.maxiaworld.app"
-    },
-    "license": {
-      "name": "Apache-2.0",
-      "url": "https://www.apache.org/licenses/LICENSE-2.0"
-    }
+    "title": "MAXIA Oracle",
+    "description": "Multi-source price feed for AI agents. Six independent upstream sources, 17 MCP tools, typed SDKs for Python and TypeScript. Data feed only. Not investment advice. No custody. No KYC.",
+    "version": "0.1.9"
   },
-  "servers": [
-    {
-      "url": "https://oracle.maxiaworld.app",
-      "description": "Production"
-    }
-  ],
   "paths": {
     "/health": {
       "get": {
@@ -27,7 +12,7 @@
           "health"
         ],
         "summary": "Health",
-        "description": "Lightweight liveness probe — always responds OK when the process is up.",
+        "description": "Liveness probe with DB and circuit-breaker degradation reporting.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -99,7 +84,7 @@
           "sources"
         ],
         "summary": "List Symbols",
-        "description": "Return the union of supported symbols grouped by upstream source.\n\nMirrors the MCP `list_supported_symbols` tool (Phase 5) so the Python\nand TypeScript SDKs have parity with the MCP surface. No upstream\ncalls — just reads the in-memory feed dictionaries.",
+        "description": "Return the union of supported symbols grouped by upstream source.\n\nMirrors the MCP `list_supported_symbols` tool (Phase 5) so the Python\nand TypeScript SDKs have parity with the MCP surface. No upstream\ncalls \u2014 just reads the in-memory feed dictionaries.",
         "operationId": "list_symbols_api_symbols_get",
         "parameters": [
           {
@@ -158,6 +143,150 @@
               "type": "string",
               "title": "Symbol"
             }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/price/{symbol}/context": {
+      "get": {
+        "tags": [
+          "price"
+        ],
+        "summary": "Get Price Context",
+        "description": "Return price + confidence score + anomaly flag + agreement label in one call.\n\nV1.6 agent-native endpoint: everything an LLM agent needs to decide\nwhether to act on a price, in a single tool call.",
+        "operationId": "get_price_context_api_price__symbol__context_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/price/{symbol}/history": {
+      "get": {
+        "tags": [
+          "price"
+        ],
+        "summary": "Get Price History Route",
+        "description": "V1.8 \u2014 Return historical price snapshots for a symbol.\n\nThe background sampler captures multi-source prices every 5 minutes.\nData is downsampled to the requested interval via averaging. Retention\nis 30 days.",
+        "operationId": "get_price_history_route_api_price__symbol__history_get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Time range: 24h, 7d, or 30d.",
+              "default": "24h",
+              "title": "Range"
+            },
+            "description": "Time range: 24h, 7d, or 30d."
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Bucket interval: 5m, 1h, or 1d. Auto-selected if omitted.",
+              "title": "Interval"
+            },
+            "description": "Bucket interval: 5m, 1h, or 1d. Auto-selected if omitted."
           },
           {
             "name": "X-API-Key",
@@ -262,8 +391,78 @@
           "price"
         ],
         "summary": "Get Chainlink Price Route",
-        "description": "Return a single-source price directly from the Chainlink feed on Base.\n\nMirrors the MCP `get_chainlink_onchain` tool (Phase 5) so SDK callers\ncan force the on-chain single-source path for audit purposes. The\nsymbol must be in `chainlink_oracle.CHAINLINK_FEEDS` — unsupported\nsymbols return 404 with the list of supported tickers.",
+        "description": "Return a single-source Chainlink on-chain price on the requested chain.\n\nV1.1: the `chain` query parameter selects Base (default), Ethereum or\nArbitrum. Default stays `base` for strict backward compatibility with\nV1.0 clients. Unsupported `symbol` + `chain` combinations return 404\nwith the list of symbols available on the requested chain.",
         "operationId": "get_chainlink_price_route_api_chainlink__symbol__get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(base|ethereum|arbitrum)$",
+              "description": "EVM chain on which to read the Chainlink feed.",
+              "default": "base",
+              "title": "Chain"
+            },
+            "description": "EVM chain on which to read the Chainlink feed."
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/redstone/{symbol}": {
+      "get": {
+        "tags": [
+          "price"
+        ],
+        "summary": "Get Redstone Price Route",
+        "description": "Return a single-source RedStone REST price for `symbol`.\n\nV1.3: RedStone is the 4th independent upstream. Coverage is dynamic\n(400+ assets across crypto majors, long-tail, forex and equities) so\nunknown symbols return 404 rather than being pre-rejected on a hardcoded\nallow-list. Callers that want the multi-source median should use\n`/api/price/{symbol}` instead \u2014 this route is for audit / cross-check.",
+        "operationId": "get_redstone_price_route_api_redstone__symbol__get",
         "parameters": [
           {
             "name": "symbol",
@@ -312,10 +511,465 @@
           }
         }
       }
+    },
+    "/api/pyth/solana/{symbol}": {
+      "get": {
+        "tags": [
+          "price"
+        ],
+        "summary": "Get Pyth Solana Price Route",
+        "description": "Return a single-source Pyth price read directly from Solana mainnet (V1.4).\n\nReads the Price Feed Account for `symbol` on shard 0 of the Pyth Push\nOracle program (`pythWSns...`) and decodes the Anchor `PriceUpdateV2`\nlayout inline. Coverage is restricted to the majors that are sponsored\nby the Pyth Data Association on shard 0 \u2014 see\n`pyth_solana_oracle.PYTH_SOLANA_FEEDS`. Unknown symbols return 404.\n\nThis route is intentionally independent of the multi-source path (see\n`/api/price/{symbol}`): Pyth is already reached via Hermes there, and\naggregating the same publishers twice would bias the divergence metric.",
+        "operationId": "get_pyth_solana_price_route_api_pyth_solana__symbol__get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/twap/{symbol}": {
+      "get": {
+        "tags": [
+          "price"
+        ],
+        "summary": "Get Twap Price Route",
+        "description": "V1.5 - Uniswap v3 time-weighted average price (TWAP) for `symbol`.\n\nReads tickCumulatives from a curated, high-TVL Uniswap v3 pool on\nthe requested EVM chain and returns the human-readable price\ncomputed from the slope over `window` seconds. Independently\nverifiable on-chain by any EVM client calling `observe()` on the\nsame pool.\n\nCoverage is intentionally narrow (high-liquidity pairs only -- ETH on\nBase/Ethereum + BTC on Ethereum). Listing more pairs requires a\nmanual audit per `docs/v1.5_uniswap_twap.md`.",
+        "operationId": "get_twap_price_route_api_twap__symbol__get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(base|ethereum)$",
+              "description": "EVM chain on which to read the Uniswap v3 pool.",
+              "default": "ethereum",
+              "title": "Chain"
+            },
+            "description": "EVM chain on which to read the Uniswap v3 pool."
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 86400,
+              "minimum": 60,
+              "description": "TWAP window in seconds. Default 1800 (30 minutes). Range: 60 - 86400.",
+              "default": 1800,
+              "title": "Window"
+            },
+            "description": "TWAP window in seconds. Default 1800 (30 minutes). Range: 60 - 86400."
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metadata/{symbol}": {
+      "get": {
+        "tags": [
+          "price"
+        ],
+        "summary": "Get Metadata Route",
+        "description": "V1.7 \u2014 Return asset metadata from CoinGecko (market cap, volume, supply).\n\nCoverage: all symbols mapped in ``price_oracle.SYM_TO_COINGECKO`` (~80\ncrypto assets). Forex and equity symbols are not covered (no CoinGecko\nID mapping). Unknown symbols return 404.",
+        "operationId": "get_metadata_route_api_metadata__symbol__get",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alerts": {
+      "post": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Create Alert Route",
+        "description": "Create a price alert. One-shot: triggers once then deactivates.",
+        "operationId": "create_alert_route_api_alerts_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "List Alerts Route",
+        "description": "List all alerts for the authenticated key.",
+        "operationId": "list_alerts_route_api_alerts_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alerts/{alert_id}": {
+      "delete": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Delete Alert Route",
+        "description": "Delete an alert by id.",
+        "operationId": "delete_alert_route_api_alerts__alert_id__delete",
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Alert Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prices/stream": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Stream Prices",
+        "description": "SSE stream of live prices, polled every ~3 seconds.\n\nDoes not consume daily quota. Auto-closes after 1 hour.",
+        "operationId": "stream_prices_api_prices_stream_get",
+        "parameters": [
+          {
+            "name": "symbols",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Comma-separated symbols (max 10), e.g. BTC,ETH,SOL",
+              "title": "Symbols"
+            },
+            "description": "Comma-separated symbols (max 10), e.g. BTC,ETH,SOL"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AlertCreateRequest": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 1,
+            "title": "Symbol"
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "above",
+              "below"
+            ],
+            "title": "Condition"
+          },
+          "threshold": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Threshold"
+          },
+          "callback_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 10,
+            "title": "Callback Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "condition",
+          "threshold",
+          "callback_url"
+        ],
+        "title": "AlertCreateRequest"
+      },
       "BatchRequest": {
         "properties": {
           "symbols": {
@@ -390,22 +1044,10 @@
       }
     }
   },
-  "tags": [
+  "servers": [
     {
-      "name": "health",
-      "description": "Service health and uptime"
-    },
-    {
-      "name": "price",
-      "description": "Multi-source aggregated prices"
-    },
-    {
-      "name": "sources",
-      "description": "Upstream sources and supported symbols"
-    },
-    {
-      "name": "chainlink",
-      "description": "Direct on-chain Chainlink (Base mainnet)"
+      "url": "https://oracle.maxiaworld.app",
+      "description": "Production"
     }
   ]
 }

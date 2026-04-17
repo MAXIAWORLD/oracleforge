@@ -1,7 +1,7 @@
 """CrewAI tool wrappers for the MAXIA Oracle Python SDK.
 
 Each tool subclasses :class:`crewai.tools.BaseTool` and delegates to a
-shared :class:`maxia_oracle.MaxiaOracleClient` instance. The thirteen tools
+shared :class:`maxia_oracle.MaxiaOracleClient` instance. The seventeen tools
 exposed here mirror the MCP tools of the MAXIA Oracle server and
 the non-register methods of the Python SDK.
 
@@ -120,7 +120,7 @@ class _MaxiaOracleTool(BaseTool):
         return self.client
 
 
-# ── Tool implementations (8 tools) ─────────────────────────────────────────
+# ── Tool implementations ───────────────────────────────────────────────────
 
 
 class MaxiaOracleGetPriceTool(_MaxiaOracleTool):

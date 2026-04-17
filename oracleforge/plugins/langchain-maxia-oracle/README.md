@@ -54,7 +54,7 @@ executor.invoke({"input": "What is BTC trading at right now?"})
 
 ## Tools
 
-All 8 tools mirror the MCP surface and the Python SDK methods:
+All 17 tools mirror the MCP surface and the Python SDK methods:
 
 | Tool class | SDK method | Purpose |
 |---|---|---|
@@ -64,8 +64,17 @@ All 8 tools mirror the MCP surface and the Python SDK methods:
 | `MaxiaOracleGetCacheStatsTool` | `cache_stats()` | Aggregator cache + circuit breaker |
 | `MaxiaOracleGetConfidenceTool` | `confidence(symbol)` | Compact agreement metric |
 | `MaxiaOracleListSupportedSymbolsTool` | `list_symbols()` | Full symbol universe by source |
-| `MaxiaOracleGetChainlinkOnchainTool` | `chainlink_onchain(symbol)` | Single-source Chainlink on Base |
+| `MaxiaOracleGetChainlinkOnchainTool` | `chainlink_onchain(symbol, chain)` | Single-source Chainlink (Base/Ethereum/Arbitrum) |
 | `MaxiaOracleHealthCheckTool` | `health()` | Backend liveness |
+| `MaxiaOracleGetRedstoneTool` | `redstone(symbol)` | Single-source RedStone price |
+| `MaxiaOracleGetPythSolanaTool` | `pyth_solana(symbol)` | Pyth on-chain Solana price |
+| `MaxiaOracleGetTwapTool` | `twap(symbol, chain, window_s)` | Uniswap v3 TWAP on-chain |
+| `MaxiaOracleGetPriceContextTool` | `price_context(symbol)` | Confidence + anomaly + context |
+| `MaxiaOracleGetMetadataTool` | `metadata(symbol)` | CoinGecko market data |
+| `MaxiaOracleGetPriceHistoryTool` | `price_history(symbol, range)` | Historical price snapshots |
+| `MaxiaOracleCreateAlertTool` | `create_alert(...)` | One-shot webhook price alert |
+| `MaxiaOracleListAlertsTool` | `list_alerts()` | List active alerts |
+| `MaxiaOracleDeleteAlertTool` | `delete_alert(alert_id)` | Delete an alert |
 
 Every tool returns a JSON string that includes the mandatory
 `disclaimer` field so the LLM sees the non-advice notice every time.

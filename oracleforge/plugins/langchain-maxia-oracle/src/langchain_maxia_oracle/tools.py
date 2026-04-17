@@ -1,7 +1,7 @@
 """LangChain tool wrappers for the MAXIA Oracle Python SDK.
 
 Each tool subclasses :class:`langchain_core.tools.BaseTool` and delegates
-to a shared :class:`maxia_oracle.MaxiaOracleClient` instance. The thirteen
+to a shared :class:`maxia_oracle.MaxiaOracleClient` instance. The seventeen
 tools exposed here mirror the MCP tools of the MAXIA Oracle server
 and the non-register methods of the Python SDK.
 
@@ -136,7 +136,7 @@ class _MaxiaOracleTool(BaseTool):
         return self.client
 
 
-# ── Tool implementations (8 tools) ─────────────────────────────────────────
+# ── Tool implementations ───────────────────────────────────────────────────
 
 
 class MaxiaOracleGetPriceTool(_MaxiaOracleTool):
@@ -496,7 +496,7 @@ def get_all_tools(
     Returns
     -------
     list[BaseTool]
-        All 13 MAXIA Oracle tools, ready to pass to a LangChain agent.
+        All 17 MAXIA Oracle tools, ready to pass to a LangChain agent.
     """
     shared = client if client is not None else MaxiaOracleClient(
         api_key=api_key,

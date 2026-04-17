@@ -6,3 +6,6 @@ __pycache__/
 node_modules/
 .next/
 .pytest_cache/
+dist/
+*.egg-info/
+docs/next-session-prompt*.md

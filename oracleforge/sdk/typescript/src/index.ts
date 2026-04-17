@@ -45,6 +45,7 @@ export type {
   MaxiaOracleClientOptions,
   MaxiaResponse,
   MetadataPayload,
+  PriceContextPayload,
   PriceHistoryDatapoint,
   PriceHistoryPayload,
   PricePayload,

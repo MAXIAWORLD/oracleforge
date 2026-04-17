@@ -42,7 +42,7 @@ Crew(agents=[analyst], tasks=[task]).kickoff()
 
 ## Tools
 
-Same 8 tools as the other plugins, one per SDK method:
+All 17 tools, one per SDK method:
 
 | Tool class | SDK method | Purpose |
 |---|---|---|
@@ -52,8 +52,17 @@ Same 8 tools as the other plugins, one per SDK method:
 | `MaxiaOracleGetCacheStatsTool` | `cache_stats()` | Aggregator cache + circuit breaker |
 | `MaxiaOracleGetConfidenceTool` | `confidence(symbol)` | Compact agreement metric |
 | `MaxiaOracleListSupportedSymbolsTool` | `list_symbols()` | Symbol universe by source |
-| `MaxiaOracleGetChainlinkOnchainTool` | `chainlink_onchain(symbol)` | Single-source Chainlink on Base |
+| `MaxiaOracleGetChainlinkOnchainTool` | `chainlink_onchain(symbol, chain)` | Single-source Chainlink (Base/Ethereum/Arbitrum) |
 | `MaxiaOracleHealthCheckTool` | `health()` | Backend liveness |
+| `MaxiaOracleGetRedstoneTool` | `redstone(symbol)` | Single-source RedStone price |
+| `MaxiaOracleGetPythSolanaTool` | `pyth_solana(symbol)` | Pyth on-chain Solana price |
+| `MaxiaOracleGetTwapTool` | `twap(symbol, chain, window_s)` | Uniswap v3 TWAP on-chain |
+| `MaxiaOracleGetPriceContextTool` | `price_context(symbol)` | Confidence + anomaly + context |
+| `MaxiaOracleGetMetadataTool` | `metadata(symbol)` | CoinGecko market data |
+| `MaxiaOracleGetPriceHistoryTool` | `price_history(symbol, range)` | Historical price snapshots |
+| `MaxiaOracleCreateAlertTool` | `create_alert(...)` | One-shot webhook price alert |
+| `MaxiaOracleListAlertsTool` | `list_alerts()` | List active alerts |
+| `MaxiaOracleDeleteAlertTool` | `delete_alert(alert_id)` | Delete an alert |
 
 ## Configuration
 

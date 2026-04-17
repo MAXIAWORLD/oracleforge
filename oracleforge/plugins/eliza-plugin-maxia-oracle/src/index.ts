@@ -32,7 +32,7 @@ import { listAlertsAction } from "./actions/list-alerts.js";
 import { deleteAlertAction } from "./actions/delete-alert.js";
 import type { Action, Plugin } from "./types.js";
 
-export const PLUGIN_VERSION = "0.6.0";
+export const PLUGIN_VERSION = "0.8.0";
 
 export const maxiaOracleActions: readonly Action[] = [
   getPriceAction,

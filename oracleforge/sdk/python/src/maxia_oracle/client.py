@@ -39,7 +39,7 @@ from .exceptions import (
 
 DEFAULT_BASE_URL: Final[str] = "https://oracle.maxiaworld.app"
 DEFAULT_TIMEOUT_S: Final[float] = 15.0
-USER_AGENT: Final[str] = "maxia-oracle-python/0.7.0"
+USER_AGENT: Final[str] = "maxia-oracle-python/0.8.0"
 
 
 class MaxiaOracleClient:

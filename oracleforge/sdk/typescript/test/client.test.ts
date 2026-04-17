@@ -422,6 +422,372 @@ describe("confidence", () => {
   });
 });
 
+describe("priceContext (V1.6)", () => {
+  it("hits /api/price/{symbol}/context and parses PriceContextPayload", async () => {
+    const client = makeClient(async (url, init) => {
+      expect(init.method).toBe("GET");
+      expect(url).toBe("http://test.invalid/api/price/BTC/context");
+      expect((init.headers as Record<string, string>)["X-API-Key"]).toBe("mxo_fake_test_key");
+      return jsonResponse(200, {
+        data: {
+          symbol: "BTC",
+          price: 74000.0,
+          confidence_score: 92,
+          anomaly: false,
+          anomaly_reasons: [],
+          sources_agreement: "strong",
+          source_count: 3,
+          divergence_pct: 0.05,
+          freshest_age_s: 2,
+          twap_5min: 73980.0,
+          twap_deviation_pct: 0.027,
+          source_outliers: [],
+          sources: [{ name: "pyth", price: 74000.0 }],
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    const r = await client.priceContext("BTC");
+    expect(r.data.symbol).toBe("BTC");
+    expect(r.data.confidence_score).toBe(92);
+    expect(r.data.anomaly).toBe(false);
+    expect(r.data.sources_agreement).toBe("strong");
+    expect(r.data.twap_5min).toBe(73980.0);
+  });
+
+  it("normalises lowercase symbol before sending", async () => {
+    let capturedUrl = "";
+    const client = makeClient(async (url) => {
+      capturedUrl = url;
+      return jsonResponse(200, {
+        data: {
+          symbol: "ETH",
+          price: 3500.0,
+          confidence_score: 85,
+          anomaly: false,
+          anomaly_reasons: [],
+          sources_agreement: "good",
+          source_count: 2,
+          divergence_pct: 0.1,
+          freshest_age_s: 4,
+          twap_5min: 3495.0,
+          twap_deviation_pct: 0.14,
+          source_outliers: [],
+          sources: [],
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    await client.priceContext("eth");
+    expect(capturedUrl).toBe("http://test.invalid/api/price/ETH/context");
+  });
+
+  it("rejects bad symbol locally", async () => {
+    const client = makeClient(async () => {
+      throw new Error("should not reach fetch");
+    });
+    await expect(client.priceContext("bad-sym!")).rejects.toThrow(
+      MaxiaOracleValidationError,
+    );
+  });
+});
+
+describe("metadata (V1.7)", () => {
+  it("hits /api/metadata/{symbol} and parses MetadataPayload", async () => {
+    const client = makeClient(async (url, init) => {
+      expect(init.method).toBe("GET");
+      expect(url).toBe("http://test.invalid/api/metadata/BTC");
+      return jsonResponse(200, {
+        data: {
+          symbol: "BTC",
+          name: "Bitcoin",
+          market_cap_usd: 1_400_000_000_000,
+          volume_24h_usd: 35_000_000_000,
+          price_change_24h_pct: 1.5,
+          circulating_supply: 19_700_000,
+          total_supply: 21_000_000,
+          max_supply: 21_000_000,
+          market_cap_rank: 1,
+          ath_usd: 109_000.0,
+          atl_usd: 67.81,
+          last_updated: "2026-04-17T10:00:00Z",
+          source: "coingecko",
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    const r = await client.metadata("BTC");
+    expect(r.data.symbol).toBe("BTC");
+    expect(r.data.name).toBe("Bitcoin");
+    expect(r.data.market_cap_rank).toBe(1);
+    expect(r.data.source).toBe("coingecko");
+  });
+
+  it("normalises lowercase symbol", async () => {
+    let capturedUrl = "";
+    const client = makeClient(async (url) => {
+      capturedUrl = url;
+      return jsonResponse(200, {
+        data: {
+          symbol: "SOL",
+          name: "Solana",
+          market_cap_usd: null,
+          volume_24h_usd: null,
+          price_change_24h_pct: null,
+          circulating_supply: null,
+          total_supply: null,
+          max_supply: null,
+          market_cap_rank: null,
+          ath_usd: null,
+          atl_usd: null,
+          last_updated: null,
+          source: "coingecko",
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    await client.metadata("sol");
+    expect(capturedUrl).toBe("http://test.invalid/api/metadata/SOL");
+  });
+
+  it("raises UpstreamError on 404 (symbol not in CoinGecko)", async () => {
+    const client = makeClient(async () =>
+      jsonResponse(404, { error: "symbol not found in CoinGecko mapping", symbol: "FOREX" }),
+    );
+    await expect(client.metadata("FOREX")).rejects.toThrow(MaxiaOracleUpstreamError);
+  });
+
+  it("rejects bad symbol locally", async () => {
+    const client = makeClient(async () => {
+      throw new Error("should not reach fetch");
+    });
+    await expect(client.metadata("not-valid!")).rejects.toThrow(
+      MaxiaOracleValidationError,
+    );
+  });
+});
+
+describe("priceHistory (V1.8)", () => {
+  it("hits /api/price/{symbol}/history with default range=24h", async () => {
+    let capturedUrl = "";
+    const client = makeClient(async (url) => {
+      capturedUrl = url;
+      return jsonResponse(200, {
+        data: {
+          symbol: "BTC",
+          range: "24h",
+          interval: "5m",
+          datapoints: [
+            { timestamp: 1_713_000_000, price: 73900.0, samples: 1 },
+            { timestamp: 1_713_000_300, price: 74000.0, samples: 1 },
+          ],
+          count: 2,
+          oldest_available: 1_713_000_000,
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    const r = await client.priceHistory("BTC");
+    expect(capturedUrl).toContain("/api/price/BTC/history");
+    expect(capturedUrl).toContain("range=24h");
+    expect(capturedUrl).not.toContain("interval=");
+    expect(r.data.symbol).toBe("BTC");
+    expect(r.data.range).toBe("24h");
+    expect(r.data.datapoints).toHaveLength(2);
+    expect(r.data.count).toBe(2);
+  });
+
+  it("forwards explicit range and interval as query params", async () => {
+    let capturedUrl = "";
+    const client = makeClient(async (url) => {
+      capturedUrl = url;
+      return jsonResponse(200, {
+        data: {
+          symbol: "ETH",
+          range: "7d",
+          interval: "1h",
+          datapoints: [],
+          count: 0,
+          oldest_available: null,
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    await client.priceHistory("eth", "7d", "1h");
+    expect(capturedUrl).toContain("/api/price/ETH/history");
+    expect(capturedUrl).toContain("range=7d");
+    expect(capturedUrl).toContain("interval=1h");
+  });
+
+  it("supports 30d range with 1d interval", async () => {
+    let capturedUrl = "";
+    const client = makeClient(async (url) => {
+      capturedUrl = url;
+      return jsonResponse(200, {
+        data: {
+          symbol: "SOL",
+          range: "30d",
+          interval: "1d",
+          datapoints: [],
+          count: 0,
+          oldest_available: null,
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    await client.priceHistory("SOL", "30d", "1d");
+    expect(capturedUrl).toContain("range=30d");
+    expect(capturedUrl).toContain("interval=1d");
+  });
+
+  it("rejects bad symbol locally", async () => {
+    const client = makeClient(async () => {
+      throw new Error("should not reach fetch");
+    });
+    await expect(client.priceHistory("bad sym")).rejects.toThrow(
+      MaxiaOracleValidationError,
+    );
+  });
+});
+
+describe("createAlert (V1.9)", () => {
+  it("POSTs to /api/alerts with correct JSON body", async () => {
+    let seenBody: unknown;
+    const client = makeClient(async (url, init) => {
+      expect(init.method).toBe("POST");
+      expect(url).toBe("http://test.invalid/api/alerts");
+      seenBody = JSON.parse(init.body as string);
+      return jsonResponse(201, {
+        data: {
+          id: 42,
+          symbol: "BTC",
+          condition: "above",
+          threshold: 80000,
+          active: true,
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    const r = await client.createAlert("btc", "above", 80000, "https://example.com/hook");
+    expect(seenBody).toEqual({
+      symbol: "BTC",
+      condition: "above",
+      threshold: 80000,
+      callback_url: "https://example.com/hook",
+    });
+    expect(r.data.id).toBe(42);
+    expect(r.data.symbol).toBe("BTC");
+    expect(r.data.condition).toBe("above");
+    expect(r.data.active).toBe(true);
+  });
+
+  it("normalises lowercase symbol in the request body", async () => {
+    let seenBody: unknown;
+    const client = makeClient(async (_url, init) => {
+      seenBody = JSON.parse(init.body as string);
+      return jsonResponse(201, {
+        data: { id: 7, symbol: "ETH", condition: "below", threshold: 3000, active: true },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    await client.createAlert("eth", "below", 3000, "https://example.com/hook");
+    expect((seenBody as Record<string, unknown>)["symbol"]).toBe("ETH");
+  });
+
+  it("rejects bad symbol locally", async () => {
+    const client = makeClient(async () => {
+      throw new Error("should not reach fetch");
+    });
+    await expect(
+      client.createAlert("bad!", "above", 80000, "https://example.com/hook"),
+    ).rejects.toThrow(MaxiaOracleValidationError);
+  });
+});
+
+describe("listAlerts (V1.9)", () => {
+  it("GETs /api/alerts and parses AlertListPayload", async () => {
+    const client = makeClient(async (url, init) => {
+      expect(init.method).toBe("GET");
+      expect(url).toBe("http://test.invalid/api/alerts");
+      expect((init.headers as Record<string, string>)["X-API-Key"]).toBe("mxo_fake_test_key");
+      return jsonResponse(200, {
+        data: {
+          alerts: [
+            {
+              id: 1,
+              symbol: "BTC",
+              condition: "above",
+              threshold: 80000,
+              callback_url: "https://example.com/hook",
+              active: true,
+              created_at: 1_713_000_000,
+              triggered_at: null,
+            },
+          ],
+          count: 1,
+        },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    const r = await client.listAlerts();
+    expect(r.data.count).toBe(1);
+    expect(r.data.alerts).toHaveLength(1);
+    expect(r.data.alerts[0]!.symbol).toBe("BTC");
+    expect(r.data.alerts[0]!.active).toBe(true);
+    expect(r.data.alerts[0]!.triggered_at).toBeNull();
+  });
+
+  it("returns empty list when no alerts are registered", async () => {
+    const client = makeClient(async () =>
+      jsonResponse(200, {
+        data: { alerts: [], count: 0 },
+        disclaimer: DISCLAIMER,
+      }),
+    );
+    const r = await client.listAlerts();
+    expect(r.data.alerts).toHaveLength(0);
+    expect(r.data.count).toBe(0);
+  });
+
+  it("raises AuthError when api key is missing", async () => {
+    const client = makeClient(async () => {
+      throw new Error("should not reach fetch");
+    }, { apiKey: undefined });
+    await expect(client.listAlerts()).rejects.toThrow(MaxiaOracleAuthError);
+  });
+});
+
+describe("deleteAlert (V1.9)", () => {
+  it("sends DELETE to /api/alerts/{alertId}", async () => {
+    const client = makeClient(async (url, init) => {
+      expect(init.method).toBe("DELETE");
+      expect(url).toBe("http://test.invalid/api/alerts/42");
+      expect((init.headers as Record<string, string>)["X-API-Key"]).toBe("mxo_fake_test_key");
+      return jsonResponse(200, {
+        data: { deleted: true, id: 42 },
+        disclaimer: DISCLAIMER,
+      });
+    });
+    const r = await client.deleteAlert(42);
+    expect(r.data.deleted).toBe(true);
+    expect(r.data.id).toBe(42);
+  });
+
+  it("raises UpstreamError on 404 (alert not found)", async () => {
+    const client = makeClient(async () =>
+      jsonResponse(404, { error: "alert not found", id: 999 }),
+    );
+    await expect(client.deleteAlert(999)).rejects.toThrow(MaxiaOracleUpstreamError);
+  });
+
+  it("raises AuthError when api key is missing", async () => {
+    const client = makeClient(async () => {
+      throw new Error("should not reach fetch");
+    }, { apiKey: undefined });
+    await expect(client.deleteAlert(1)).rejects.toThrow(MaxiaOracleAuthError);
+  });
+});
+
 describe("transport errors", () => {
   it("connection failure raises transport error", async () => {
     const client = makeClient(async () => {

@@ -41,7 +41,7 @@ agent = AssistantAgent(
 
 ## Tools
 
-All 8 tools are `FunctionTool` instances, one per SDK method:
+All 17 tools are `FunctionTool` instances, one per SDK method:
 
 | Tool name | SDK method |
 |---|---|
@@ -51,8 +51,17 @@ All 8 tools are `FunctionTool` instances, one per SDK method:
 | `maxia_oracle_get_cache_stats` | `cache_stats()` |
 | `maxia_oracle_get_confidence` | `confidence(symbol)` |
 | `maxia_oracle_list_supported_symbols` | `list_symbols()` |
-| `maxia_oracle_get_chainlink_onchain` | `chainlink_onchain(symbol)` |
+| `maxia_oracle_get_chainlink_onchain` | `chainlink_onchain(symbol, chain)` |
 | `maxia_oracle_health_check` | `health()` |
+| `maxia_oracle_get_redstone` | `redstone(symbol)` |
+| `maxia_oracle_get_pyth_solana` | `pyth_solana(symbol)` |
+| `maxia_oracle_get_twap` | `twap(symbol, chain, window_s)` |
+| `maxia_oracle_get_price_context` | `price_context(symbol)` |
+| `maxia_oracle_get_metadata` | `metadata(symbol)` |
+| `maxia_oracle_get_price_history` | `price_history(symbol, range)` |
+| `maxia_oracle_create_alert` | `create_alert(...)` |
+| `maxia_oracle_list_alerts` | `list_alerts()` |
+| `maxia_oracle_delete_alert` | `delete_alert(alert_id)` |
 
 ## Configuration
 

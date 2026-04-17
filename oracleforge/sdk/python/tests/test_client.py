@@ -453,6 +453,320 @@ def test_confidence_extracts_divergence_from_price_call() -> None:
     assert "price" not in result["data"]
 
 
+# ── price_context ───────────────────────────────────────────────────────────
+
+
+def test_price_context_hits_correct_path() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["method"] = request.method
+        assert request.headers["X-API-Key"] == "mxo_fake_test_key"
+        return _ok(
+            {
+                "data": {
+                    "symbol": "BTC",
+                    "price": 74000.0,
+                    "confidence_score": 92,
+                    "anomaly": False,
+                    "anomaly_reasons": [],
+                    "sources_agreement": "strong",
+                    "source_count": 4,
+                    "divergence_pct": 0.05,
+                    "freshest_age_s": 2,
+                    "twap_5min": 73950.0,
+                    "twap_deviation_pct": 0.07,
+                    "source_outliers": [],
+                    "sources": [],
+                },
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        result = c.price_context("btc")  # lowercase normalised
+    assert captured["path"] == "/api/price/BTC/context"
+    assert captured["method"] == "GET"
+    assert result["data"]["symbol"] == "BTC"
+    assert result["data"]["confidence_score"] == 92
+    assert result["data"]["anomaly"] is False
+
+
+def test_price_context_rejects_invalid_symbol_locally() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        pytest.fail("request should never leave the client")
+
+    with _client_with(handler) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.price_context("bad-sym!")
+
+
+# ── metadata ─────────────────────────────────────────────────────────────────
+
+
+def test_metadata_hits_correct_path_and_parses_response() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["method"] = request.method
+        return _ok(
+            {
+                "data": {
+                    "symbol": "ETH",
+                    "market_cap": 420_000_000_000,
+                    "volume_24h": 18_000_000_000,
+                    "circulating_supply": 120_000_000,
+                    "total_supply": 120_000_000,
+                    "max_supply": None,
+                    "market_cap_rank": 2,
+                    "ath": 4878.26,
+                    "atl": 0.432979,
+                    "price_change_24h_pct": -1.34,
+                },
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        result = c.metadata("eth")  # lowercase normalised
+    assert captured["path"] == "/api/metadata/ETH"
+    assert captured["method"] == "GET"
+    assert result["data"]["symbol"] == "ETH"
+    assert result["data"]["market_cap_rank"] == 2
+
+
+def test_metadata_rejects_invalid_symbol_locally() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        pytest.fail("request should never leave the client")
+
+    with _client_with(handler) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.metadata("not valid!")
+
+
+# ── price_history ────────────────────────────────────────────────────────────
+
+
+def test_price_history_hits_correct_path_with_default_range() -> None:
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["method"] = request.method
+        captured["range"] = request.url.params.get("range", "")
+        captured["interval"] = request.url.params.get("interval", "")
+        return _ok(
+            {
+                "data": {
+                    "symbol": "BTC",
+                    "range": "24h",
+                    "interval": "5m",
+                    "count": 288,
+                    "oldest_available": "2026-04-16T00:00:00Z",
+                    "datapoints": [
+                        {"timestamp": 1_776_000_000, "price": 74000.0, "samples": 1}
+                    ],
+                },
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        result = c.price_history("BTC")
+    assert captured["path"] == "/api/price/BTC/history"
+    assert captured["method"] == "GET"
+    assert captured["range"] == "24h"
+    assert captured["interval"] == ""  # not sent when None
+    assert result["data"]["count"] == 288
+    assert len(result["data"]["datapoints"]) == 1
+
+
+def test_price_history_propagates_range_and_interval() -> None:
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["range"] = request.url.params.get("range", "")
+        captured["interval"] = request.url.params.get("interval", "")
+        return _ok(
+            {
+                "data": {
+                    "symbol": "ETH",
+                    "range": "7d",
+                    "interval": "1h",
+                    "count": 168,
+                    "oldest_available": "2026-04-10T00:00:00Z",
+                    "datapoints": [],
+                },
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        c.price_history("ETH", range_="7d", interval="1h")
+    assert captured["range"] == "7d"
+    assert captured["interval"] == "1h"
+
+
+def test_price_history_rejects_invalid_symbol_locally() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        pytest.fail("request should never leave the client")
+
+    with _client_with(handler) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.price_history("bad-sym!")
+
+
+# ── create_alert ─────────────────────────────────────────────────────────────
+
+
+def test_create_alert_posts_correct_payload_and_parses_response() -> None:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/api/alerts"
+        seen["body"] = json.loads(request.content)
+        return _created(
+            {
+                "data": {
+                    "id": 42,
+                    "symbol": "BTC",
+                    "condition": "above",
+                    "threshold": 80000.0,
+                    "active": True,
+                    "callback_url": "https://example.com/hook",
+                },
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        result = c.create_alert(
+            symbol="btc",
+            condition="above",
+            threshold=80000.0,
+            callback_url="https://example.com/hook",
+        )
+    assert seen["body"]["symbol"] == "BTC"
+    assert seen["body"]["condition"] == "above"
+    assert seen["body"]["threshold"] == 80000.0
+    assert seen["body"]["callback_url"] == "https://example.com/hook"
+    assert result["data"]["id"] == 42
+    assert result["data"]["active"] is True
+
+
+def test_create_alert_rejects_invalid_condition_locally() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        pytest.fail("request should never leave the client")
+
+    with _client_with(handler) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.create_alert("BTC", condition="equal", threshold=80000.0, callback_url="https://example.com/hook")
+
+
+def test_create_alert_rejects_non_positive_threshold_locally() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        pytest.fail("request should never leave the client")
+
+    with _client_with(handler) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.create_alert("BTC", condition="above", threshold=-1.0, callback_url="https://example.com/hook")
+        with pytest.raises(MaxiaOracleValidationError):
+            c.create_alert("BTC", condition="below", threshold=0.0, callback_url="https://example.com/hook")
+
+
+def test_create_alert_rejects_invalid_symbol_locally() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        pytest.fail("request should never leave the client")
+
+    with _client_with(handler) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.create_alert("bad-sym!", condition="above", threshold=1.0, callback_url="https://example.com/hook")
+
+
+# ── list_alerts ──────────────────────────────────────────────────────────────
+
+
+def test_list_alerts_hits_correct_path_and_returns_list() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["method"] = request.method
+        assert request.headers["X-API-Key"] == "mxo_fake_test_key"
+        return _ok(
+            {
+                "data": {
+                    "alerts": [
+                        {
+                            "id": 1,
+                            "symbol": "BTC",
+                            "condition": "above",
+                            "threshold": 80000.0,
+                            "active": True,
+                        }
+                    ],
+                    "count": 1,
+                },
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        result = c.list_alerts()
+    assert captured["path"] == "/api/alerts"
+    assert captured["method"] == "GET"
+    assert result["data"]["count"] == 1
+    assert result["data"]["alerts"][0]["id"] == 1
+
+
+def test_list_alerts_returns_empty_list_gracefully() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return _ok({"data": {"alerts": [], "count": 0}, "disclaimer": DISCLAIMER})
+
+    with _client_with(handler) as c:
+        result = c.list_alerts()
+    assert result["data"]["count"] == 0
+    assert result["data"]["alerts"] == []
+
+
+# ── delete_alert ─────────────────────────────────────────────────────────────
+
+
+def test_delete_alert_sends_delete_to_correct_path() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["method"] = request.method
+        assert request.headers["X-API-Key"] == "mxo_fake_test_key"
+        return _ok(
+            {
+                "data": {"id": 42, "deleted": True},
+                "disclaimer": DISCLAIMER,
+            }
+        )
+
+    with _client_with(handler) as c:
+        result = c.delete_alert(42)
+    assert captured["path"] == "/api/alerts/42"
+    assert captured["method"] == "DELETE"
+    assert result["data"]["deleted"] is True
+
+
+def test_delete_alert_rejects_non_integer_id_locally() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        pytest.fail("request should never leave the client")
+
+    with _client_with(handler) as c:
+        with pytest.raises(MaxiaOracleValidationError):
+            c.delete_alert("42")  # type: ignore[arg-type]
+        with pytest.raises(MaxiaOracleValidationError):
+            c.delete_alert(True)  # type: ignore[arg-type]  # bool subclass of int
+
+
 # ── transport errors ────────────────────────────────────────────────────────
 
 

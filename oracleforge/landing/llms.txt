@@ -1,29 +1,39 @@
 # MAXIA Oracle
 
-> A multi-source price feed API for autonomous AI agents. Reconciles Pyth Hermes, Chainlink (Base mainnet, read directly from the aggregator contract), and a spot venue aggregator into a single response. Data feed only. Not investment advice. No custody. No KYC. No trade routing.
+> A multi-source price feed API for autonomous AI agents. Reconciles six independent upstream sources — Pyth Hermes, Chainlink (Base/Ethereum/Arbitrum), Coinpaprika, RedStone, Pyth Solana on-chain, and Uniswap v3 TWAP — into a single response with confidence scoring and anomaly detection. Data feed only. Not investment advice. No custody. No KYC. No trade routing.
 
-MAXIA Oracle is consumed by agent frameworks via six first-party client packages: `maxia-oracle` (Python, PyPI), `@maxia/oracle` (TypeScript, npm), plus four framework adapters on PyPI — `langchain-maxia-oracle`, `crewai-tools-maxia-oracle`, `autogen-maxia-oracle`, `llama-index-tools-maxia-oracle`. A spec-compliant Model Context Protocol (MCP) server exposes the same eight tools over stdio and HTTP SSE for MCP-native clients (Claude Desktop, Cursor, Continue).
+MAXIA Oracle is consumed by agent frameworks via seven first-party client packages: `maxia-oracle` (Python, PyPI), `@maxia/oracle` (TypeScript, npm), plus four framework adapters on PyPI — `langchain-maxia-oracle`, `crewai-tools-maxia-oracle`, `autogen-maxia-oracle`, `llama-index-tools-maxia-oracle` — and `eliza-plugin-maxia-oracle` (TypeScript, npm). A spec-compliant Model Context Protocol (MCP) server exposes the same seventeen tools over stdio and HTTP SSE for MCP-native clients (Claude Desktop, Cursor, Continue).
 
-Every response includes the full list of contributing sources, their ages, and a divergence percentage so integrators can reject on drift. Authentication is either a free-tier API key header (100 requests/day, issued on demand by `POST /api/register`) or anonymous pay-per-call at 0.001 USDC per request via the x402 protocol on Base mainnet. Direct sale — no intermediation, no escrow, no custody.
+Every response includes the full list of contributing sources, their ages, and a divergence percentage so integrators can reject on drift. Authentication is either a free-tier API key header (100 requests/day, issued on demand by `POST /api/register`) or anonymous pay-per-call at 0.001 USDC per request via the x402 protocol on Base, Arbitrum, Optimism, or Polygon. Direct sale — no intermediation, no escrow, no custody.
 
 ## Product
 
-- [Landing page](https://oracle.maxiaworld.app/): single-page overview of what the API is, the eight tools, install snippets for all six packages, pricing, quick-start.
-- [API reference](https://oracle.maxiaworld.app/docs/): static OpenAPI 3.1 reference rendered with Scalar. Six public endpoints, every parameter and response shape.
+- [Landing page](https://oracle.maxiaworld.app/): single-page overview of what the API is, the seventeen tools, install snippets for all seven packages, pricing, quick-start.
+- [API reference](https://oracle.maxiaworld.app/docs/): static OpenAPI 3.1 reference rendered with Scalar. Fifteen public endpoints, every parameter and response shape.
 
 ## Endpoints
 
 - [GET /health](https://oracle.maxiaworld.app/health): service liveness and env indicator. No auth required.
 - [POST /api/register](https://oracle.maxiaworld.app/api/register): issue a free-tier API key (100 req/day). One call, no identity fields.
 - [GET /api/price/{symbol}](https://oracle.maxiaworld.app/api/price/BTC): multi-source aggregated price. Returns every contributing source with age and a divergence figure.
-- [POST /api/prices/batch](https://oracle.maxiaworld.app/api/prices/batch): up to 20 symbols in one call, same shape.
+- [POST /api/prices/batch](https://oracle.maxiaworld.app/api/prices/batch): up to 50 symbols in one call, same shape.
 - [GET /api/sources](https://oracle.maxiaworld.app/api/sources): list of every upstream source, the feeds each exposes, heartbeat status.
-- [GET /api/symbols](https://oracle.maxiaworld.app/api/symbols): all 79 symbols currently covered — crypto majors, select US equities via Pyth, stablecoins.
-- [GET /api/chainlink/{symbol}](https://oracle.maxiaworld.app/api/chainlink/BTC): direct Base mainnet read from the Chainlink aggregator contract. Round ID, contract address, update timestamp, age.
+- [GET /api/symbols](https://oracle.maxiaworld.app/api/symbols): all symbols currently covered — crypto majors, select US equities via Pyth, forex, stablecoins.
+- [GET /api/chainlink/{symbol}](https://oracle.maxiaworld.app/api/chainlink/BTC?chain=base): direct on-chain read from Chainlink aggregator contracts on Base, Ethereum, or Arbitrum.
+- [GET /api/redstone/{symbol}](https://oracle.maxiaworld.app/api/redstone/BTC): single-source RedStone oracle price. 400+ assets including forex and equities.
+- [GET /api/pyth/solana/{symbol}](https://oracle.maxiaworld.app/api/pyth/solana/BTC): native Pyth Solana on-chain read from Push Oracle accounts. Fully verified.
+- [GET /api/twap/{symbol}](https://oracle.maxiaworld.app/api/twap/ETH?chain=ethereum&window=1800): Uniswap v3 time-weighted average price from on-chain pools on Base or Ethereum.
+- [GET /api/price/{symbol}/context](https://oracle.maxiaworld.app/api/price/BTC/context): confidence score (0-100), anomaly flag, sources agreement classification — one call for agent decisions.
+- [GET /api/metadata/{symbol}](https://oracle.maxiaworld.app/api/metadata/BTC): asset metadata from CoinGecko — market cap, 24h volume, supply, ATH/ATL.
+- [GET /api/price/{symbol}/history](https://oracle.maxiaworld.app/api/price/BTC/history?range=24h): historical price snapshots. 5-minute sampling, 30-day retention.
+- [POST /api/alerts](https://oracle.maxiaworld.app/api/alerts): create a one-shot webhook price alert (above/below threshold).
+- [GET /api/alerts](https://oracle.maxiaworld.app/api/alerts): list all active alerts for the authenticated key.
+- [DELETE /api/alerts/{id}](https://oracle.maxiaworld.app/api/alerts/1): delete an alert by ID.
+- [GET /api/prices/stream](https://oracle.maxiaworld.app/api/prices/stream?symbols=BTC,ETH): SSE real-time price stream. Polls every 3 seconds, max 10 symbols, 1-hour timeout.
 
 ## Tools (MCP + SDK + plugin parity)
 
-Eight named tools available through every surface (REST, MCP, Python SDK, TypeScript SDK, and the four framework adapters), with identical names and inputs:
+Seventeen named tools available through every surface (REST, MCP, Python SDK, TypeScript SDK, and the five framework adapters), with identical names and inputs:
 
 - `get_price`
 - `get_prices_batch`
@@ -33,8 +43,17 @@ Eight named tools available through every surface (REST, MCP, Python SDK, TypeSc
 - `list_supported_symbols`
 - `get_chainlink_onchain`
 - `health_check`
+- `get_redstone_price`
+- `get_pyth_solana_onchain`
+- `get_twap_onchain`
+- `get_price_context`
+- `get_asset_metadata`
+- `get_price_history`
+- `create_price_alert`
+- `list_price_alerts`
+- `delete_price_alert`
 
-A ninth SDK method, `register`, is deliberately absent from the tool surface — operators call it, agents do not.
+A method `register` is deliberately absent from the tool surface — operators call it, agents do not.
 
 ## What MAXIA Oracle is not
 
@@ -46,10 +65,10 @@ A ninth SDK method, `register`, is deliberately absent from the tool surface —
 
 ## Operational facts
 
-- Backend: Python 3.12 + FastAPI, served behind nginx with TLS (Let's Encrypt, auto-renewed). SQLite for rate-limit state and payment replay protection.
+- Backend: Python 3.12 + FastAPI, served behind nginx with TLS (Let's Encrypt, auto-renewed). SQLite for rate-limit state, payment replay protection, historical snapshots, and price alerts.
 - Licence: Apache-2.0 on every package and on the backend source (repo `github.com/MAXIAWORLD/oracleforge`).
 - Contact: `ceo@maxiaworld.app`.
-- Version: 0.1.0 (April 2026).
+- Version: 0.1.9 (April 2026).
 
 ## Optional
 

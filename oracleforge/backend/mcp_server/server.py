@@ -1,9 +1,9 @@
-"""MAXIA Oracle — MCP server instance and tool registration (Phase 5 Step 4).
+"""MAXIA Oracle — MCP server instance and tool registration.
 
-Creates the `mcp.server.lowlevel.Server` instance, registers the 8 V1 tools
+Creates the `mcp.server.lowlevel.Server` instance, registers the 17 tools
 declared in `tools.py`, and exposes a `build_server()` factory that both the
 stdio entry point (`__main__.py`) and the HTTP SSE transport
-(`api/routes_mcp.py`, Phase 5 Step 6) reuse.
+(`api/routes_mcp.py`) reuse.
 
 The factory returns a fresh server on each call so that two different
 transports can run side by side without sharing internal state.
@@ -428,7 +428,7 @@ def _error_result(payload: dict[str, Any]) -> types.CallToolResult:
 
 
 def build_server(rate_limit_key_hash: str | None = None) -> Server:
-    """Create a fresh MCP server instance with all 8 V1 tools registered.
+    """Create a fresh MCP server instance with all 17 tools registered.
 
     Args:
         rate_limit_key_hash: If provided, every `tools/call` invocation

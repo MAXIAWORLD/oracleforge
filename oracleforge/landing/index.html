@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MAXIA Oracle — Multi-source price feed for AI agents</title>
-<meta name="description" content="A drop-in price oracle for autonomous agents. Pyth, Chainlink on-chain, and a basket of spot venues, aggregated and served as one call. Data feed only. Not investment advice. No custody. No KYC.">
+<meta name="description" content="A drop-in price oracle for autonomous agents. Six independent sources — Pyth, Chainlink, RedStone, Pyth Solana, Uniswap v3 TWAP, Coinpaprika — aggregated and served as one call. Data feed only. Not investment advice. No custody. No KYC.">
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta name="theme-color" content="#0a0a0b">
 <meta name="color-scheme" content="dark">
@@ -41,9 +41,9 @@
       "name": "MAXIA Oracle",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Any",
-      "description": "Multi-source price feed for AI agents. Aggregates Pyth Hermes, Chainlink on Base mainnet, and a spot venue into a single call with explicit divergence reporting. Data feed only — not investment advice, no custody, no KYC.",
+      "description": "Multi-source price feed for AI agents. Aggregates six independent sources — Pyth Hermes, Chainlink (Base/Ethereum/Arbitrum), RedStone, Pyth Solana, Uniswap v3 TWAP, and Coinpaprika — into a single call with explicit divergence reporting. Data feed only — not investment advice, no custody, no KYC.",
       "url": "https://oracle.maxiaworld.app/",
-      "softwareVersion": "0.1.0",
+      "softwareVersion": "0.1.9",
       "license": "https://www.apache.org/licenses/LICENSE-2.0",
       "image": "https://oracle.maxiaworld.app/og.png",
       "provider": { "@id": "https://oracle.maxiaworld.app/#org" },
@@ -69,7 +69,7 @@
       "name": "MAXIA Oracle API",
       "url": "https://oracle.maxiaworld.app/docs/",
       "documentation": "https://oracle.maxiaworld.app/docs/",
-      "description": "REST and MCP surface exposing 8 tools for multi-source price aggregation, Chainlink on-chain reads, and source-status inspection."
+      "description": "REST and MCP surface exposing 17 tools for multi-source price aggregation, on-chain reads (Chainlink, Pyth Solana, Uniswap v3 TWAP), historical prices, price alerts, and agent intelligence (confidence scoring, anomaly detection)."
     }
   ]
 }
@@ -1006,7 +1006,7 @@
           </div>
           <div class="panel-foot">
             <div><div class="k">symbols</div><div class="v">79</div></div>
-            <div><div class="k">sources</div><div class="v">3</div></div>
+            <div><div class="k">sources</div><div class="v">6</div></div>
             <div><div class="k">uptime</div><div class="v">100%</div></div>
           </div>
         </aside>
@@ -1022,7 +1022,7 @@
       <div class="section-head">
         <span class="numeral" aria-hidden="true">01 / 06</span>
         <div>
-          <h2 id="mechanism-heading">Three feeds. One answer. An audit trail either way.</h2>
+          <h2 id="mechanism-heading">Six feeds. One answer. An audit trail either way.</h2>
           <p>No statistical magic, no secret weighting. The request returns every source that spoke, every age, and the divergence between them. You decide what to do with outliers.</p>
         </div>
       </div>
@@ -1035,13 +1035,28 @@
         </div>
         <div class="mech-cell">
           <div class="mech-num">02</div>
-          <h3>Chainlink on Base</h3>
-          <p>Read directly from the aggregator contract on Base mainnet. What on-chain contracts see is what you see. No server in the middle.</p>
+          <h3>Chainlink on-chain</h3>
+          <p>Direct reads from aggregator contracts on Base, Ethereum, and Arbitrum. What on-chain contracts see is what you see.</p>
         </div>
         <div class="mech-cell">
           <div class="mech-num">03</div>
-          <h3>Spot venue fallback</h3>
-          <p>A third reading from a spot market aggregator. If the two oracles disagree, you know it — before your agent commits to anything.</p>
+          <h3>Coinpaprika</h3>
+          <p>Spot market aggregator as independent price reference. If the two oracles disagree, you know it — before your agent commits.</p>
+        </div>
+        <div class="mech-cell">
+          <div class="mech-num">04</div>
+          <h3>RedStone</h3>
+          <p>Fourth independent oracle with 400+ assets. Dynamic coverage across crypto, forex, and equities.</p>
+        </div>
+        <div class="mech-cell">
+          <div class="mech-num">05</div>
+          <h3>Pyth Solana on-chain</h3>
+          <p>Native Solana reads from Pyth Push Oracle accounts. Fully verified on-chain data, no intermediary.</p>
+        </div>
+        <div class="mech-cell">
+          <div class="mech-num">06</div>
+          <h3>Uniswap v3 TWAP</h3>
+          <p>Time-weighted average prices from high-liquidity Uniswap v3 pools on Base and Ethereum. DEX-native, manipulation-resistant.</p>
         </div>
       </div>
     </div>
@@ -1053,20 +1068,29 @@
       <div class="section-head">
         <span class="numeral" aria-hidden="true">02 / 06</span>
         <div>
-          <h2 id="tools-heading">Eight tools. Every agent framework speaks them.</h2>
+          <h2 id="tools-heading">Seventeen tools. Every agent framework speaks them.</h2>
           <p>The same surface is available as REST endpoints, MCP tools, and typed methods in our SDKs. Swap frameworks without teaching your agent anything new.</p>
         </div>
       </div>
 
       <div class="tool-table">
         <div class="tool-row"><span class="idx">T.01</span><span class="name">get_price</span><span class="desc">Aggregated price for one symbol across every live source.</span></div>
-        <div class="tool-row"><span class="idx">T.02</span><span class="name">get_prices_batch</span><span class="desc">Up to 20 symbols in one call. Same shape, same disclaimer.</span></div>
+        <div class="tool-row"><span class="idx">T.02</span><span class="name">get_prices_batch</span><span class="desc">Up to 50 symbols in one call. Same shape, same disclaimer.</span></div>
         <div class="tool-row"><span class="idx">T.03</span><span class="name">get_sources_status</span><span class="desc">Which upstreams answered, which feeds they expose, their last heartbeat.</span></div>
         <div class="tool-row"><span class="idx">T.04</span><span class="name">get_cache_stats</span><span class="desc">Hit ratio, median age, per-source breakdown — useful in observability pipelines.</span></div>
         <div class="tool-row"><span class="idx">T.05</span><span class="name">get_confidence</span><span class="desc">The divergence figure split out, for policies that reject on drift.</span></div>
-        <div class="tool-row"><span class="idx">T.06</span><span class="name">list_supported_symbols</span><span class="desc">All 79 symbols currently covered — crypto majors, select equities, stablecoins.</span></div>
-        <div class="tool-row"><span class="idx">T.07</span><span class="name">get_chainlink_onchain</span><span class="desc">Direct Base mainnet read. Round ID, contract, age. Nothing we aggregated.</span></div>
+        <div class="tool-row"><span class="idx">T.06</span><span class="name">list_supported_symbols</span><span class="desc">All symbols currently covered — crypto majors, select equities, forex, stablecoins.</span></div>
+        <div class="tool-row"><span class="idx">T.07</span><span class="name">get_chainlink_onchain</span><span class="desc">Direct on-chain read from Base, Ethereum, or Arbitrum. Round ID, contract, age.</span></div>
         <div class="tool-row"><span class="idx">T.08</span><span class="name">health_check</span><span class="desc">Liveness + env. One call, no auth required.</span></div>
+        <div class="tool-row"><span class="idx">T.09</span><span class="name">get_redstone_price</span><span class="desc">Single-source RedStone oracle. 400+ assets including forex and equities.</span></div>
+        <div class="tool-row"><span class="idx">T.10</span><span class="name">get_pyth_solana_onchain</span><span class="desc">Native Pyth Solana on-chain read. Fully verified, no intermediary.</span></div>
+        <div class="tool-row"><span class="idx">T.11</span><span class="name">get_twap_onchain</span><span class="desc">Uniswap v3 TWAP from on-chain pools on Base and Ethereum.</span></div>
+        <div class="tool-row"><span class="idx">T.12</span><span class="name">get_price_context</span><span class="desc">Confidence score, anomaly flag, sources agreement — one call for agent decisions.</span></div>
+        <div class="tool-row"><span class="idx">T.13</span><span class="name">get_asset_metadata</span><span class="desc">Market cap, 24h volume, supply, ATH/ATL from CoinGecko.</span></div>
+        <div class="tool-row"><span class="idx">T.14</span><span class="name">get_price_history</span><span class="desc">Historical price snapshots. 5-minute sampling, 30-day retention.</span></div>
+        <div class="tool-row"><span class="idx">T.15</span><span class="name">create_price_alert</span><span class="desc">One-shot webhook alert when a price crosses a threshold.</span></div>
+        <div class="tool-row"><span class="idx">T.16</span><span class="name">list_price_alerts</span><span class="desc">List all active alerts for the authenticated key.</span></div>
+        <div class="tool-row"><span class="idx">T.17</span><span class="name">delete_price_alert</span><span class="desc">Delete an alert by ID.</span></div>
       </div>
     </div>
   </section>
@@ -1078,7 +1102,7 @@
         <span class="numeral" aria-hidden="true">03 / 06</span>
         <div>
           <h2 id="install-heading">Install, or wire the MCP server. Pick any surface.</h2>
-          <p>Six first-party packages covering the Python and TypeScript ecosystems that actually ship agents. Each one is a thin adapter over the same HTTP API.</p>
+          <p>Seven first-party packages covering the Python and TypeScript ecosystems that actually ship agents. Each one is a thin adapter over the same HTTP API.</p>
         </div>
       </div>
 
@@ -1129,6 +1153,14 @@
             <span class="pkg-reg">pypi · llamaindex</span>
           </div>
           <pre class="code"><button class="copy" type="button" data-copy="pip install llama-index-tools-maxia-oracle" aria-label="Copy command: pip install llama-index-tools-maxia-oracle">copy</button>pip install llama-index-tools-maxia-oracle</pre>
+        </div>
+
+        <div class="pkg">
+          <div class="pkg-head">
+            <span class="pkg-name">eliza-plugin-maxia-oracle</span>
+            <span class="pkg-reg">npm · eliza</span>
+          </div>
+          <pre class="code"><button class="copy" type="button" data-copy="npm install eliza-plugin-maxia-oracle" aria-label="Copy command: npm install eliza-plugin-maxia-oracle">copy</button>npm install eliza-plugin-maxia-oracle</pre>
         </div>
       </div>
     </div>
@@ -1188,7 +1220,7 @@ curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxia
           <p class="plan-sub">USDC on Base mainnet via the x402 protocol. Direct sale — no intermediation, no escrow, no holding.</p>
           <ul>
             <li>0.001 USDC per single request</li>
-            <li>0.005 USDC per batch (up to 20)</li>
+            <li>0.005 USDC per batch (up to 50)</li>
             <li>Coinbase x402 facilitator, with on-chain fallback</li>
             <li>Anonymous — no key required</li>
           </ul>
@@ -1211,7 +1243,7 @@ curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxia
       <a href="/docs/" class="docs-card" aria-label="Open API reference">
         <div>
           <h3>MAXIA Oracle — API reference</h3>
-          <p>Six public endpoints, OpenAPI 3.1, rendered with Scalar. Built from the prod schema, served as a frozen artefact — not the live backend.</p>
+          <p>Full REST surface, OpenAPI 3.1, rendered with Scalar. Built from the prod schema, served as a frozen artefact — not the live backend.</p>
         </div>
         <div class="btn btn--primary" aria-hidden="true">
           open reference <span class="arrow" aria-hidden="true">→</span>
@@ -1242,7 +1274,7 @@ curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxia
       <a href="/llms.txt">/llms.txt</a>
       <a href="https://github.com/MAXIAWORLD/oracleforge" rel="noreferrer">github</a>
     </div>
-    <div>Apache-2.0 · v0.1.0</div>
+    <div>Apache-2.0 · v0.1.9</div>
   </div>
 </footer>
 
