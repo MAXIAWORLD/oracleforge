@@ -476,8 +476,8 @@ def build_server(rate_limit_key_hash: str | None = None) -> Server:
 
         try:
             result = await handler(**(arguments or {}))
-        except TypeError as exc:
-            return _error_result({"error": "invalid arguments", "detail": str(exc)})
+        except TypeError:
+            return _error_result({"error": "invalid arguments"})
 
         if isinstance(result, dict) and "error" in result:
             return _error_result(result)

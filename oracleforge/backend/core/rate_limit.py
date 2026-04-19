@@ -141,6 +141,60 @@ def check_daily(db: sqlite3.Connection, key_hash: str) -> RateLimitDecision:
     )
 
 
+def check_batch(
+    db: sqlite3.Connection, key_hash: str, cost: int
+) -> RateLimitDecision:
+    """Atomic batch quota check: increment by `cost` only if the full cost fits.
+
+    Unlike calling check_daily N times, this never partially drains the quota:
+    the UPDATE fires only when count + cost <= DAILY_LIMIT, so a rejected
+    batch leaves the counter unchanged.
+    """
+    now = now_unix()
+    window_start = _compute_window_start(now, DAILY_WINDOW_S)
+
+    db.execute(
+        "INSERT OR IGNORE INTO rate_limit (key_hash, window_start, count) "
+        "VALUES (?, ?, 0)",
+        (key_hash, window_start),
+    )
+    cursor = db.execute(
+        "UPDATE rate_limit SET count = count + ? "
+        "WHERE key_hash = ? AND window_start = ? AND count + ? <= ? "
+        "RETURNING count",
+        (cost, key_hash, window_start, cost, DAILY_LIMIT),
+    )
+    row = cursor.fetchone()
+    if row is not None:
+        return RateLimitDecision(
+            allowed=True,
+            count=row[0],
+            limit=DAILY_LIMIT,
+            window_start=window_start,
+            window_s=DAILY_WINDOW_S,
+        )
+
+    current = db.execute(
+        "SELECT count FROM rate_limit WHERE key_hash = ? AND window_start = ?",
+        (key_hash, window_start),
+    ).fetchone()
+    count = current[0] if current else 0
+    logger.info(
+        "Batch rate limit exceeded: key=%s count=%d cost=%d limit=%d",
+        key_hash[:16] + "…",
+        count,
+        cost,
+        DAILY_LIMIT,
+    )
+    return RateLimitDecision(
+        allowed=False,
+        count=count,
+        limit=DAILY_LIMIT,
+        window_start=window_start,
+        window_s=DAILY_WINDOW_S,
+    )
+
+
 def check_register(db: sqlite3.Connection, client_ip: str) -> RateLimitDecision:
     """Per-IP throttle on /api/register to prevent mass-minting of free keys."""
     return _check_and_increment(

@@ -167,6 +167,63 @@ def test_batch_caps_at_50(client: TestClient, api_key: str) -> None:
     assert r.status_code == 422
 
 
+def test_batch_rejected_does_not_drain_quota(client: TestClient, api_key: str) -> None:
+    """A batch that exceeds the daily quota must NOT consume remaining requests.
+
+    Regression test for the bug where _enforce_rate_limit incremented the
+    counter N times before checking if the last increment was allowed, causing
+    rejected batch requests to drain the user's remaining quota.
+
+    Setup: exhaust 99 of 100 daily requests, then attempt a batch of 10.
+    The batch must be rejected (99+10 > 100) AND the user must still have
+    1 request remaining (not 0).
+    """
+    from core.db import get_db  # noqa: PLC0415
+    from core.rate_limit import DAILY_LIMIT  # noqa: PLC0415
+
+    # Manually set counter to DAILY_LIMIT - 1 (99 used, 1 remaining)
+    from core.auth import hash_key  # noqa: PLC0415
+    from core.rate_limit import DAILY_WINDOW_S, _compute_window_start  # noqa: PLC0415
+    import time  # noqa: PLC0415
+
+    db = get_db()
+    key_hash = hash_key(api_key)
+    window_start = _compute_window_start(int(time.time()), DAILY_WINDOW_S)
+    db.execute(
+        "INSERT OR REPLACE INTO rate_limit (key_hash, window_start, count) VALUES (?, ?, ?)",
+        (key_hash, window_start, DAILY_LIMIT - 1),
+    )
+
+    # Batch of 10 symbols — would need 10 slots, only 1 remains → must reject
+    symbols = [f"SY{i:02d}" for i in range(10)]
+    r = client.post(
+        "/api/prices/batch",
+        headers={"X-API-Key": api_key},
+        json={"symbols": symbols},
+    )
+    assert r.status_code == 429, "batch should be rejected when quota insufficient"
+
+    # Verify the counter was NOT incremented by the rejected batch
+    row = db.execute(
+        "SELECT count FROM rate_limit WHERE key_hash = ? AND window_start = ?",
+        (key_hash, window_start),
+    ).fetchone()
+    assert row is not None
+    assert row[0] == DAILY_LIMIT - 1, (
+        f"counter should remain at {DAILY_LIMIT - 1} after rejected batch, got {row[0]}"
+    )
+
+    # The 1 remaining request must still work
+    r2 = client.post(
+        "/api/prices/batch",
+        headers={"X-API-Key": api_key},
+        json={"symbols": ["BTC"]},
+    )
+    assert r2.status_code in (200, 404), (
+        f"single-slot batch should succeed (1 remaining), got {r2.status_code}"
+    )
+
+
 # ── /api/sources ─────────────────────────────────────────────────────────────
 
 

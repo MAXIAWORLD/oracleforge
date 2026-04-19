@@ -139,11 +139,19 @@ def get_history(
     datapoints = query_price_history(db, symbol, since, bucket_s)
     oldest = oldest_snapshot_ts(db, symbol)
 
+    count = len(datapoints)
+    note: str | None = (
+        "No historical data yet. The sampler collects prices every 5 minutes "
+        "and builds up history over time. Try again after the first sampling cycle."
+        if count == 0
+        else None
+    )
     return {
         "symbol": symbol,
         "range": range_key,
         "interval": interval_key,
         "datapoints": datapoints,
-        "count": len(datapoints),
+        "count": count,
         "oldest_available": oldest,
+        "note": note,
     }

@@ -124,6 +124,23 @@ class TestForexDispatch:
         assert resp.status_code == 200
         assert resp.json()["data"]["asset_class"] == "crypto"
 
+    def test_unsupported_forex_returns_404_with_hint(self, client, api_key):
+        """Known forex tickers not in _FOREX_SYMBOLS must return 404 with a
+        helpful message listing the supported currencies, instead of the
+        generic 'no live price available' from the crypto fallback path.
+        """
+        for symbol in ("JPY", "CHF", "AUD", "CAD"):
+            resp = client.get(
+                f"/api/price/{symbol}", headers={"X-API-Key": api_key}
+            )
+            assert resp.status_code == 404, f"{symbol} should return 404"
+            body = resp.json()
+            assert "forex" in body["error"].lower(), (
+                f"{symbol}: error message should mention 'forex', got: {body['error']!r}"
+            )
+            assert "EUR" in str(body), f"{symbol}: response should list EUR as supported"
+            assert "GBP" in str(body), f"{symbol}: response should list GBP as supported"
+
 
 # ── Asset metadata ────────────────────────────────────────────────────────────
 

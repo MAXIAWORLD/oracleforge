@@ -161,6 +161,43 @@ class TestHistoryService:
 
         assert get_history("BTC", range_key="24h", interval_key="2h") is None
 
+    def test_empty_history_includes_note(self, session_app):
+        """When no historical data exists for a symbol, the response must
+        include a 'note' field explaining that data collection has not
+        started yet, so clients understand the feature is functional but
+        the sampler needs time to accumulate data.
+        """
+        from core.db import get_db  # noqa: PLC0415
+        from services.oracle.history import get_history  # noqa: PLC0415
+
+        db = get_db()
+        db.execute("DELETE FROM price_snapshots WHERE symbol = 'ZZZNEW'")
+
+        result = get_history("ZZZNEW", range_key="24h")
+
+        assert result is not None
+        assert result["count"] == 0
+        assert "note" in result, "empty history must include a 'note' field"
+        assert result["note"] is not None, "note must not be None when count == 0"
+        assert len(result["note"]) > 10, "note must be a meaningful message"
+
+    def test_non_empty_history_note_is_none(self, session_app):
+        """When data exists, 'note' must be None (no confusion for clients
+        that already have prices).
+        """
+        from core.db import get_db, insert_price_snapshots  # noqa: PLC0415
+        from services.oracle.history import get_history  # noqa: PLC0415
+
+        db = get_db()
+        db.execute("DELETE FROM price_snapshots WHERE symbol = 'ZZZFULL'")
+        insert_price_snapshots(db, [("ZZZFULL", 100.0, 2)])
+
+        result = get_history("ZZZFULL", range_key="24h")
+
+        assert result is not None
+        assert result["count"] >= 1
+        assert result["note"] is None
+
 
 # ── Sampler ──────────────────────────────────────────────────────────────────
 

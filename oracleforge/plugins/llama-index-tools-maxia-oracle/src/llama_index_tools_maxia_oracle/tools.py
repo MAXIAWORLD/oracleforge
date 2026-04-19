@@ -206,15 +206,15 @@ def get_all_tools(
         return _fmt(shared.price_history(symbol, range_=range, interval=interval))
 
     def maxia_oracle_create_alert(symbol: str, condition: str, threshold: float, callback_url: str) -> str:
-        """Create a one-shot price alert. Triggers once, POSTs webhook, deactivates."""
+        """Create a one-shot price alert. Triggers once, POSTs webhook, deactivates. Data feed only. Not investment advice. No custody. No KYC."""
         return _fmt(shared.create_alert(symbol, condition, threshold, callback_url))
 
     def maxia_oracle_list_alerts() -> str:
-        """List all price alerts for the current API key."""
+        """List all price alerts for the current API key. Data feed only. Not investment advice. No custody. No KYC."""
         return _fmt(shared.list_alerts())
 
     def maxia_oracle_delete_alert(alert_id: int) -> str:
-        """Delete a price alert by id."""
+        """Delete a price alert by id. Data feed only. Not investment advice. No custody. No KYC."""
         return _fmt(shared.delete_alert(alert_id))
 
     callables = (

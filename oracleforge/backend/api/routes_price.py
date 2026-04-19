@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from core.auth import X402_KEY_HASH_SENTINEL, require_access
 from core.db import get_db
 from core.disclaimer import wrap_error, wrap_with_disclaimer
-from core.rate_limit import check_daily
+from core.rate_limit import check_batch, check_daily
 from services.oracle import (
     chainlink_oracle,
     history,
@@ -46,6 +46,11 @@ _TWAP_CHAIN_PATTERN = r"^(base|ethereum)$"
 # Only symbols that are live on Pyth Solana shard 0 (verified V1.4).
 _FOREX_SYMBOLS = frozenset({"EUR", "GBP"})
 
+# Known forex tickers NOT yet supported on Pyth Solana shard 0 (no live PDA
+# audit done). Return 404 with a hint instead of falling through to the crypto
+# path, which would return a confusing "no live price available".
+_KNOWN_FOREX_TICKERS = frozenset({"JPY", "CHF", "AUD", "CAD", "CNY", "NZD", "HKD", "SGD", "SEK", "NOK"})
+
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -55,12 +60,17 @@ def _enforce_rate_limit(key_hash: str, cost: int = 1) -> JSONResponse | None:
     Phase 4: x402-paid requests bypass the daily quota entirely. The
     pay-per-call model already prices each request, so compounding it with
     the free-tier quota would double-charge the caller.
+
+    For cost > 1 we use check_batch() which atomically checks that the full
+    cost fits before incrementing — a rejected batch never drains the quota.
     """
     if key_hash == X402_KEY_HASH_SENTINEL:
         return None
     db = get_db()
-    decisions = [check_daily(db, key_hash) for _ in range(cost)]
-    last = decisions[-1]
+    if cost > 1:
+        last = check_batch(db, key_hash, cost)
+    else:
+        last = check_daily(db, key_hash)
     if not last.allowed:
         return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -102,6 +112,17 @@ async def get_single_price(symbol: str, key_hash: str = Depends(require_access))
     rl = _enforce_rate_limit(key_hash)
     if rl is not None:
         return rl
+
+    # Known-but-unsupported forex tickers: return a clear 404 with hint.
+    if symbol in _KNOWN_FOREX_TICKERS:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=wrap_error(
+                "forex symbol not supported — only EUR and GBP are live on Pyth Solana shard 0",
+                symbol=symbol,
+                supported_forex=sorted(_FOREX_SYMBOLS),
+            ),
+        )
 
     # V1.7 — Forex symbols dispatch directly to Pyth Solana.
     if symbol in _FOREX_SYMBOLS:

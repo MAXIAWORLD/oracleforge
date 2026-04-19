@@ -14,6 +14,8 @@ from __future__ import annotations
 from .tools import (
     DISCLAIMER,
     MAXIA_ORACLE_TOOL_CLASSES,
+    MaxiaOracleCreateAlertTool,
+    MaxiaOracleDeleteAlertTool,
     MaxiaOracleGetCacheStatsTool,
     MaxiaOracleGetChainlinkOnchainTool,
     MaxiaOracleGetConfidenceTool,
@@ -27,6 +29,7 @@ from .tools import (
     MaxiaOracleGetSourcesStatusTool,
     MaxiaOracleGetTwapTool,
     MaxiaOracleHealthCheckTool,
+    MaxiaOracleListAlertsTool,
     MaxiaOracleListSupportedSymbolsTool,
     get_all_tools,
 )
@@ -51,5 +54,8 @@ __all__ = [
     "MaxiaOracleGetPriceHistoryTool",
     "MaxiaOracleGetMetadataTool",
     "MaxiaOracleHealthCheckTool",
+    "MaxiaOracleCreateAlertTool",
+    "MaxiaOracleListAlertsTool",
+    "MaxiaOracleDeleteAlertTool",
     "get_all_tools",
 ]

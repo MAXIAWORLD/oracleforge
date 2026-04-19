@@ -294,6 +294,37 @@ async def test_rate_limit_ticks_on_tools_call(client: TestClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_type_error_in_handler_does_not_leak_exception_detail(session_app) -> None:
+    """A TypeError from a tool handler must NOT expose str(exc) to the client.
+
+    Regression test for H12: mcp_server/server.py previously returned
+    {"error": "invalid arguments", "detail": str(exc)} which could leak
+    internal Python exception messages (file paths, internal symbols, etc.)
+    to authenticated MCP clients.
+    """
+    from unittest.mock import patch  # noqa: PLC0415
+
+    from mcp_server import server as srv_module  # noqa: PLC0415
+    from mcp_server.server import build_server  # noqa: PLC0415
+
+    internal_secret = "INTERNAL_SYMBOL_/var/lib/maxia/db.sqlite"
+
+    async def _raises_type_error(**_kwargs):
+        raise TypeError(internal_secret)
+
+    server = build_server()
+    with patch.dict(srv_module._TOOL_DISPATCH, {"health_check": _raises_type_error}):
+        result = await _call_handler(server, "health_check", {})
+
+    assert result.isError is True
+    raw_text = result.content[0].text
+    assert internal_secret not in raw_text, "TypeError detail must NOT be leaked to client"
+    payload = json.loads(raw_text)
+    assert "invalid arguments" in payload["error"]
+    assert "detail" not in payload
+
+
+@pytest.mark.asyncio
 async def test_rate_limit_refuses_when_quota_exceeded(client: TestClient) -> None:
     from core.auth import hash_key  # noqa: PLC0415
     from core.db import get_db, now_unix  # noqa: PLC0415
