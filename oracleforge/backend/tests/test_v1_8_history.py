@@ -156,6 +156,19 @@ class TestHistoryService:
 
         assert get_history("BTC", range_key="99d") is None
 
+    def test_get_history_invalid_combination_24h_1d(self, session_app):
+        """24h range + 1d interval = bucket size equals range = 1 point max.
+        Logically useless and confusing — must be rejected."""
+        from services.oracle.history import get_history
+
+        assert get_history("BTC", range_key="24h", interval_key="1d") is None
+
+    def test_get_history_invalid_combination_30d_5m(self, session_app):
+        """30d range + 5m interval = up to 8 640 points — too expensive to serve."""
+        from services.oracle.history import get_history
+
+        assert get_history("BTC", range_key="30d", interval_key="5m") is None
+
     def test_get_history_invalid_interval_returns_none(self, session_app):
         from services.oracle.history import get_history
 
@@ -342,6 +355,20 @@ class TestHistoryRoute:
     def test_history_invalid_interval_400(self, client, api_key):
         resp = client.get(
             "/api/price/BTC/history?range=24h&interval=2h",
+            headers={"X-API-Key": api_key},
+        )
+        assert resp.status_code == 400
+
+    def test_history_invalid_combination_24h_1d_400(self, client, api_key):
+        resp = client.get(
+            "/api/price/BTC/history?range=24h&interval=1d",
+            headers={"X-API-Key": api_key},
+        )
+        assert resp.status_code == 400
+
+    def test_history_invalid_combination_30d_5m_400(self, client, api_key):
+        resp = client.get(
+            "/api/price/BTC/history?range=30d&interval=5m",
             headers={"X-API-Key": api_key},
         )
         assert resp.status_code == 400

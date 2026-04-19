@@ -335,6 +335,25 @@ def test_daily_rate_limit_exhausts_to_429(client: TestClient, api_key: str) -> N
 # ── safe_error() defense-in-depth ────────────────────────────────────────────
 
 
+def test_422_validation_error_has_disclaimer(client: TestClient, api_key: str) -> None:
+    """Pydantic validation errors (422) must include the disclaimer field.
+
+    FastAPI's default 422 handler bypasses our wrap_error() helper, exposing
+    raw {"detail": [...]} responses without the disclaimer. A custom handler
+    must be registered to inject it.
+    """
+    r = client.post(
+        "/api/prices/batch",
+        headers={"X-API-Key": api_key},
+        json={"symbols": []},
+    )
+    assert r.status_code == 422
+    body = r.json()
+    assert "disclaimer" in body, (
+        "422 validation errors must include 'disclaimer' field"
+    )
+
+
 def test_safe_error_never_leaks(client: TestClient) -> None:
     from core.errors import safe_error
 

@@ -42,7 +42,7 @@ def _is_valid_symbol(symbol: str) -> bool:
 class AlertCreateRequest(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=10)
     condition: Literal["above", "below"]
-    threshold: float = Field(..., gt=0)
+    threshold: float = Field(..., gt=0, le=1e12)
     callback_url: str = Field(..., min_length=10, max_length=2048)
 
     @field_validator("symbol")

@@ -382,6 +382,20 @@ class TestAlertRoutes:
         assert resp.status_code == 400
         assert "HTTPS" in resp.json()["error"]
 
+    def test_create_alert_threshold_too_large_422(self, client, api_key):
+        """Threshold above 1e12 must be rejected — never triggers and signals bad input."""
+        resp = client.post(
+            "/api/alerts",
+            json={
+                "symbol": "BTC",
+                "condition": "above",
+                "threshold": 1e13,
+                "callback_url": "https://example.com/hook",
+            },
+            headers={"X-API-Key": api_key},
+        )
+        assert resp.status_code == 422
+
     def test_create_alert_quota_exceeded(self, client, api_key):
         for i in range(10):
             resp = client.post(

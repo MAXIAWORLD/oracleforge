@@ -2,6 +2,45 @@
 
 All notable changes to MAXIA Oracle are documented in this file.
 
+## [0.1.9] — 2026-04-19
+
+### Added
+- Price alerts CRUD (`POST/GET/DELETE /api/alerts`) — one-shot webhook callbacks (above/below threshold)
+- SSE price streaming (`GET /api/prices/stream`) — live prices, max 10 symbols, 1-hour session
+- MCP tools: `create_price_alert`, `list_price_alerts`, `delete_price_alert` — alert management from any MCP client
+- SSRF protection on alert callback URLs — HTTPS-only, private IP reject, DNS resolve guard
+
+### Fixed
+- Batch quota drain bug — rejected batches no longer consume remaining daily quota (atomic SQL `WHERE count + cost <= DAILY_LIMIT`)
+- `TypeError` detail leak in MCP server — internal exception messages no longer forwarded to callers
+- Forex 404 hint — known tickers (JPY, CHF, AUD…) return a clear message instead of silent 404
+- History cold-start note — `get_price_history` returns an explanatory message when sampler hasn't run yet
+- 422 Pydantic errors now include `disclaimer` field (custom `RequestValidationError` handler)
+- Alert threshold capped at `1e12` to prevent quasi-infinite sentinel thresholds
+
+## [0.1.8] — 2026-04-18
+
+### Added
+- Historical price sampling — background sampler every 5 minutes, 30-day retention in SQLite
+- `GET /api/price/{symbol}/history` endpoint (24h/7d/30d × 5m/1h/1d intervals, 7 valid combos)
+- MCP tool `get_price_history` — same surface via MCP
+- Downsampling via bucketed SQL AVG — efficient serve at any interval
+
+## [0.1.7] — 2026-04-18
+
+### Added
+- Forex dispatch — EUR and GBP routed via Pyth Hermes shard 0
+- Asset metadata — `GET /api/metadata/{symbol}` via CoinGecko (market cap, 24h volume, ATH/ATL)
+- MCP tool `get_asset_metadata`
+
+## [0.1.6] — 2026-04-18
+
+### Added
+- Agent intelligence layer — confidence score (0–100), anomaly detection, sources agreement classification
+- `GET /api/price/{symbol}/context` endpoint
+- MCP tool `get_price_context`
+- Plugin tool `MaxiaOracleGetPriceContextTool` (all 4 Python frameworks)
+
 ## [0.1.5] — 2026-04-17
 
 ### Added

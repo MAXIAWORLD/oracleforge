@@ -43,6 +43,19 @@ DEFAULT_INTERVAL: Final[dict[str, str]] = {
     "30d": "1d",
 }
 
+# Whitelist of valid range+interval combinations. Excluded combos:
+#   24h+1d  → bucket size = total range → at most 1 point, useless
+#   30d+5m  → up to 8 640 points → too expensive to serve
+VALID_COMBINATIONS: Final[frozenset[tuple[str, str]]] = frozenset({
+    ("24h", "5m"),
+    ("24h", "1h"),
+    ("7d", "5m"),
+    ("7d", "1h"),
+    ("7d", "1d"),
+    ("30d", "1h"),
+    ("30d", "1d"),
+})
+
 _sampler_task: asyncio.Task[None] | None = None
 _PURGE_EVERY_CYCLES: Final[int] = 288  # ~24h at 5min interval
 
@@ -131,6 +144,8 @@ def get_history(
     if interval_key is None:
         interval_key = DEFAULT_INTERVAL[range_key]
     if interval_key not in VALID_INTERVALS:
+        return None
+    if (range_key, interval_key) not in VALID_COMBINATIONS:
         return None
 
     since = int(time.time()) - VALID_RANGES[range_key]

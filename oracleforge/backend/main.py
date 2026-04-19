@@ -21,6 +21,8 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator, Final
 
 from fastapi import FastAPI
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from api import routes_alerts, routes_health, routes_mcp, routes_price, routes_register, routes_sources
@@ -131,6 +133,20 @@ app.mount("/mcp/messages/", app=routes_mcp.sse_transport.handle_post_message)
 
 
 # ── Generic JSON error handler ──────────────────────────────────────────────
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error_handler(request, exc: RequestValidationError):  # type: ignore[no-untyped-def]
+    """Wrap FastAPI 422 Pydantic errors with the disclaimer field.
+
+    FastAPI's default handler emits {"detail": [...]} without disclaimer,
+    inconsistent with every other error response in the API.
+    """
+    from core.disclaimer import DISCLAIMER_TEXT
+    return JSONResponse(
+        status_code=422,
+        content={"detail": jsonable_encoder(exc.errors()), "disclaimer": DISCLAIMER_TEXT},
+    )
+
 
 @app.exception_handler(Exception)
 async def _unhandled_exception_handler(request, exc: Exception):  # type: ignore[no-untyped-def]

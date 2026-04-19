@@ -1,0 +1,124 @@
+name: maxia-oracle
+displayName: MAXIA Oracle
+description: >
+  Multi-source crypto and equity price feed for AI agents.
+  Aggregates Pyth, Chainlink (Base), CoinPaprika, RedStone, and more
+  into a single cross-validated price with confidence score and
+  inter-source divergence. 91 symbols. Data feed only — not investment advice.
+version: "0.1.9"
+license: Apache-2.0
+homepage: https://oracle.maxiaworld.app
+repository: https://github.com/maxiaworld/oracleforge
+contact: ceo@maxiaworld.app
+
+server:
+  transport: sse
+  url: https://oracle.maxiaworld.app/mcp/sse
+  authRequired: true
+  authType: header
+  authHeader: X-API-Key
+  authHint: >
+    Register a free key via POST https://oracle.maxiaworld.app/api/register
+    (no email, no credit card). Free tier: 100 requests/day.
+
+tools:
+  - name: get_price
+    description: >
+      Cross-validated median price for a single symbol, aggregated across
+      every available source. Returns per-source breakdown, inter-source
+      divergence in percent, confidence score (0–100), and anomaly flag.
+    inputSchema:
+      type: object
+      properties:
+        symbol:
+          type: string
+          description: Ticker symbol (e.g. BTC, ETH, AAPL, EUR)
+      required: [symbol]
+
+  - name: get_prices_batch
+    description: >
+      Prices for up to 50 symbols in a single upstream Pyth Hermes call.
+      Order-of-magnitude cheaper than N × get_price for portfolio agents.
+    inputSchema:
+      type: object
+      properties:
+        symbols:
+          type: array
+          items:
+            type: string
+          maxItems: 50
+          description: List of ticker symbols
+      required: [symbols]
+
+  - name: get_price_history
+    description: >
+      OHLC-style downsampled price history for a symbol.
+      Ranges: 24h, 7d, 30d. Intervals: 5m, 1h, 1d.
+    inputSchema:
+      type: object
+      properties:
+        symbol:
+          type: string
+        range:
+          type: string
+          enum: ["24h", "7d", "30d"]
+          default: "24h"
+        interval:
+          type: string
+          enum: ["5m", "1h", "1d"]
+      required: [symbol]
+
+  - name: get_confidence
+    description: >
+      Divergence metric only — do the sources agree on this price?
+      Lighter than get_price when you only need the confidence score.
+    inputSchema:
+      type: object
+      properties:
+        symbol:
+          type: string
+      required: [symbol]
+
+  - name: get_chainlink_onchain
+    description: >
+      Single-source price directly from Chainlink on Base mainnet.
+      Independently verifiable on-chain. Use for audit or fallback.
+    inputSchema:
+      type: object
+      properties:
+        symbol:
+          type: string
+          description: Must be a Chainlink-supported symbol (BTC, ETH, SOL…)
+      required: [symbol]
+
+  - name: list_supported_symbols
+    description: >
+      Full list of 91 supported symbols grouped by source
+      (Pyth crypto, Pyth equity, Chainlink Base, aggregator).
+    inputSchema:
+      type: object
+      properties: {}
+
+  - name: get_sources_status
+    description: >
+      Liveness probe of every upstream source using BTC as probe ticker.
+      Shows circuit-breaker state per source.
+    inputSchema:
+      type: object
+      properties: {}
+
+  - name: health_check
+    description: Minimal liveness check. Safe to call every few seconds.
+    inputSchema:
+      type: object
+      properties: {}
+
+tags:
+  - finance
+  - crypto
+  - price-feed
+  - oracle
+  - agents
+  - pyth
+  - chainlink
+  - mcp

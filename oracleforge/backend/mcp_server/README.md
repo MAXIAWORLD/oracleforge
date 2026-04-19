@@ -8,19 +8,28 @@ tools for Claude Desktop, Cursor, Continue, Zed, and any other MCP client.
 
 ## What this gives an agent
 
-Eight tools that surface the MAXIA Oracle aggregator (Pyth, Chainlink on Base
-mainnet, CoinPaprika, CoinGecko, Yahoo Finance, Helius DAS) directly inside
-the agent's tool-use loop — no manual HTTP, no API wrappers to maintain:
+Seventeen tools that surface the MAXIA Oracle aggregator (Pyth, Chainlink on
+Base mainnet, CoinPaprika, RedStone, Uniswap v3 TWAP) directly inside the
+agent's tool-use loop — no manual HTTP, no API wrappers to maintain:
 
 | Tool | Purpose |
 |---|---|
 | `get_price(symbol)` | Cross-validated median price across every available source, with the per-source breakdown and the inter-source divergence in percent. |
 | `get_prices_batch(symbols)` | Up to 50 symbols in a single upstream call via Pyth Hermes. Order-of-magnitude cheaper than N × `get_price`. |
+| `get_confidence(symbol)` | Divergence metric only (without the per-source breakdown). Lighter than `get_price` when all you want is "do the sources agree?". |
+| `get_price_context(symbol)` | Confidence score (0–100), anomaly flag, and sources agreement classification in one call. |
+| `get_price_history(symbol, range, interval)` | Downsampled historical prices. Ranges: 24h/7d/30d. Intervals: 5m/1h/1d. |
 | `get_sources_status()` | Liveness probe of every upstream source, using BTC as the probe ticker. |
 | `get_cache_stats()` | Aggregator cache hit-rate and circuit-breaker state — lets an agent introspect its own latency amplification. |
-| `get_confidence(symbol)` | Divergence metric only (without the per-source breakdown). Lighter than `get_price` when all you want is "do the sources agree?". |
 | `list_supported_symbols()` | Union of all symbols supported, grouped by source (Pyth crypto, Pyth equity, Chainlink Base, aggregator). |
 | `get_chainlink_onchain(symbol)` | Forces a single-source fetch from the Chainlink feed on Base mainnet. Independently verifiable on-chain. |
+| `get_redstone_price(symbol)` | Single-source RedStone oracle price. 400+ assets including forex and equities. |
+| `get_pyth_solana_onchain(symbol)` | Native Pyth Solana on-chain read from Push Oracle accounts. |
+| `get_twap_onchain(symbol, chain, window_s)` | Uniswap v3 time-weighted average price from on-chain pools (Base or Ethereum). |
+| `get_asset_metadata(symbol)` | CoinGecko metadata — market cap, 24h volume, supply, ATH/ATL. |
+| `create_price_alert(symbol, condition, threshold, callback_url)` | Create a one-shot webhook alert (above/below threshold). Fires once then deactivates. |
+| `list_price_alerts()` | List all active and triggered alerts for the authenticated key. |
+| `delete_price_alert(alert_id)` | Delete an alert by ID. |
 | `health_check()` | Minimal liveness probe. Cheap enough for monitoring agents to call every few seconds. |
 
 Every successful response carries a mandatory disclaimer
@@ -60,7 +69,7 @@ up the `mcp_server` package. `ENV=dev` is the default that the server sets
 itself if the client does not provide it — it is included here to be
 explicit.
 
-Restart the client and the 8 tools appear in its tool picker.
+Restart the client and the 17 tools appear in its tool picker.
 
 ### 2. Remote — HTTP SSE
 
@@ -121,7 +130,7 @@ python -m mcp_server
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"health_check","arguments":{}}}
 ```
 
-`tools/list` returns the 8 tools listed above. `health_check` returns the
+`tools/list` returns the 17 tools listed above. `health_check` returns the
 liveness payload without touching any upstream source.
 
 Pytest coverage lives in `tests/test_phase5_mcp.py`:
@@ -133,14 +142,14 @@ ENV=dev API_KEY_PEPPER=test-pepper-that-is-more-than-32-chars-long \
 
 ## Architecture notes
 
-- `tools.py` — the 8 async tool functions. Each wraps an oracle service
+- `tools.py` — the 17 async tool functions. Each wraps an oracle service
   (`pyth_oracle`, `chainlink_oracle`, `price_oracle`, or the aggregator
   helper `services/oracle/multi_source.py`) and returns a dict with either
   `{"data": ..., "disclaimer": ...}` or `{"error": ..., "disclaimer": ...}`.
   Tools never raise — every exception is captured and converted to an error
   dict.
 - `server.py` — `build_server()` factory. Instantiates
-  `mcp.server.lowlevel.Server`, registers the 8 tools via `@list_tools()`
+  `mcp.server.lowlevel.Server`, registers the 17 tools via `@list_tools()`
   and `@call_tool()`. Accepts an optional `rate_limit_key_hash` that
   carries the daily quota into the handler closure. A fresh server is
   built per HTTP SSE session so each connected agent gets its own quota.
@@ -162,8 +171,8 @@ or a regulated investment service. The MCP server reflects that scope:
 - No "investment advice" tools — no position sizing, no buy/sell signals,
   no portfolio construction.
 
-The two tools from the original Phase 5 plan that are **not** shipped in
-V1 — `get_price_history(symbol, period)` and `subscribe_price_stream(symbol)` —
-are deferred to V1.1 (historical candles were dropped in Phase 1 as part of
-the "no speculative UI" surgery; streaming subscriptions require the MCP
-notification primitive and upstream SSE wrapping).
+The one tool from the original Phase 5 plan that is **not** shipped —
+`subscribe_price_stream(symbol)` — is deferred. Streaming subscriptions
+require the MCP notification primitive; the REST SSE endpoint
+(`GET /api/prices/stream`) covers the use case for agent frameworks that
+can consume server-sent events directly.
