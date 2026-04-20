@@ -51,6 +51,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from core.auth import lookup_key
 from core.db import get_db
 from core.disclaimer import wrap_error
+from core.rate_limit import PUBLIC_MCP_BUCKET
 from mcp_server.server import build_server
 
 logger = logging.getLogger("maxia_oracle.routes_mcp")
@@ -78,22 +79,22 @@ def _unauthorized(message: str) -> JSONResponse:
     )
 
 
-def _authenticate_mcp_request(request: Request) -> tuple[str | None, JSONResponse | None]:
-    """Validate X-API-Key at SSE handshake time.
+def _authenticate_mcp_request(request: Request) -> tuple[str, JSONResponse | None]:
+    """Resolve X-API-Key at SSE handshake time.
 
-    Returns `(key_hash, None)` on success, or `(None, response)` on failure
-    so the caller can return the JSONResponse directly instead of raising.
+    - Valid key  → (key_hash, None)          — personal 100/day quota
+    - No key     → (PUBLIC_MCP_BUCKET, None) — shared 20/day anonymous bucket
+    - Invalid key → (PUBLIC_MCP_BUCKET, 401) — bad key is always rejected
     """
     raw_key = request.headers.get("X-API-Key")
     if not raw_key:
-        return None, _unauthorized(
-            "missing X-API-Key header — register a free key via POST /api/register"
-        )
+        logger.info("MCP anonymous session — shared public bucket")
+        return PUBLIC_MCP_BUCKET, None
 
     db = get_db()
     row = lookup_key(db, raw_key)
     if row is None:
-        return None, _unauthorized("invalid or inactive API key")
+        return PUBLIC_MCP_BUCKET, _unauthorized("invalid or inactive API key")
 
     return row["key_hash"], None
 

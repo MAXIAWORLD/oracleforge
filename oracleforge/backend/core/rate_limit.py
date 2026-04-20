@@ -44,6 +44,10 @@ DAILY_WINDOW_S: Final[int] = 86400
 REGISTER_LIMIT: Final[int] = 1
 REGISTER_WINDOW_S: Final[int] = 60
 
+# Anonymous MCP public bucket: 20 tool calls / 24h shared across all keyless sessions
+PUBLIC_MCP_BUCKET: Final[str] = "__mcp_anon__"
+PUBLIC_MCP_LIMIT: Final[int] = 20
+
 # How many days of historical counters to keep at startup purge
 _KEEP_DAYS: Final[int] = 7
 
@@ -137,6 +141,18 @@ def check_daily(db: sqlite3.Connection, key_hash: str) -> RateLimitDecision:
         key_col="key_hash",
         key_value=key_hash,
         limit=DAILY_LIMIT,
+        window_s=DAILY_WINDOW_S,
+    )
+
+
+def check_public_mcp(db: sqlite3.Connection) -> RateLimitDecision:
+    """Shared bucket for anonymous MCP sessions (no X-API-Key). 20 tool calls/day total."""
+    return _check_and_increment(
+        db,
+        table="rate_limit",
+        key_col="key_hash",
+        key_value=PUBLIC_MCP_BUCKET,
+        limit=PUBLIC_MCP_LIMIT,
         window_s=DAILY_WINDOW_S,
     )
 

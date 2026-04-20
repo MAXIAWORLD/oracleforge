@@ -456,9 +456,12 @@ def build_server(rate_limit_key_hash: str | None = None) -> Server:
             # Imported lazily so stdio installs that never touch the daily
             # quota do not pay the SQLite bootstrap cost on import.
             from core.db import get_db
-            from core.rate_limit import check_daily
+            from core.rate_limit import PUBLIC_MCP_BUCKET, check_daily, check_public_mcp
 
-            decision = check_daily(get_db(), rate_limit_key_hash)
+            if rate_limit_key_hash == PUBLIC_MCP_BUCKET:
+                decision = check_public_mcp(get_db())
+            else:
+                decision = check_daily(get_db(), rate_limit_key_hash)
             if not decision.allowed:
                 return _error_result(
                     {
