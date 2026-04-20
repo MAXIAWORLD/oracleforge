@@ -7,6 +7,9 @@
 <meta name="description" content="A drop-in price oracle for autonomous agents. Six independent sources — Pyth, Chainlink, RedStone, Pyth Solana, Uniswap v3 TWAP, Coinpaprika — aggregated and served as one call. Data feed only. Not investment advice. No custody. No KYC.">
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta name="theme-color" content="#0a0a0b">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="apple-touch-icon" href="/logo.png">
 <meta name="color-scheme" content="dark">
 <link rel="canonical" href="https://oracle.maxiaworld.app/">
 <meta property="og:type" content="website">
@@ -299,12 +302,12 @@
     gap: 0.6rem;
   }
 
-  .brand-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 12px var(--accent);
+  .brand-logo {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 6px var(--accent));
     animation: pulse 2.4s ease-in-out infinite;
   }
 
@@ -939,7 +942,7 @@
 <header class="nav">
   <div class="wrap nav-inner">
     <a class="brand" href="/" aria-label="MAXIA Oracle">
-      <span class="brand-dot" aria-hidden="true"></span>
+      <img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" width="22" height="22">
       MAXIA&nbsp;·&nbsp;ORACLE
     </a>
     <nav class="nav-links" aria-label="Primary">
@@ -980,18 +983,18 @@
           </div>
         </div>
 
-        <aside class="panel reveal" aria-label="Example response from /api/price/BTC">
+        <aside class="panel reveal" aria-label="Live response from /api/price/BTC">
           <div class="panel-head">
-            <span class="example-tag">example · GET /api/price/BTC</span>
+            <span class="example-tag" id="hero-tag">live · GET /api/price/BTC</span>
             <span>v0.1.0</span>
           </div>
           <div class="price">
-            <span class="symbol">BTC</span>$74,757<span class="cents">.58</span>
+            <span class="symbol">BTC</span><span id="hero-price-int">$74,757</span><span class="cents" id="hero-price-cents">.58</span>
           </div>
-          <div class="divergence">
+          <div class="divergence" id="hero-divergence">
             ◆ divergence 0.16% across 3 sources
           </div>
-          <div class="panel-rows">
+          <div class="panel-rows" id="hero-sources">
             <span class="src">pyth</span>
             <span>$74,781.31</span>
             <span class="age">1s</span>
@@ -1006,7 +1009,7 @@
           </div>
           <div class="panel-foot">
             <div><div class="k">symbols</div><div class="v">79</div></div>
-            <div><div class="k">sources</div><div class="v">6</div></div>
+            <div><div class="k">sources</div><div class="v" id="hero-src-count">6</div></div>
             <div><div class="k">uptime</div><div class="v">100%</div></div>
           </div>
         </aside>
@@ -1335,6 +1338,54 @@ curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxia
       el.style.transition = 'opacity 600ms ease, transform 600ms cubic-bezier(.16,.84,.44,1)';
       io.observe(el);
     });
+  })();
+
+  // ── Live BTC price widget ─────────────────────────────────────
+  (function () {
+    var elInt   = document.getElementById('hero-price-int');
+    var elCents = document.getElementById('hero-price-cents');
+    var elDiv   = document.getElementById('hero-divergence');
+    var elSrcs  = document.getElementById('hero-sources');
+    var elCnt   = document.getElementById('hero-src-count');
+    if (!elInt) return;
+
+    function fmt(n) {
+      var s = n.toFixed(2);
+      var parts = s.split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return parts;
+    }
+
+    function renderSources(sources) {
+      var html = '';
+      sources.forEach(function (s) {
+        var age = s.age_s != null ? s.age_s + 's' : '—';
+        var p = fmt(s.price);
+        html += '<span class="src">' + s.name.replace('_crypto','').replace('price_oracle','coinpaprika') + '</span>'
+              + '<span>$' + p[0] + '.' + p[1] + '</span>'
+              + '<span class="age">' + age + '</span>\n';
+      });
+      elSrcs.innerHTML = html;
+    }
+
+    function update() {
+      fetch('/api/price/demo')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!j || !j.data) return;
+          var d = j.data;
+          var p = fmt(d.price);
+          elInt.textContent   = '$' + p[0];
+          elCents.textContent = '.' + p[1];
+          elDiv.textContent   = '\u25C6 divergence ' + d.divergence_pct.toFixed(2) + '% across ' + d.source_count + ' sources';
+          if (elCnt) elCnt.textContent = d.source_count;
+          renderSources(d.sources);
+        })
+        .catch(function () {});
+    }
+
+    update();
+    setInterval(update, 30000);
   })();
 </script>
 

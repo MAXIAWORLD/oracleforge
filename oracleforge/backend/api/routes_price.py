@@ -8,8 +8,11 @@ whether the quote is trustworthy.
 from __future__ import annotations
 
 import re
+import time
+from collections import defaultdict
+from typing import Final
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -38,6 +41,64 @@ from services.oracle.multi_source import collect_sources, compute_divergence
 router = APIRouter(prefix="/api", tags=["price"])
 
 _SYMBOL_REGEX = re.compile(r"^[A-Z0-9]{1,10}$")
+
+# ── Public demo endpoint (no auth) ───────────────────────────────────────────
+_DEMO_LIMIT: Final[int] = 10       # requests
+_DEMO_WINDOW: Final[int] = 60      # seconds
+_demo_hits: dict[str, list[float]] = defaultdict(list)
+
+
+def _demo_client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "").strip()
+    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+
+
+def _demo_allowed(ip: str) -> bool:
+    now = time.monotonic()
+    cutoff = now - _DEMO_WINDOW
+    hits = [t for t in _demo_hits[ip] if t > cutoff]
+    if len(hits) >= _DEMO_LIMIT:
+        return False
+    hits.append(now)
+    _demo_hits[ip] = hits
+    return True
+
+
+@router.get("/price/demo")
+async def demo_price(request: Request) -> JSONResponse:
+    """Live BTC price — no API key required. Rate-limited to 10 req/min per IP.
+
+    Used by the landing page widget to show a real-time price without forcing
+    visitors to register first.
+    """
+    if not _demo_allowed(_demo_client_ip(request)):
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content=wrap_error("demo rate limit: 10 req/min per IP"),
+        )
+    sources = await collect_sources("BTC")
+    if not sources:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=wrap_error("no live sources available"),
+        )
+    prices = [s["price"] for s in sources]
+    median_price = sorted(prices)[len(prices) // 2]
+    divergence_pct = compute_divergence(prices)
+    return JSONResponse(content=wrap_with_disclaimer({
+        "symbol": "BTC",
+        "price": round(median_price, 2),
+        "divergence_pct": round(divergence_pct, 4),
+        "source_count": len(sources),
+        "sources": [
+            {
+                "name": s.get("name", "unknown"),
+                "price": round(s["price"], 2),
+                "age_s": s.get("age_s"),
+            }
+            for s in sources
+        ],
+    }))
 _MAX_BATCH_SYMBOLS = 50
 _CHAIN_PATTERN = r"^(base|ethereum|arbitrum)$"
 _TWAP_CHAIN_PATTERN = r"^(base|ethereum)$"
