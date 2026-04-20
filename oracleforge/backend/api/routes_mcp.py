@@ -46,6 +46,7 @@ import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from mcp.server.sse import SseServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 
 from core.auth import lookup_key
 from core.db import get_db
@@ -56,11 +57,16 @@ logger = logging.getLogger("maxia_oracle.routes_mcp")
 
 router = APIRouter(tags=["mcp"])
 
-# Module-level transport: shared by the GET /mcp/sse handler below and by the
-# ASGI mount in `main.py`. SseServerTransport holds a session registry keyed by
-# UUID, so all sessions must share the same instance across both handlers.
+# Legacy SSE transport (kept for Claude Desktop / Cursor backwards compat).
 _SSE_ENDPOINT_PATH = "/mcp/messages/"
 sse_transport: SseServerTransport = SseServerTransport(_SSE_ENDPOINT_PATH)
+
+# Streamable HTTP session manager — stateless, one server per request.
+_http_manager = StreamableHTTPSessionManager(
+    build_server(),
+    stateless=True,
+    json_response=False,
+)
 
 
 def _unauthorized(message: str) -> JSONResponse:
@@ -121,4 +127,21 @@ async def handle_sse(request: Request) -> Response:
 
     # The SSE SDK docs explicitly require returning a Response here to avoid
     # a "NoneType is not callable" error when the client disconnects.
+    return Response()
+
+
+@router.api_route("/mcp", methods=["GET", "POST", "DELETE"])
+async def handle_streamable_http(request: Request) -> Response:
+    """Streamable HTTP MCP transport (new spec, required by Glama/modern clients).
+
+    Accepts GET (SSE stream init), POST (JSON-RPC message), DELETE (session end).
+    Auth via X-API-Key header; unauthenticated requests are rejected with 401.
+    """
+    key_hash, error_response = _authenticate_mcp_request(request)
+    if error_response is not None:
+        return error_response
+
+    logger.info("MCP streamable-HTTP request method=%s key_hash=%s", request.method, (key_hash or "")[:16])
+
+    await _http_manager.handle_request(request.scope, request.receive, request._send)
     return Response()
