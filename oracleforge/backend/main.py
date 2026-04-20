@@ -25,7 +25,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from api import routes_alerts, routes_health, routes_mcp, routes_price, routes_register, routes_sources
+from api import routes_admin, routes_alerts, routes_health, routes_mcp, routes_price, routes_register, routes_sources
 from core.config import ENV, IS_PROD, LOG_LEVEL
 from core.db import close_db, get_db, init_db
 from core.disclaimer import wrap_error
@@ -119,6 +119,7 @@ app.add_middleware(RequestIDMiddleware)
 
 # ── Routers ─────────────────────────────────────────────────────────────────
 
+app.include_router(routes_admin.router)
 app.include_router(routes_health.router)
 app.include_router(routes_register.router)
 app.include_router(routes_sources.router)
@@ -130,6 +131,57 @@ app.include_router(routes_mcp.router)
 # handles session routing by `session_id` query parameter. Must use the same
 # SseServerTransport instance as the GET /mcp/sse handler above.
 app.mount("/mcp/messages/", app=routes_mcp.sse_transport.handle_post_message)
+
+
+# ── Smithery server-card (skip auto-scan) ───────────────────────────────────
+
+@app.get("/.well-known/mcp/server-card.json", include_in_schema=False)
+async def mcp_server_card() -> dict:
+    return {
+        "serverInfo": {"name": "maxia-oracle", "version": "0.1.9"},
+        "tools": [
+            {
+                "name": "get_price",
+                "description": "Cross-validated median price for a single symbol, aggregated across Pyth, Chainlink, CoinPaprika, RedStone, Uniswap v3.",
+                "inputSchema": {"type": "object", "properties": {"symbol": {"type": "string", "description": "Ticker symbol (e.g. BTC, ETH, AAPL, EUR)"}}, "required": ["symbol"]},
+            },
+            {
+                "name": "get_prices_batch",
+                "description": "Prices for up to 50 symbols in a single call.",
+                "inputSchema": {"type": "object", "properties": {"symbols": {"type": "array", "items": {"type": "string"}, "maxItems": 50}}, "required": ["symbols"]},
+            },
+            {
+                "name": "get_price_history",
+                "description": "OHLC price history for a symbol. Ranges: 24h, 7d, 30d. Intervals: 5m, 1h, 1d.",
+                "inputSchema": {"type": "object", "properties": {"symbol": {"type": "string"}, "range": {"type": "string", "enum": ["24h", "7d", "30d"]}, "interval": {"type": "string", "enum": ["5m", "1h", "1d"]}}, "required": ["symbol"]},
+            },
+            {
+                "name": "get_confidence",
+                "description": "Inter-source divergence and confidence score for a symbol.",
+                "inputSchema": {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]},
+            },
+            {
+                "name": "get_chainlink_onchain",
+                "description": "Direct on-chain price from Chainlink on Base mainnet.",
+                "inputSchema": {"type": "object", "properties": {"symbol": {"type": "string"}}, "required": ["symbol"]},
+            },
+            {
+                "name": "list_supported_symbols",
+                "description": "Full list of 91 supported symbols grouped by source.",
+                "inputSchema": {"type": "object", "properties": {}},
+            },
+            {
+                "name": "get_sources_status",
+                "description": "Liveness of every upstream source using BTC as probe.",
+                "inputSchema": {"type": "object", "properties": {}},
+            },
+            {
+                "name": "health_check",
+                "description": "Minimal liveness check. Safe to call frequently.",
+                "inputSchema": {"type": "object", "properties": {}},
+            },
+        ],
+    }
 
 
 # ── Generic JSON error handler ──────────────────────────────────────────────
