@@ -24,6 +24,13 @@ keywords = [
     "x402",
     "pyth",
     "chainlink",
+    "langchain",
+    "crewai",
+    "price-oracle",
+    "market-data",
+    "defi",
+    "confidence-score",
+    "multi-source",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",

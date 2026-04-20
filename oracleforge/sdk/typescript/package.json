@@ -1,5 +1,5 @@
 {
-  "name": "@maxia/oracle",
+  "name": "@maxia-marketplace/oracle",
   "version": "0.1.9",
   "description": "Multi-source price data feed for AI agents. Data feed only. Not investment advice. No custody. No KYC.",
   "license": "Apache-2.0",
@@ -32,9 +32,17 @@
     "crypto",
     "ai-agents",
     "mcp",
+    "model-context-protocol",
     "x402",
     "pyth",
-    "chainlink"
+    "chainlink",
+    "langchain",
+    "crewai",
+    "price-oracle",
+    "market-data",
+    "defi",
+    "confidence-score",
+    "multi-source"
   ],
   "engines": {
     "node": ">=18"
