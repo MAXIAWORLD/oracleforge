@@ -1369,7 +1369,7 @@ curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxia
     }
 
     function update() {
-      fetch('/api/price/demo')
+      fetch('/api/public/price')
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (j) {
           if (!j || !j.data) return;

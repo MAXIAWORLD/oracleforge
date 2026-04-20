@@ -64,12 +64,12 @@ def _demo_allowed(ip: str) -> bool:
     return True
 
 
-@router.get("/price/demo")
+@router.get("/public/price")
 async def demo_price(request: Request) -> JSONResponse:
     """Live BTC price — no API key required. Rate-limited to 10 req/min per IP.
 
     Used by the landing page widget to show a real-time price without forcing
-    visitors to register first.
+    visitors to register first. Path is outside /api/price/ to bypass x402.
     """
     if not _demo_allowed(_demo_client_ip(request)):
         return JSONResponse(
