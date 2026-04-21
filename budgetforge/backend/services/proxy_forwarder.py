@@ -84,6 +84,34 @@ class ProxyForwarder:
                     yield chunk
 
     @staticmethod
+    async def forward_google_stream(request_body: dict, api_key: str, timeout_s: float = 120.0):
+        """Google Gemini OpenAI-compat streaming."""
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
+            async with client.stream(
+                "POST",
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                json=request_body,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            ) as resp:
+                resp.raise_for_status()
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+
+    @staticmethod
+    async def forward_deepseek_stream(request_body: dict, api_key: str, timeout_s: float = 120.0):
+        """DeepSeek OpenAI-compat streaming."""
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
+            async with client.stream(
+                "POST",
+                "https://api.deepseek.com/v1/chat/completions",
+                json=request_body,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            ) as resp:
+                resp.raise_for_status()
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+
+    @staticmethod
     async def forward_ollama(request_body: dict) -> dict:
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(

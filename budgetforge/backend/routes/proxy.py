@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -197,23 +198,28 @@ async def _maybe_send_alert(project: Project, db: Session) -> None:
     if project.alert_sent and project.alert_sent_at and project.alert_sent_at >= period_start:
         return  # déjà envoyée dans cette période
 
+    email_ok = False
+    webhook_ok = False
+
     if project.alert_email:
-        AlertService.send_email(
-            to=project.alert_email,
-            project_name=project.name,
-            used_usd=used,
-            budget_usd=project.budget_usd,
-            db=db,
+        # smtplib is blocking — offload to thread to avoid blocking the event loop
+        email_ok = await asyncio.to_thread(
+            AlertService.send_email,
+            project.alert_email,
+            project.name,
+            used,
+            project.budget_usd,
+            db,
         )
     if project.webhook_url:
-        await AlertService.send_webhook(
+        webhook_ok = await AlertService.send_webhook(
             url=project.webhook_url,
             project_name=project.name,
             used_usd=used,
             budget_usd=project.budget_usd,
         )
 
-    if project.alert_email or project.webhook_url:
+    if email_ok or webhook_ok:
         project.alert_sent = True
         project.alert_sent_at = datetime.now()
         db.commit()
@@ -379,6 +385,42 @@ async def proxy_google(
 
     timeout_s = project.proxy_timeout_ms / 1000.0 if project.proxy_timeout_ms else 60.0
 
+    if payload.get("stream"):
+        stream_payload = {
+            **payload,
+            "model": final_model,
+            "stream_options": {"include_usage": True},
+        }
+
+        async def generate_google():
+            tokens_in, tokens_out = 0, 0
+            got_usage = False
+            try:
+                async for chunk in ProxyForwarder.forward_google_stream(
+                    stream_payload, settings.google_api_key, timeout_s=timeout_s
+                ):
+                    text = chunk.decode("utf-8", errors="ignore")
+                    for line in text.split("\n"):
+                        if line.startswith("data: ") and line.strip() != "data: [DONE]":
+                            try:
+                                data = json.loads(line[6:])
+                                usage = data.get("usage")
+                                if usage:
+                                    tokens_in = usage.get("prompt_tokens", tokens_in)
+                                    tokens_out = usage.get("completion_tokens", tokens_out)
+                                    got_usage = True
+                            except (json.JSONDecodeError, KeyError):
+                                pass
+                    yield chunk
+            except Exception as e:
+                logger.error(f"Google stream error: {e}")
+            finally:
+                if got_usage:
+                    _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
+                await _maybe_send_alert(project, db)
+
+        return StreamingResponse(generate_google(), media_type="text/event-stream")
+
     try:
         response = await ProxyForwarder.forward_google(
             {**payload, "model": final_model}, settings.google_api_key, timeout_s=timeout_s
@@ -411,6 +453,42 @@ async def proxy_deepseek(
         usage_id = _prebill_usage(db, project, "deepseek", final_model, payload, x_budgetforge_agent)
 
     timeout_s = project.proxy_timeout_ms / 1000.0 if project.proxy_timeout_ms else 60.0
+
+    if payload.get("stream"):
+        stream_payload = {
+            **payload,
+            "model": final_model,
+            "stream_options": {"include_usage": True},
+        }
+
+        async def generate_deepseek():
+            tokens_in, tokens_out = 0, 0
+            got_usage = False
+            try:
+                async for chunk in ProxyForwarder.forward_deepseek_stream(
+                    stream_payload, settings.deepseek_api_key, timeout_s=timeout_s
+                ):
+                    text = chunk.decode("utf-8", errors="ignore")
+                    for line in text.split("\n"):
+                        if line.startswith("data: ") and line.strip() != "data: [DONE]":
+                            try:
+                                data = json.loads(line[6:])
+                                usage = data.get("usage")
+                                if usage:
+                                    tokens_in = usage.get("prompt_tokens", tokens_in)
+                                    tokens_out = usage.get("completion_tokens", tokens_out)
+                                    got_usage = True
+                            except (json.JSONDecodeError, KeyError):
+                                pass
+                    yield chunk
+            except Exception as e:
+                logger.error(f"DeepSeek stream error: {e}")
+            finally:
+                if got_usage:
+                    _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
+                await _maybe_send_alert(project, db)
+
+        return StreamingResponse(generate_deepseek(), media_type="text/event-stream")
 
     try:
         response = await ProxyForwarder.forward_deepseek(
