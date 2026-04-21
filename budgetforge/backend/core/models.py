@@ -17,6 +17,8 @@ class Project(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False, index=True)
     api_key = Column(String, unique=True, nullable=False, default=lambda: f"bf-{secrets.token_urlsafe(32)}")
+    previous_api_key = Column(String, nullable=True)
+    key_rotated_at = Column(DateTime, nullable=True)
     budget_usd = Column(Float, nullable=True)
     alert_threshold_pct = Column(Integer, nullable=True, default=80)
     action = Column(Enum(BudgetActionEnum), nullable=True, default=BudgetActionEnum.block)

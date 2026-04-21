@@ -315,6 +315,8 @@ def rotate_key(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    project.previous_api_key = project.api_key
+    project.key_rotated_at = datetime.now()
     project.api_key = f"bf-{secrets.token_urlsafe(32)}"
     db.commit()
     db.refresh(project)

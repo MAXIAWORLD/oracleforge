@@ -22,14 +22,30 @@ guard = BudgetGuard()
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
+_GRACE_PERIOD_MINUTES = 5
+
+
 def _get_project_by_api_key(authorization: Optional[str], db: Session) -> Project:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     api_key = authorization.removeprefix("Bearer ").strip()
+
+    # Check current key first
     project = db.query(Project).filter(Project.api_key == api_key).first()
-    if not project:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    return project
+    if project:
+        return project
+
+    # Check previous key within grace period
+    from datetime import timedelta
+    cutoff = datetime.now() - timedelta(minutes=_GRACE_PERIOD_MINUTES)
+    project = db.query(Project).filter(
+        Project.previous_api_key == api_key,
+        Project.key_rotated_at >= cutoff,
+    ).first()
+    if project:
+        return project
+
+    raise HTTPException(status_code=401, detail="Invalid API key")
 
 
 # ── Budget helpers ────────────────────────────────────────────────────────────
