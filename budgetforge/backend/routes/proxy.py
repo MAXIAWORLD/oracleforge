@@ -253,7 +253,7 @@ async def proxy_openai(
             got_usage = False
             try:
                 async for chunk in ProxyForwarder.forward_openai_stream(
-                    stream_payload, settings.openai_api_key
+                    stream_payload, settings.openai_api_key, timeout_s=timeout_s
                 ):
                     text = chunk.decode("utf-8", errors="ignore")
                     for line in text.split("\n"):
@@ -319,7 +319,7 @@ async def proxy_anthropic(
             got_usage = False
             try:
                 async for chunk in ProxyForwarder.forward_anthropic_stream(
-                    stream_payload, settings.anthropic_api_key
+                    stream_payload, settings.anthropic_api_key, timeout_s=timeout_s
                 ):
                     text = chunk.decode("utf-8", errors="ignore")
                     for line in text.split("\n"):

@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from core.database import get_db
 from core.models import Usage
+from core.auth import require_viewer
 
 router = APIRouter(prefix="/api/usage", tags=["export"])
 
@@ -27,7 +28,7 @@ def _query_usages(
     return q.order_by(Usage.created_at.desc()).all()
 
 
-@router.get("/export")
+@router.get("/export", dependencies=[Depends(require_viewer)])
 async def export_usage(
     format: str = Query("csv"),
     project_id: Optional[int] = None,

@@ -54,8 +54,8 @@ class ProxyForwarder:
             return resp.json()
 
     @staticmethod
-    async def forward_openai_stream(request_body: dict, api_key: str):
-        async with httpx.AsyncClient(timeout=120.0) as client:
+    async def forward_openai_stream(request_body: dict, api_key: str, timeout_s: float = 120.0):
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
             async with client.stream(
                 "POST",
                 "https://api.openai.com/v1/chat/completions",
@@ -67,8 +67,8 @@ class ProxyForwarder:
                     yield chunk
 
     @staticmethod
-    async def forward_anthropic_stream(request_body: dict, api_key: str):
-        async with httpx.AsyncClient(timeout=120.0) as client:
+    async def forward_anthropic_stream(request_body: dict, api_key: str, timeout_s: float = 120.0):
+        async with httpx.AsyncClient(timeout=timeout_s) as client:
             async with client.stream(
                 "POST",
                 "https://api.anthropic.com/v1/messages",

@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
 from core.database import engine, Base, get_db
 from core.models import Usage
+from core.auth import require_viewer
 from routes.projects import router as projects_router, _compute_breakdown, UsageBreakdown, DailySpend
 from routes.proxy import router as proxy_router
 from routes.history import router as history_router
@@ -33,7 +34,12 @@ app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "https://llmbudget.maxiaworld.app",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -53,14 +59,14 @@ def health():
     return {"status": "ok", "service": "llm-budgetforge"}
 
 
-@app.get("/api/usage/breakdown", response_model=UsageBreakdown, tags=["usage"])
+@app.get("/api/usage/breakdown", response_model=UsageBreakdown, tags=["usage"], dependencies=[Depends(require_viewer)])
 def global_breakdown(db: Session = Depends(get_db)):
     """Breakdown local vs cloud across ALL projects."""
     all_usages = db.query(Usage).all()
     return _compute_breakdown(all_usages)
 
 
-@app.get("/api/usage/daily", response_model=list[DailySpend], tags=["usage"])
+@app.get("/api/usage/daily", response_model=list[DailySpend], tags=["usage"], dependencies=[Depends(require_viewer)])
 def global_daily_usage(db: Session = Depends(get_db)):
     """Last 30 days aggregated spend across ALL projects."""
     today = date.today()
