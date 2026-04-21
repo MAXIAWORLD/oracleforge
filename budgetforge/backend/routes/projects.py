@@ -14,6 +14,7 @@ from core.auth import require_admin, require_viewer
 from core.url_validator import is_safe_webhook_url
 from services.budget_guard import BudgetGuard, get_period_start
 from services.cost_calculator import CostCalculator
+from services.plan_quota import PLAN_LIMITS, get_calls_this_month
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 guard = BudgetGuard()
@@ -71,6 +72,7 @@ class ProjectResponse(BaseModel):
     id: int
     name: str
     api_key: str
+    plan: str = "free"
     budget_usd: Optional[float] = None
     alert_threshold_pct: Optional[int] = None
     action: Optional[str] = None
@@ -349,4 +351,52 @@ def get_agent_breakdown(project_id: int, db: Session = Depends(get_db)):
     return AgentBreakdown(
         agents={k: AgentStats(**v) for k, v in agents.items()},
         total_calls=sum(v["calls"] for v in agents.values()),
+    )
+
+
+_VALID_PLANS = frozenset(PLAN_LIMITS.keys())
+
+
+class PlanUpdate(BaseModel):
+    plan: str
+
+    @field_validator("plan")
+    @classmethod
+    def validate_plan(cls, v: str) -> str:
+        if v not in _VALID_PLANS:
+            raise ValueError(f"Invalid plan '{v}'. Valid: {sorted(_VALID_PLANS)}")
+        return v
+
+
+class PlanStatus(BaseModel):
+    plan: str
+    calls_this_month: int
+    calls_limit: int
+
+
+@router.get("/{project_id}/plan", response_model=PlanStatus, dependencies=[Depends(require_viewer)])
+def get_plan(project_id: int, db: Session = Depends(get_db)):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    plan = project.plan or "free"
+    return PlanStatus(
+        plan=plan,
+        calls_this_month=get_calls_this_month(project_id, db),
+        calls_limit=PLAN_LIMITS.get(plan, PLAN_LIMITS["free"]),
+    )
+
+
+@router.put("/{project_id}/plan", response_model=PlanStatus, dependencies=[Depends(require_admin)])
+def set_plan(project_id: int, payload: PlanUpdate, db: Session = Depends(get_db)):
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project.plan = payload.plan
+    db.commit()
+    db.refresh(project)
+    return PlanStatus(
+        plan=project.plan,
+        calls_this_month=get_calls_this_month(project_id, db),
+        calls_limit=PLAN_LIMITS.get(project.plan, PLAN_LIMITS["free"]),
     )

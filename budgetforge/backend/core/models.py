@@ -32,6 +32,9 @@ class Project(Base):
     downgrade_chain = Column(String, nullable=True)     # JSON list e.g. '["gpt-4o-mini","claude-haiku-4-5"]'
     proxy_timeout_ms = Column(Integer, nullable=True)   # None = use default 60s
     proxy_retries = Column(Integer, nullable=True, default=0)
+    plan = Column(String, nullable=False, default="free")  # free / pro / agency / ltd
+    stripe_customer_id = Column(String, nullable=True)
+    stripe_subscription_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     usages = relationship("Usage", back_populates="project", cascade="all, delete-orphan")
 

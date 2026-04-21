@@ -14,6 +14,7 @@ from services.budget_lock import budget_lock
 from services.cost_calculator import CostCalculator, UnknownModelError
 from services.proxy_forwarder import ProxyForwarder
 from services.alert_service import AlertService
+from services.plan_quota import check_quota
 from core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -239,6 +240,7 @@ async def proxy_openai(
     _require_key(settings.openai_api_key, "openai")
     model = payload.get("model", "gpt-4o")
 
+    check_quota(project, db)
     # C1: section critique sérialisée par projet
     async with budget_lock(project.id):
         final_model = _check_budget(project, db, model)
@@ -311,6 +313,7 @@ async def proxy_anthropic(
     _require_key(settings.anthropic_api_key, "anthropic")
     model = payload.get("model", "claude-sonnet-4-6")
 
+    check_quota(project, db)
     async with budget_lock(project.id):
         final_model = _check_budget(project, db, model)
         usage_id = _prebill_usage(db, project, "anthropic", final_model, payload, x_budgetforge_agent)
@@ -379,6 +382,7 @@ async def proxy_google(
     _require_key(settings.google_api_key, "google")
     model = payload.get("model", "gemini-2.0-flash")
 
+    check_quota(project, db)
     async with budget_lock(project.id):
         final_model = _check_budget(project, db, model)
         usage_id = _prebill_usage(db, project, "google", final_model, payload, x_budgetforge_agent)
@@ -448,6 +452,7 @@ async def proxy_deepseek(
     _require_key(settings.deepseek_api_key, "deepseek")
     model = payload.get("model", "deepseek-chat")
 
+    check_quota(project, db)
     async with budget_lock(project.id):
         final_model = _check_budget(project, db, model)
         usage_id = _prebill_usage(db, project, "deepseek", final_model, payload, x_budgetforge_agent)
@@ -516,6 +521,7 @@ async def proxy_ollama(
     _check_provider(project, "ollama")
     model = payload.get("model", "llama3")
 
+    check_quota(project, db)
     async with budget_lock(project.id):
         _check_budget(project, db, f"ollama/{model}")
         usage_id = _prebill_usage(db, project, "ollama", f"ollama/{model}", payload, x_budgetforge_agent)
