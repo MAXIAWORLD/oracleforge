@@ -1,0 +1,57 @@
+from fastapi import FastAPI, Depends, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from sqlalchemy.orm import Session
+from core.database import engine, Base, get_db
+from core.models import Usage
+from routes.projects import router as projects_router, _compute_breakdown, UsageBreakdown
+from routes.proxy import router as proxy_router
+from routes.history import router as history_router
+from routes.models import router as models_router
+from routes.settings import router as settings_router
+from routes.export import router as export_router
+
+Base.metadata.create_all(bind=engine)
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+
+app = FastAPI(
+    title="LLM BudgetForge",
+    description="LLM Budget Guard — proxy layer with hard limits per project/user/agent",
+    version="0.1.0",
+)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(projects_router)
+app.include_router(proxy_router)
+app.include_router(history_router)
+app.include_router(models_router)
+app.include_router(settings_router)
+app.include_router(export_router)
+
+
+@app.get("/health")
+@limiter.exempt
+def health():
+    return {"status": "ok", "service": "llm-budgetforge"}
+
+
+@app.get("/api/usage/breakdown", response_model=UsageBreakdown, tags=["usage"])
+def global_breakdown(db: Session = Depends(get_db)):
+    """Breakdown local vs cloud across ALL projects."""
+    all_usages = db.query(Usage).all()
+    return _compute_breakdown(all_usages)
