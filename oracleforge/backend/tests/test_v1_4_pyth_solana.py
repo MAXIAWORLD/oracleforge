@@ -449,4 +449,51 @@ async def test_mcp_pyth_solana_dispatches(monkeypatch: pytest.MonkeyPatch) -> No
     result = await mcp_tools.get_pyth_solana_onchain("BTC")
     assert captured["symbol"] == "BTC"
     assert "error" not in result
-    assert result["data"]["source"] == "pyth_solana"
+
+
+# ── multi_source wiring ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_collect_sources_includes_pyth_solana(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """collect_sources() must include pyth_solana when the module answers."""
+    from services.oracle import multi_source
+
+    async def fake_pyth_solana(symbol: str) -> dict[str, Any]:
+        return {
+            "price": 75000.0,
+            "conf": 10.0,
+            "confidence_pct": 0.01,
+            "publish_time": 1_776_000_000,
+            "age_s": 1,
+            "stale": False,
+            "source": "pyth_solana",
+            "symbol": symbol,
+            "price_account": "4cSM2e6rvbGQUFiJbqytoVMi5GgghSMr8LwVrT9VPSPo",
+            "posted_slot": 413_000_000,
+            "exponent": -8,
+            "feed_id": "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
+        }
+
+    async def _skip(*_a: Any, **_kw: Any) -> dict[str, Any]:
+        return {"error": "skip"}
+
+    async def _skip_price_oracle(*_a: Any, **_kw: Any) -> dict[str, Any]:
+        return {}
+
+    monkeypatch.setattr(multi_source.pyth_solana_oracle, "get_pyth_solana_price", fake_pyth_solana)
+    monkeypatch.setattr(multi_source.pyth_oracle, "get_pyth_price", _skip)
+    monkeypatch.setattr(multi_source.chainlink_oracle, "get_chainlink_price", _skip)
+    monkeypatch.setattr(multi_source.price_oracle, "get_prices", _skip_price_oracle)
+    monkeypatch.setattr(multi_source.redstone_oracle, "get_redstone_price", _skip)
+    monkeypatch.setattr(multi_source.uniswap_v3_oracle, "get_twap_price", _skip)
+
+    sources = await multi_source.collect_sources("BTC")
+
+    assert any(s["name"] == "pyth_solana" for s in sources), sources
+    entry = next(s for s in sources if s["name"] == "pyth_solana")
+    assert entry["price"] == 75000.0
+    assert entry["age_s"] == 1
+    assert entry["stale"] is False

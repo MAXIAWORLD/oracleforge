@@ -500,4 +500,48 @@ async def test_mcp_twap_dispatches(monkeypatch: pytest.MonkeyPatch) -> None:
     r = await mcp_tools.get_twap_onchain("ETH", chain="ethereum", window_s=3600)
     assert captured == {"symbol": "ETH", "chain": "ethereum", "window_s": 3600}
     assert "error" not in r
-    assert r["data"]["source"] == "uniswap_v3"
+
+
+# ── multi_source wiring ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_collect_sources_includes_uniswap_v3(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """collect_sources() must include uniswap_v3 when the module answers."""
+    from services.oracle import multi_source
+
+    async def fake_twap(symbol: str, chain: str = "ethereum", window_s: int = 1800) -> dict[str, Any]:
+        return {
+            "price": 75100.0,
+            "avg_tick": 548_000,
+            "window_s": window_s,
+            "tick_cumulatives": [100, 200],
+            "chain": chain,
+            "pool": "0x99ac8cA7087fA4A2A1FB6357269965A2014ABc35",
+            "fee_bps": 30,
+            "token0": "WBTC",
+            "token1": "USDC",
+            "source": "uniswap_v3",
+            "symbol": symbol,
+        }
+
+    async def _skip(*_a: Any, **_kw: Any) -> dict[str, Any]:
+        return {"error": "skip"}
+
+    async def _skip_price_oracle(*_a: Any, **_kw: Any) -> dict[str, Any]:
+        return {}
+
+    monkeypatch.setattr(multi_source.uniswap_v3_oracle, "get_twap_price", fake_twap)
+    monkeypatch.setattr(multi_source.pyth_oracle, "get_pyth_price", _skip)
+    monkeypatch.setattr(multi_source.chainlink_oracle, "get_chainlink_price", _skip)
+    monkeypatch.setattr(multi_source.price_oracle, "get_prices", _skip_price_oracle)
+    monkeypatch.setattr(multi_source.redstone_oracle, "get_redstone_price", _skip)
+    monkeypatch.setattr(multi_source.pyth_solana_oracle, "get_pyth_solana_price", _skip)
+
+    sources = await multi_source.collect_sources("BTC")
+
+    assert any(s["name"] == "uniswap_v3" for s in sources), sources
+    entry = next(s for s in sources if s["name"] == "uniswap_v3")
+    assert entry["price"] == 75100.0

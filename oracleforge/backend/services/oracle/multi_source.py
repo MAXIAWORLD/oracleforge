@@ -27,7 +27,14 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from services.oracle import chainlink_oracle, price_oracle, pyth_oracle, redstone_oracle
+from services.oracle import (
+    chainlink_oracle,
+    price_oracle,
+    pyth_oracle,
+    pyth_solana_oracle,
+    redstone_oracle,
+    uniswap_v3_oracle,
+)
 
 
 def compute_divergence(prices: list[float]) -> float:
@@ -87,6 +94,12 @@ async def collect_sources(symbol: str) -> list[dict[str, Any]]:
     # V1.3 — RedStone public REST (4th independent upstream). Every symbol
     # is attempted; `symbol not found` replies are silent-dropped below.
     tasks.append(("redstone", redstone_oracle.get_redstone_price(symbol)))
+    # V1.4 — Pyth native Solana on-chain shard-0 read.
+    if pyth_solana_oracle.has_feed(symbol):
+        tasks.append(("pyth_solana", pyth_solana_oracle.get_pyth_solana_price(symbol)))
+    # V1.5 — Uniswap v3 TWAP on Ethereum mainnet.
+    if uniswap_v3_oracle.has_pool(symbol, "ethereum"):
+        tasks.append(("uniswap_v3", uniswap_v3_oracle.get_twap_price(symbol, chain="ethereum")))
 
     results = await asyncio.gather(
         *(coro for _, coro in tasks), return_exceptions=True
