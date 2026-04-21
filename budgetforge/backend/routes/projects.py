@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from core.database import get_db
 from core.models import Project, Usage, BudgetActionEnum
-from core.auth import require_admin
+from core.auth import require_admin, require_viewer
 from core.url_validator import is_safe_webhook_url
 from services.budget_guard import BudgetGuard, get_period_start
 from services.cost_calculator import CostCalculator
@@ -180,12 +180,12 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db)):
     return project
 
 
-@router.get("", response_model=list[ProjectResponse], dependencies=[Depends(require_admin)])
+@router.get("", response_model=list[ProjectResponse], dependencies=[Depends(require_viewer)])
 def list_projects(db: Session = Depends(get_db)):
     return db.query(Project).all()
 
 
-@router.get("/{project_id}", response_model=ProjectResponse, dependencies=[Depends(require_admin)])
+@router.get("/{project_id}", response_model=ProjectResponse, dependencies=[Depends(require_viewer)])
 def get_project(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -231,7 +231,7 @@ def set_budget(project_id: int, payload: BudgetUpdate, db: Session = Depends(get
     )
 
 
-@router.get("/{project_id}/usage", response_model=UsageSummary, dependencies=[Depends(require_admin)])
+@router.get("/{project_id}/usage", response_model=UsageSummary, dependencies=[Depends(require_viewer)])
 def get_usage(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:

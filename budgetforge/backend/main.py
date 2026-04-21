@@ -14,6 +14,7 @@ from routes.history import router as history_router
 from routes.models import router as models_router
 from routes.settings import router as settings_router
 from routes.export import router as export_router
+from routes.members import router as members_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -42,6 +43,7 @@ app.include_router(history_router)
 app.include_router(models_router)
 app.include_router(settings_router)
 app.include_router(export_router)
+app.include_router(members_router)
 
 
 @app.get("/health")

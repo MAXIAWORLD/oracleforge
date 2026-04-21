@@ -45,6 +45,17 @@ class SiteSetting(Base):
                         onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
+class Member(Base):
+    __tablename__ = "members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    api_key = Column(String, unique=True, nullable=False,
+                     default=lambda: f"bf-mbr-{secrets.token_urlsafe(24)}")
+    role = Column(String, nullable=False, default="viewer")  # "admin" or "viewer"
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
+
 class Usage(Base):
     __tablename__ = "usages"
 
