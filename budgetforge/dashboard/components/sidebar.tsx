@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, FolderKanban, Zap, Settings, Shield } from "lucide-react";
+import { LayoutDashboard, FolderKanban, Zap, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -73,9 +74,14 @@ export function Sidebar() {
       >
         {/* Logo */}
         <div className="flex items-center gap-3 px-5 h-14 border-b border-[--border]">
-          <div className="flex items-center justify-center w-7 h-7 rounded-md bg-[--amber] shadow-[0_0_16px_rgba(245,158,11,0.5)]">
-            <Shield className="w-4 h-4 text-[#070a0f]" strokeWidth={2.5} />
-          </div>
+          <Image
+            src="/logo.png"
+            alt="BudgetForge"
+            width={28}
+            height={28}
+            className="rounded-md"
+            style={{ boxShadow: "0 0 12px rgba(245,158,11,0.4)" }}
+          />
           <span className="font-heading font-700 text-[15px] text-[--foreground] tracking-tight">
             LLM Budget<span className="text-[--amber]">Forge</span>
           </span>

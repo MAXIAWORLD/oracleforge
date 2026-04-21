@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export default function LandingPage() {
@@ -11,10 +12,12 @@ export default function LandingPage() {
         className="px-6 py-4 flex items-center justify-between"
         style={{ borderBottom: "1px solid var(--border)" }}
       >
-        <span className="font-bold text-lg tracking-tight">
-          LLM{" "}
-          <span style={{ color: "var(--amber)" }}>BudgetForge</span>
-        </span>
+        <div className="flex items-center gap-3">
+          <Image src="/logo.png" alt="BudgetForge" width={36} height={36} className="rounded-lg" />
+          <span className="font-bold text-lg tracking-tight">
+            LLM <span style={{ color: "var(--amber)" }}>BudgetForge</span>
+          </span>
+        </div>
         <Link
           href="/"
           className="text-sm px-4 py-2 rounded-lg font-semibold transition-opacity hover:opacity-90"
