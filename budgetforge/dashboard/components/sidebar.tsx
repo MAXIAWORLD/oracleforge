@@ -10,7 +10,7 @@ import { api } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV = [
-  { href: "/",          label: "Overview",   icon: LayoutDashboard },
+  { href: "/dashboard", label: "Overview",   icon: LayoutDashboard },
   { href: "/projects",  label: "Projects",   icon: FolderKanban },
   { href: "/activity",  label: "Activity",   icon: Zap },
   { href: "/settings",  label: "Settings",   icon: Settings },
@@ -93,8 +93,7 @@ export function Sidebar() {
             Menu
           </p>
           {NAV.map(({ href, label, icon: Icon }) => {
-            const active =
-              href === "/" ? path === "/" : path.startsWith(href);
+            const active = path === href || path.startsWith(href + "/");
             return (
               <Link
                 key={href}
