@@ -11,14 +11,19 @@ from core.models import Usage
 router = APIRouter(prefix="/api/usage", tags=["export"])
 
 
-def _query_usages(db: Session, project_id: Optional[int], date_from: Optional[str], date_to: Optional[str]) -> list:
+def _query_usages(
+    db: Session,
+    project_id: Optional[int],
+    date_from_dt,
+    date_to_dt,
+) -> list:
     q = db.query(Usage)
     if project_id is not None:
         q = q.filter(Usage.project_id == project_id)
-    if date_from:
-        q = q.filter(Usage.created_at >= datetime.fromisoformat(date_from))
-    if date_to:
-        q = q.filter(Usage.created_at <= datetime.fromisoformat(date_to))
+    if date_from_dt is not None:
+        q = q.filter(Usage.created_at >= date_from_dt)
+    if date_to_dt is not None:
+        q = q.filter(Usage.created_at <= date_to_dt)
     return q.order_by(Usage.created_at.desc()).all()
 
 
@@ -33,7 +38,13 @@ async def export_usage(
     if format not in ("csv", "json"):
         raise HTTPException(status_code=400, detail="format must be 'csv' or 'json'")
 
-    records = _query_usages(db, project_id, date_from, date_to)
+    try:
+        date_from_dt = datetime.fromisoformat(date_from) if date_from else None
+        date_to_dt = datetime.fromisoformat(date_to) if date_to else None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid date format: {exc}")
+
+    records = _query_usages(db, project_id, date_from_dt, date_to_dt)
 
     if format == "json":
         return [

@@ -133,3 +133,8 @@ class TestExportEndpoint:
     async def test_export_unknown_format_returns_400(self, client):
         r = await client.get("/api/usage/export?format=xml")
         assert r.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_export_invalid_date_returns_422(self, client):
+        resp = await client.get("/api/usage/export?format=csv&date_from=not-a-date")
+        assert resp.status_code == 422
