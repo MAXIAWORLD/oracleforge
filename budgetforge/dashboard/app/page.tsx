@@ -54,7 +54,7 @@ export default function LandingPage() {
             Open Dashboard
           </Link>
           <a
-            href="https://github.com/maxia-lab/budgetforge"
+            href="https://github.com/majorelalexis-stack/budgetforge"
             className="px-6 py-3 rounded-lg transition-colors"
             style={{ border: "1px solid var(--border)" }}
           >
