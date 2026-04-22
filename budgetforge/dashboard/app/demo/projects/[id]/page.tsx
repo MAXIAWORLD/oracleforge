@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ArrowLeft, Copy, Check, TrendingDown, Zap, Key, Save, Plus, X, Calendar } from "lucide-react";
 import Link from "next/link";
@@ -70,10 +71,6 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
     </div>
   );
 }
-
-"use client";
-
-import { useParams } from "next/navigation";
 
 const DEMO_PROJECTS: Record<string, { name: string; used: number; budget: number; chain: string[] }> = {
   "ai-chat-assistant": { name: "AI Chat Assistant", used: 108.45, budget: 150, chain: ["anthropic/claude-opus-4-7", "anthropic/claude-3-5-sonnet-20241022", "ollama/gemma4:31b"] },
