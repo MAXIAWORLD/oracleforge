@@ -6,7 +6,7 @@ import { Users, TrendingUp, CreditCard, Zap } from "lucide-react";
 import { Shell } from "@/components/shell";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell,
+  BarChart, Bar, Cell, LineChart, Line,
 } from "recharts";
 
 interface AdminStats {
@@ -16,6 +16,7 @@ interface AdminStats {
   total_calls: number;
   total_spend_usd: number;
   signups_last_30_days: { date: string; count: number }[];
+  client_growth: { date: string; total: number }[];
 }
 
 const PLAN_COLORS: Record<string, string> = {
@@ -51,6 +52,22 @@ function StatCard({
         {value}
       </div>
       {sub && <p className="text-xs text-[--muted-fg]">{sub}</p>}
+    </motion.div>
+  );
+}
+
+function PlanCountCard({ plan, count }: { plan: string; count: number }) {
+  const color = PLAN_COLORS[plan] ?? "#64748b";
+  return (
+    <motion.div variants={STAGGER.item} className="card-base p-4 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+        <span className="text-[11px] uppercase tracking-widest font-600 text-[--muted-fg]">{plan}</span>
+      </div>
+      <div className="font-heading font-800 text-4xl tracking-tight" style={{ color }}>
+        {count}
+      </div>
+      <p className="text-xs text-[--muted-fg]">client{count !== 1 ? "s" : ""}</p>
     </motion.div>
   );
 }
@@ -100,7 +117,7 @@ export default function ClientsPage() {
             <motion.div variants={STAGGER.container} initial="hidden" animate="show"
               className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <StatCard icon={Users} label="Total Clients" value={stats.total_clients} accent="#3b82f6"
-                sub={`${signupTotal} new · ${stats.clients_by_plan.free ?? 0} Free · ${stats.clients_by_plan.pro ?? 0} Pro · ${stats.clients_by_plan.agency ?? 0} Agency`} />
+                sub={`${signupTotal} new last 30d`} />
               <StatCard icon={TrendingUp} label="MRR" value={`$${stats.mrr_usd}`} accent="#f59e0b"
                 sub={`${stats.clients_by_plan.pro ?? 0} Pro · ${stats.clients_by_plan.agency ?? 0} Agency`} />
               <StatCard icon={Zap} label="Total Calls" value={stats.total_calls.toLocaleString()} accent="#22c55e"
@@ -109,13 +126,48 @@ export default function ClientsPage() {
                 sub="Proxied through BF" />
             </motion.div>
 
+            {/* Plan count cards */}
+            <motion.div variants={STAGGER.container} initial="hidden" animate="show"
+              className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {(["free", "pro", "agency", "ltd"] as const).map((plan) => (
+                <PlanCountCard key={plan} plan={plan} count={stats.clients_by_plan[plan] ?? 0} />
+              ))}
+            </motion.div>
+
+            {/* Client growth chart */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+              className="card-base p-5 mb-6">
+              <h2 className="text-[11px] uppercase tracking-widest font-600 text-[--muted-fg] mb-4">
+                Client growth — last 90 days
+              </h2>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={stats.client_growth} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="growthGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" tick={{ fontSize: 9, fill: "#c8d8e8" }} tickLine={false} axisLine={false}
+                    tickFormatter={(v: string) => v.slice(5)} interval={14} />
+                  <YAxis tick={{ fontSize: 9, fill: "#c8d8e8" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
+                    formatter={(v) => [v, "Total clients"]}
+                    labelStyle={{ color: "#c8d8e8" }}
+                  />
+                  <Line type="monotone" dataKey="total" stroke="#22c55e" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </motion.div>
+
             {/* Signups chart */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
               className="card-base p-5 mb-6">
               <h2 className="text-[11px] uppercase tracking-widest font-600 text-[--muted-fg] mb-4">
                 New signups — last 30 days
               </h2>
-              <ResponsiveContainer width="100%" height={160}>
+              <ResponsiveContainer width="100%" height={140}>
                 <AreaChart data={stats.signups_last_30_days} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="signupGrad" x1="0" y1="0" x2="0" y2="1">

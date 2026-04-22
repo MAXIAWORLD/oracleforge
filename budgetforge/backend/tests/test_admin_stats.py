@@ -131,3 +131,44 @@ class TestAdminStats:
         assert daily[target] == 2
         total_in_window = sum(d["count"] for d in body["signups_last_30_days"])
         assert total_in_window == 2  # proj3 hors fenêtre
+
+
+class TestAdminStatsGrowth:
+    @pytest.mark.asyncio
+    async def test_stats_includes_client_growth(self, client):
+        """admin/stats inclut client_growth (90 entrées)."""
+        resp = await client.get("/api/admin/stats")
+        body = resp.json()
+        assert "client_growth" in body
+        assert isinstance(body["client_growth"], list)
+        assert len(body["client_growth"]) == 90
+
+    @pytest.mark.asyncio
+    async def test_stats_client_growth_is_cumulative(self, client, test_db):
+        """client_growth est un running total cumulatif par jour."""
+        from core.models import Project
+
+        today = datetime.utcnow()
+        p1 = Project(name="g1@test.com", plan="free",
+                     stripe_customer_id="cus_g1", stripe_subscription_id="sub_g1")
+        p1.created_at = today - timedelta(days=5)
+        p2 = Project(name="g2@test.com", plan="pro",
+                     stripe_customer_id="cus_g2", stripe_subscription_id="sub_g2")
+        p2.created_at = today - timedelta(days=3)
+        p3 = Project(name="g3@test.com", plan="agency",
+                     stripe_customer_id="cus_g3", stripe_subscription_id="sub_g3")
+        p3.created_at = today - timedelta(days=3)
+        test_db.add_all([p1, p2, p3])
+        test_db.commit()
+
+        resp = await client.get("/api/admin/stats")
+        body = resp.json()
+        growth = {d["date"]: d["total"] for d in body["client_growth"]}
+
+        day5 = (today - timedelta(days=5)).date().isoformat()
+        day3 = (today - timedelta(days=3)).date().isoformat()
+        day0 = today.date().isoformat()
+
+        assert growth[day5] == 1   # p1 seulement
+        assert growth[day3] == 3   # p1 + p2 + p3
+        assert growth[day0] == 3   # pas de nouveaux

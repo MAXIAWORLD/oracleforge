@@ -51,6 +51,32 @@ def admin_stats(db: Session = Depends(get_db)):
         for i in range(30)
     ]
 
+    # Cumulative growth — 90 jours
+    ninety_start = today - timedelta(days=89)
+    ninety_dt = datetime(ninety_start.year, ninety_start.month, ninety_start.day)
+
+    baseline = db.query(func.count(Project.id)).filter(
+        Project.created_at < ninety_dt
+    ).scalar() or 0
+
+    growth_rows = (
+        db.query(
+            func.date(Project.created_at).label("day"),
+            func.count(Project.id).label("count"),
+        )
+        .filter(Project.created_at >= ninety_dt)
+        .group_by(func.date(Project.created_at))
+        .all()
+    )
+    by_day_new = {r.day: r.count for r in growth_rows}
+
+    running = baseline
+    client_growth = []
+    for i in range(90):
+        d = (ninety_start + timedelta(days=i)).isoformat()
+        running += by_day_new.get(d, 0)
+        client_growth.append({"date": d, "total": running})
+
     return {
         "clients_by_plan": clients_by_plan,
         "mrr_usd": mrr_usd,
@@ -58,4 +84,5 @@ def admin_stats(db: Session = Depends(get_db)):
         "total_calls": total_calls,
         "total_spend_usd": total_spend_usd,
         "signups_last_30_days": signups_last_30_days,
+        "client_growth": client_growth,
     }
