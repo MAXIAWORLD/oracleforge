@@ -6,59 +6,81 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_PLAN_LABELS = {"pro": "Pro ($29/mo)", "agency": "Agency ($79/mo)", "ltd": "Lifetime"}
+_PLAN_LABELS = {"free": "Free ($0/mo)", "pro": "Pro ($29/mo)", "agency": "Agency ($79/mo)", "ltd": "Lifetime"}
+
+_PLAN_DETAILS = {
+    "free":   "1,000 calls/month · 1 project · OpenAI + Anthropic",
+    "pro":    "100,000 calls/month · 10 projects · OpenAI · Anthropic · Google · DeepSeek",
+    "agency": "500,000 calls/month · Unlimited projects · All providers · Priority support",
+    "ltd":    "100,000 calls/month · Lifetime access · All providers",
+}
 
 _BODY_TEMPLATE = """\
 Welcome to BudgetForge!
 
-Your payment was successful. Here is your API key:
+Your {plan_label} plan is active.
+{plan_details}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOUR BUDGETFORGE KEY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   {api_key}
 
-Plan: {plan_label}
+Keep it safe. This is what identifies your account.
 
-──────────────────────────────────────────
-HOW TO USE IT
-──────────────────────────────────────────
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CONNECT IN 2 STEPS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Replace your LLM provider base URL with BudgetForge's proxy:
+STEP 1 — Update your AI tool or app:
 
-  OpenAI:    https://llmbudget.maxiaworld.app/proxy/openai/v1/chat/completions
-  Anthropic: https://llmbudget.maxiaworld.app/proxy/anthropic/v1/messages
-  Google:    https://llmbudget.maxiaworld.app/proxy/google/v1/chat/completions
-  DeepSeek:  https://llmbudget.maxiaworld.app/proxy/deepseek/v1/chat/completions
+  Python / OpenAI SDK:
+    client = openai.OpenAI(
+        api_key="{api_key}",
+        base_url="https://llmbudget.maxiaworld.app/proxy/openai/v1",
+        default_headers={{"X-Provider-Key": "YOUR-OPENAI-KEY"}}
+    )
 
-Set your Authorization header:
-  Authorization: Bearer {api_key}
+  Cursor / n8n / any tool:
+    API Key:  {api_key}
+    Base URL: https://llmbudget.maxiaworld.app/proxy/openai
 
-Set your budget limit and alerts at:
-  https://llmbudget.maxiaworld.app
+  ⚠️  You keep your original OpenAI / Anthropic key.
+  BudgetForge never stores it — you pass it as X-Provider-Key.
+  BudgetForge only sees it to forward your request.
 
-──────────────────────────────────────────
+STEP 2 — Set your spending limit:
+  Go to: https://llmbudget.maxiaworld.app/portal
+  Enter your email → get a magic link → open your dashboard.
 
-Questions? Reply to this email.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Need help? Reply to this email — we respond within 24h.
 
 — The BudgetForge team
+https://llmbudget.maxiaworld.app
 """
 
 
 def send_onboarding_email(to: str, api_key: str, plan: str) -> bool:
     cfg = {
-        "smtp_host":        settings.smtp_host,
-        "smtp_port":        settings.smtp_port,
-        "smtp_user":        settings.smtp_user,
-        "smtp_password":    settings.smtp_password,
-        "from_email":       settings.alert_from_email,
+        "smtp_host":     settings.smtp_host,
+        "smtp_port":     settings.smtp_port,
+        "smtp_user":     settings.smtp_user,
+        "smtp_password": settings.smtp_password,
+        "from_email":    settings.alert_from_email,
     }
     if not cfg["smtp_host"]:
         logger.warning("SMTP not configured — skipping onboarding email to %s", to)
         return False
 
     plan_label = _PLAN_LABELS.get(plan, plan)
-    body = _BODY_TEMPLATE.format(api_key=api_key, plan_label=plan_label)
+    plan_details = _PLAN_DETAILS.get(plan, "")
+    body = _BODY_TEMPLATE.format(api_key=api_key, plan_label=plan_label, plan_details=plan_details)
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Your BudgetForge API key"
+    msg["Subject"] = "Your BudgetForge API key — connect in 2 steps"
     msg["From"] = cfg["from_email"]
     msg["To"] = to
     msg.attach(MIMEText(body, "plain"))

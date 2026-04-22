@@ -73,12 +73,14 @@ def _check_provider(project: Project, provider: str) -> None:
         )
 
 
-def _require_key(key: str, provider: str) -> None:
+def _resolve_provider_key(x_provider_key: Optional[str], settings_key: str, provider: str) -> str:
+    key = x_provider_key or settings_key
     if not key:
         raise HTTPException(
             status_code=400,
-            detail=f"No API key configured for provider '{provider}' on this server. Set {provider.upper()}_API_KEY in the backend .env"
+            detail=f"No API key for provider '{provider}'. Set X-Provider-Key header."
         )
+    return key
 
 
 def _check_budget(project: Project, db: Session, model: str) -> str:
@@ -232,12 +234,13 @@ async def _maybe_send_alert(project: Project, db: Session) -> None:
 async def proxy_openai(
     payload: dict,
     authorization: Optional[str] = Header(None),
+    x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
     x_budgetforge_agent: Optional[str] = Header(None, alias="X-BudgetForge-Agent"),
     db: Session = Depends(get_db),
 ):
     project = _get_project_by_api_key(authorization, db)
     _check_provider(project, "openai")
-    _require_key(settings.openai_api_key, "openai")
+    openai_key = _resolve_provider_key(x_provider_key, settings.openai_api_key, "openai")
     model = payload.get("model", "gpt-4o")
 
     check_quota(project, db)
@@ -261,7 +264,7 @@ async def proxy_openai(
             got_usage = False
             try:
                 async for chunk in ProxyForwarder.forward_openai_stream(
-                    stream_payload, settings.openai_api_key, timeout_s=timeout_s
+                    stream_payload, openai_key, timeout_s=timeout_s
                 ):
                     text = chunk.decode("utf-8", errors="ignore")
                     for line in text.split("\n"):
@@ -288,7 +291,7 @@ async def proxy_openai(
 
     try:
         response = await ProxyForwarder.forward_openai(
-            {**payload, "model": final_model}, settings.openai_api_key, timeout_s=timeout_s
+            {**payload, "model": final_model}, openai_key, timeout_s=timeout_s
         )
     except Exception as e:
         _cancel_usage(db, usage_id)
@@ -305,12 +308,13 @@ async def proxy_openai(
 async def proxy_anthropic(
     payload: dict,
     authorization: Optional[str] = Header(None),
+    x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
     x_budgetforge_agent: Optional[str] = Header(None, alias="X-BudgetForge-Agent"),
     db: Session = Depends(get_db),
 ):
     project = _get_project_by_api_key(authorization, db)
     _check_provider(project, "anthropic")
-    _require_key(settings.anthropic_api_key, "anthropic")
+    anthropic_key = _resolve_provider_key(x_provider_key, settings.anthropic_api_key, "anthropic")
     model = payload.get("model", "claude-sonnet-4-6")
 
     check_quota(project, db)
@@ -328,7 +332,7 @@ async def proxy_anthropic(
             got_usage = False
             try:
                 async for chunk in ProxyForwarder.forward_anthropic_stream(
-                    stream_payload, settings.anthropic_api_key, timeout_s=timeout_s
+                    stream_payload, anthropic_key, timeout_s=timeout_s
                 ):
                     text = chunk.decode("utf-8", errors="ignore")
                     for line in text.split("\n"):
@@ -357,7 +361,7 @@ async def proxy_anthropic(
 
     try:
         response = await ProxyForwarder.forward_anthropic(
-            {**payload, "model": final_model}, settings.anthropic_api_key, timeout_s=timeout_s
+            {**payload, "model": final_model}, anthropic_key, timeout_s=timeout_s
         )
     except Exception as e:
         _cancel_usage(db, usage_id)
@@ -374,12 +378,13 @@ async def proxy_anthropic(
 async def proxy_google(
     payload: dict,
     authorization: Optional[str] = Header(None),
+    x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
     x_budgetforge_agent: Optional[str] = Header(None, alias="X-BudgetForge-Agent"),
     db: Session = Depends(get_db),
 ):
     project = _get_project_by_api_key(authorization, db)
     _check_provider(project, "google")
-    _require_key(settings.google_api_key, "google")
+    google_key = _resolve_provider_key(x_provider_key, settings.google_api_key, "google")
     model = payload.get("model", "gemini-2.0-flash")
 
     check_quota(project, db)
@@ -401,7 +406,7 @@ async def proxy_google(
             got_usage = False
             try:
                 async for chunk in ProxyForwarder.forward_google_stream(
-                    stream_payload, settings.google_api_key, timeout_s=timeout_s
+                    stream_payload, google_key, timeout_s=timeout_s
                 ):
                     text = chunk.decode("utf-8", errors="ignore")
                     for line in text.split("\n"):
@@ -427,7 +432,7 @@ async def proxy_google(
 
     try:
         response = await ProxyForwarder.forward_google(
-            {**payload, "model": final_model}, settings.google_api_key, timeout_s=timeout_s
+            {**payload, "model": final_model}, google_key, timeout_s=timeout_s
         )
     except Exception as e:
         _cancel_usage(db, usage_id)
@@ -444,12 +449,13 @@ async def proxy_google(
 async def proxy_deepseek(
     payload: dict,
     authorization: Optional[str] = Header(None),
+    x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
     x_budgetforge_agent: Optional[str] = Header(None, alias="X-BudgetForge-Agent"),
     db: Session = Depends(get_db),
 ):
     project = _get_project_by_api_key(authorization, db)
     _check_provider(project, "deepseek")
-    _require_key(settings.deepseek_api_key, "deepseek")
+    deepseek_key = _resolve_provider_key(x_provider_key, settings.deepseek_api_key, "deepseek")
     model = payload.get("model", "deepseek-chat")
 
     check_quota(project, db)
@@ -471,7 +477,7 @@ async def proxy_deepseek(
             got_usage = False
             try:
                 async for chunk in ProxyForwarder.forward_deepseek_stream(
-                    stream_payload, settings.deepseek_api_key, timeout_s=timeout_s
+                    stream_payload, deepseek_key, timeout_s=timeout_s
                 ):
                     text = chunk.decode("utf-8", errors="ignore")
                     for line in text.split("\n"):
@@ -497,7 +503,7 @@ async def proxy_deepseek(
 
     try:
         response = await ProxyForwarder.forward_deepseek(
-            {**payload, "model": final_model}, settings.deepseek_api_key, timeout_s=timeout_s
+            {**payload, "model": final_model}, deepseek_key, timeout_s=timeout_s
         )
     except Exception as e:
         _cancel_usage(db, usage_id)

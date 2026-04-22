@@ -11,12 +11,12 @@ from services.onboarding_email import send_onboarding_email
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["billing"])
 
-_PAID_PLANS = {"pro", "agency"}
-_PLAN_PRICE_IDS: dict[str, str] = {}
+_CHECKOUT_PLANS = {"free", "pro", "agency"}
 
 
 def _price_ids() -> dict[str, str]:
     return {
+        "free":   settings.stripe_free_price_id,
         "pro":    settings.stripe_pro_price_id,
         "agency": settings.stripe_agency_price_id,
     }
@@ -26,8 +26,8 @@ def _price_ids() -> dict[str, str]:
 
 @router.post("/api/checkout/{plan}")
 async def create_checkout_session(plan: str):
-    if plan not in _PAID_PLANS:
-        raise HTTPException(status_code=400, detail=f"No checkout available for plan '{plan}'. Valid: {sorted(_PAID_PLANS)}")
+    if plan not in _CHECKOUT_PLANS:
+        raise HTTPException(status_code=400, detail=f"No checkout available for plan '{plan}'. Valid: {sorted(_CHECKOUT_PLANS)}")
 
     price_id = _price_ids().get(plan, "")
     if not price_id:
@@ -38,15 +38,20 @@ async def create_checkout_session(plan: str):
 
     stripe.api_key = settings.stripe_secret_key
 
-    session = stripe.checkout.Session.create(
-        mode="subscription",
-        payment_method_types=["card"],
-        line_items=[{"price": price_id, "quantity": 1}],
-        success_url=f"{settings.app_url}/success?session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{settings.app_url}/#pricing",
-        metadata={"plan": plan},
-        allow_promotion_codes=True,
-    )
+    session_params: dict = {
+        "mode": "subscription",
+        "line_items": [{"price": price_id, "quantity": 1}],
+        "success_url": f"{settings.app_url}/success?session_id={{CHECKOUT_SESSION_ID}}",
+        "cancel_url": f"{settings.app_url}/#pricing",
+        "metadata": {"plan": plan},
+        "allow_promotion_codes": True,
+    }
+    if plan == "free":
+        session_params["payment_method_collection"] = "if_required"
+    else:
+        session_params["payment_method_types"] = ["card"]
+
+    session = stripe.checkout.Session.create(**session_params)
     return {"checkout_url": session.url}
 
 

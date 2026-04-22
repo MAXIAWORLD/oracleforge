@@ -97,10 +97,22 @@ class TestCheckout:
         assert resp.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_checkout_free_plan_rejected(self, client):
-        """POST /api/checkout/free → 400 (free plan has no checkout)."""
-        resp = await client.post("/api/checkout/free")
-        assert resp.status_code == 400
+    async def test_checkout_free_returns_url(self, client):
+        """POST /api/checkout/free → checkout_url Stripe $0."""
+        with patch("routes.billing.settings.stripe_free_price_id", "price_test_free"), \
+             patch("stripe.checkout.Session.create", return_value=_mock_checkout_session("free")):
+            resp = await client.post("/api/checkout/free")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "checkout_url" in body
+        assert body["checkout_url"].startswith("https://checkout.stripe.com/")
+
+    @pytest.mark.asyncio
+    async def test_checkout_free_unconfigured_returns_503(self, client):
+        """POST /api/checkout/free sans STRIPE_FREE_PRICE_ID → 503."""
+        with patch("routes.billing.settings.stripe_free_price_id", ""):
+            resp = await client.post("/api/checkout/free")
+        assert resp.status_code == 503
 
 
 # ── Stripe webhook ────────────────────────────────────────────────────────────
@@ -196,6 +208,40 @@ class TestStripeWebhook:
         projects = (await client.get("/api/projects")).json()
         cancelled = next((p for p in projects if p["name"] == "cancel@example.com"), None)
         assert cancelled["plan"] == "free"
+
+    @pytest.mark.asyncio
+    async def test_webhook_free_plan_creates_project(self, client):
+        """checkout.session.completed plan=free → project avec plan=free créé."""
+        event = _fake_checkout_event(plan="free", email="freeuser@example.com")
+        with patch("stripe.Webhook.construct_event", return_value=event), \
+             patch("routes.billing.send_onboarding_email"):
+            resp = await client.post(
+                "/webhook/stripe",
+                content=b'{"fake":"payload"}',
+                headers={"stripe-signature": "valid_sig"},
+            )
+        assert resp.status_code == 200
+        projects = (await client.get("/api/projects")).json()
+        created = next((p for p in projects if p["name"] == "freeuser@example.com"), None)
+        assert created is not None
+        assert created["plan"] == "free"
+
+    @pytest.mark.asyncio
+    async def test_webhook_free_plan_sends_email(self, client):
+        """checkout.session.completed plan=free → email onboarding envoyé."""
+        event = _fake_checkout_event(plan="free", email="freeemail@example.com")
+        with patch("stripe.Webhook.construct_event", return_value=event), \
+             patch("routes.billing.send_onboarding_email") as mock_email:
+            await client.post(
+                "/webhook/stripe",
+                content=b'{"fake":"payload"}',
+                headers={"stripe-signature": "valid_sig"},
+            )
+        assert mock_email.called
+        args = mock_email.call_args[0]
+        assert args[0] == "freeemail@example.com"
+        assert args[1].startswith("bf-")
+        assert args[2] == "free"
 
     @pytest.mark.asyncio
     async def test_webhook_unknown_event_returns_200(self, client):

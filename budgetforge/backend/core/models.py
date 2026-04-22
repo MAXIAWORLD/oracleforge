@@ -59,6 +59,17 @@ class Member(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
+class PortalToken(Base):
+    __tablename__ = "portal_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, nullable=False, index=True)
+    token = Column(String, unique=True, nullable=False, index=True,
+                   default=lambda: secrets.token_urlsafe(32))
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
+
 class Usage(Base):
     __tablename__ = "usages"
 

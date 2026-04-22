@@ -61,7 +61,7 @@ class TestPlanDefaults:
         body = resp.json()
         assert body["plan"] == "free"
         assert body["calls_this_month"] == 42
-        assert body["calls_limit"] == 5_000
+        assert body["calls_limit"] == 1_000
 
     @pytest.mark.asyncio
     async def test_admin_can_set_plan(self, client):
@@ -77,10 +77,10 @@ class TestPlanDefaults:
 
 class TestFreePlanQuota:
     @pytest.mark.asyncio
-    async def test_free_plan_blocked_at_5000(self, client):
-        """plan=free bloqué quand calls_this_month >= 5 000."""
+    async def test_free_plan_blocked_at_1000(self, client):
+        """plan=free bloqué quand calls_this_month >= 1 000."""
         proj = (await client.post("/api/projects", json={"name": "free-block"})).json()
-        with patch("services.plan_quota.get_calls_this_month", return_value=5_000), \
+        with patch("services.plan_quota.get_calls_this_month", return_value=1_000), \
              patch("services.proxy_forwarder.ProxyForwarder.forward_openai", new_callable=AsyncMock) as m:
             m.return_value = FAKE_OPENAI_RESP
             resp = await client.post(
@@ -95,7 +95,7 @@ class TestFreePlanQuota:
     async def test_free_plan_allowed_below_quota(self, client):
         """plan=free autorisé sous 5 000 appels."""
         proj = (await client.post("/api/projects", json={"name": "free-ok"})).json()
-        with patch("services.plan_quota.get_calls_this_month", return_value=4_999), \
+        with patch("services.plan_quota.get_calls_this_month", return_value=999), \
              patch("services.proxy_forwarder.ProxyForwarder.forward_openai", new_callable=AsyncMock) as m:
             m.return_value = FAKE_OPENAI_RESP
             resp = await client.post(

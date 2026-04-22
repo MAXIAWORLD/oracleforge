@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # ── Stripe billing ─────────
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+    stripe_free_price_id: str = ""
     stripe_pro_price_id: str = ""
     stripe_agency_price_id: str = ""
     app_url: str = "https://llmbudget.maxiaworld.app"

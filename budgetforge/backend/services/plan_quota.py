@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from core.models import Usage
 
 PLAN_LIMITS: dict[str, int] = {
-    "free":     5_000,
+    "free":     1_000,
     "pro":    100_000,
     "agency": 500_000,
     "ltd":    100_000,
