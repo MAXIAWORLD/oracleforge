@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { BurnBar } from "@/components/burn-bar";
 import { CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 
@@ -55,31 +56,36 @@ export default function DemoProjectsPage() {
           <div className="py-12 text-center text-sm" style={{ color: "var(--muted-fg)" }}>Loading…</div>
         ) : (
           <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-            {projects.map((p) => (
-              <div key={p.name} className="grid grid-cols-[auto_1fr_140px_120px_100px] gap-4 items-center px-5 py-4">
-                <StatusIcon pct={p.pct_used} />
-                <div>
-                  <p className="font-medium text-sm">{p.name}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--muted-fg)" }}>
-                    {p.allowed_providers?.join(", ") ?? "openai"} · {p.pct_used.toFixed(1)}% used
-                  </p>
-                </div>
-                <BurnBar pct={p.pct_used} showValue={false} height={5} />
-                <div className="text-right">
-                  <p className="font-mono text-sm">${p.used_usd.toFixed(2)}</p>
-                  <p className="font-mono text-xs" style={{ color: "var(--muted-fg)" }}>/ ${p.budget_usd.toFixed(2)}</p>
-                </div>
-                <div className="text-right">
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                    p.action === "block" ? "bg-red-500/10 text-red-400" :
-                    p.action === "downgrade" ? "bg-blue-500/10 text-blue-400" :
-                    "bg-white/5 text-gray-400"
-                  }`}>
-                    {p.action ?? "—"}
-                  </span>
-                </div>
-              </div>
-            ))}
+            {projects.map((p) => {
+              const slug = p.name.toLowerCase().replace(/\s+/g, "-");
+              return (
+                <Link key={p.name} href={`/demo/projects/${slug}`}>
+                  <div className="grid grid-cols-[auto_1fr_140px_120px_100px] gap-4 items-center px-5 py-4 hover:bg-white/5 transition-colors cursor-pointer">
+                    <StatusIcon pct={p.pct_used} />
+                    <div>
+                      <p className="font-medium text-sm">{p.name}</p>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--muted-fg)" }}>
+                        {p.allowed_providers?.join(", ") ?? "openai"} · {p.pct_used.toFixed(1)}% used
+                      </p>
+                    </div>
+                    <BurnBar pct={p.pct_used} showValue={false} height={5} />
+                    <div className="text-right">
+                      <p className="font-mono text-sm">${p.used_usd.toFixed(2)}</p>
+                      <p className="font-mono text-xs" style={{ color: "var(--muted-fg)" }}>/ ${p.budget_usd.toFixed(2)}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                        p.action === "block" ? "bg-red-500/10 text-red-400" :
+                        p.action === "downgrade" ? "bg-blue-500/10 text-blue-400" :
+                        "bg-white/5 text-gray-400"
+                      }`}>
+                        {p.action ?? "—"}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

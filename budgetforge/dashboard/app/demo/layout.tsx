@@ -7,10 +7,9 @@ import { LayoutDashboard, FolderKanban, Zap, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/demo",                label: "Overview",  icon: LayoutDashboard },
-  { href: "/demo/projects",       label: "Projects",  icon: FolderKanban },
-  { href: "/demo/projects/1",     label: "↳ My AI Assistant", icon: FolderKanban },
-  { href: "/demo/activity",       label: "Activity",  icon: Zap },
+  { href: "/demo",          label: "Overview",  icon: LayoutDashboard },
+  { href: "/demo/projects", label: "Projects",  icon: FolderKanban },
+  { href: "/demo/activity", label: "Activity",  icon: Zap },
 ];
 
 export default function DemoLayout({ children }: { children: React.ReactNode }) {
@@ -19,9 +18,11 @@ export default function DemoLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen flex flex-col" style={{ background: "var(--background)", color: "var(--foreground)" }}>
       {/* Demo banner */}
       <div className="w-full py-2 px-4 text-center text-sm font-semibold flex items-center justify-center gap-3 shrink-0" style={{ background: "var(--amber)", color: "#070a0f" }}>
-        <span>Preview — read only</span>
+        <span>Demo — read only</span>
         <span style={{ opacity: 0.5 }}>·</span>
-        <Link href="/#pricing" className="underline hover:opacity-80">Get started →</Link>
+        <a href="https://github.com/majorelalexis-stack/budgetforge" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">
+          Self-host for free →
+        </a>
       </div>
 
       <div className="flex flex-1 min-h-0">

@@ -71,20 +71,32 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
+"use client";
+
+import { useParams } from "next/navigation";
+
+const DEMO_PROJECTS: Record<string, { name: string; used: number; budget: number; chain: string[] }> = {
+  "ai-chat-assistant": { name: "AI Chat Assistant", used: 108.45, budget: 150, chain: ["anthropic/claude-opus-4-7", "anthropic/claude-3-5-sonnet-20241022", "ollama/gemma4:31b"] },
+  "content-generator": { name: "Content Generator", used: 287.92, budget: 300, chain: ["openai/gpt-4o", "openai/gpt-4o-mini", "anthropic/claude-haiku-4-5"] },
+  "web-scraper-agent": { name: "Web Scraper Agent", used: 22.10, budget: 75, chain: ["openai/gpt-4o-mini", "openai/gpt-3.5-turbo"] },
+  "image-analysis": { name: "Image Analysis", used: 156.33, budget: 200, chain: ["google/gemini-2.0-flash", "google/gemini-1.5-pro", "anthropic/claude-opus-4-7"] },
+  "code-review-bot": { name: "Code Review Bot", used: 38.67, budget: 100, chain: ["anthropic/claude-opus-4-7", "openai/gpt-4o"] },
+};
+
 export default function DemoProjectPage() {
+  const params = useParams();
+  const projectId = (params?.id as string) || "ai-chat-assistant";
+  const projectData = DEMO_PROJECTS[projectId] || DEMO_PROJECTS["ai-chat-assistant"];
+
   const [action, setAction]               = useState<"block" | "downgrade">("downgrade");
-  const [budgetUsd, setBudgetUsd]         = useState("150");
+  const [budgetUsd, setBudgetUsd]         = useState(projectData.budget.toString());
   const [threshold, setThreshold]         = useState("80");
   const [allowedProviders, setAllowedProviders] = useState<string[]>([]);
-  const [downgradeChain, setDowngradeChain] = useState([
-    "anthropic/claude-opus-4-7",
-    "anthropic/claude-3-5-sonnet-20241022",
-    "ollama/gemma4:31b",
-  ]);
+  const [downgradeChain, setDowngradeChain] = useState(projectData.chain);
   const [saved, setSaved] = useState(false);
 
-  const USED    = 45.23;
-  const BUDGET  = parseFloat(budgetUsd) || 150;
+  const USED    = projectData.used;
+  const BUDGET  = parseFloat(budgetUsd) || projectData.budget;
   const PCT     = Math.min(100, (USED / BUDGET) * 100);
   const API_KEY = "bf-demo-xxxxxxxxxxxxxxxx";
 
@@ -101,7 +113,7 @@ export default function DemoProjectPage() {
         <Link href="/demo/projects" className="flex items-center gap-1.5 text-xs text-[--muted-fg] hover:text-[--foreground] transition-colors mb-4 w-fit">
           <ArrowLeft className="w-3.5 h-3.5" /> Projects
         </Link>
-        <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">My AI Assistant</h1>
+        <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">{projectData.name}</h1>
         <div className="flex items-center gap-2">
           <code className="font-mono text-xs text-[--muted-fg] bg-white/5 px-2 py-0.5 rounded">{API_KEY}</code>
           <CopyButton text={API_KEY} />
