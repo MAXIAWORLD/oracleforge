@@ -5,6 +5,15 @@ set -euo pipefail
 
 DEPLOY_DIR="/opt/budgetforge"
 REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+BACKUP_DIR="/opt/budgetforge.bak-$(date +%Y%m%d-%H%M%S)"
+
+echo "==> Backup current deploy to $BACKUP_DIR..."
+if [ -d "$DEPLOY_DIR" ]; then
+  sudo cp -a "$DEPLOY_DIR" "$BACKUP_DIR"
+  echo "  (restore: sudo rsync -a --delete $BACKUP_DIR/ $DEPLOY_DIR/)"
+  # Garde les 5 derniers backups, supprime les plus vieux
+  ls -1dt /opt/budgetforge.bak-* 2>/dev/null | tail -n +6 | xargs -r sudo rm -rf
+fi
 
 echo "==> Syncing files..."
 rsync -a --exclude='.git' --exclude='node_modules' --exclude='venv' --exclude='__pycache__' \
