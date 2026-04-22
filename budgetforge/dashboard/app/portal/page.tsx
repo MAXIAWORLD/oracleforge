@@ -105,13 +105,24 @@ function PortalContent() {
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (!token) return;
-    fetch(`/api/portal/verify?token=${token}`)
-      .then((r) => r.ok ? r.json() : Promise.reject(r.status))
-      .then((data) => setProjects(data.projects))
-      .catch(() => setError("This link is invalid or has expired. Request a new one below."));
+    if (token) {
+      // magic link → verify + pose le cookie session 90j
+      fetch(`/api/portal/verify?token=${token}`)
+        .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+        .then((data) => setProjects(data.projects))
+        .catch(() => setError("This link is invalid or has expired. Request a new one below."))
+        .finally(() => setChecking(false));
+    } else {
+      // pas de token → essayer le cookie session existant
+      fetch("/api/portal/session", { credentials: "include" })
+        .then((r) => r.ok ? r.json() : Promise.reject())
+        .then((data) => setProjects(data.projects))
+        .catch(() => {})
+        .finally(() => setChecking(false));
+    }
   }, [token]);
 
   async function handleRequest(e: FormEvent) {
@@ -123,6 +134,19 @@ function PortalContent() {
   }
 
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
+  if (checking) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="w-2 h-2 rounded-full"
+              style={{ background: "var(--amber)", opacity: 0.6 }} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (projects) {
     return (

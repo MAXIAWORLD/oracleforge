@@ -100,7 +100,7 @@ export default function ClientsPage() {
             <motion.div variants={STAGGER.container} initial="hidden" animate="show"
               className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <StatCard icon={Users} label="Total Clients" value={stats.total_clients} accent="#3b82f6"
-                sub={`${signupTotal} new last 30d`} />
+                sub={`${signupTotal} new · ${stats.clients_by_plan.free ?? 0} Free · ${stats.clients_by_plan.pro ?? 0} Pro · ${stats.clients_by_plan.agency ?? 0} Agency`} />
               <StatCard icon={TrendingUp} label="MRR" value={`$${stats.mrr_usd}`} accent="#f59e0b"
                 sub={`${stats.clients_by_plan.pro ?? 0} Pro · ${stats.clients_by_plan.agency ?? 0} Agency`} />
               <StatCard icon={Zap} label="Total Calls" value={stats.total_calls.toLocaleString()} accent="#22c55e"

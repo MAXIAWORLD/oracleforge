@@ -203,3 +203,76 @@ class TestPortalUsage:
 
         resp = await client.get(f"/api/portal/usage?token=wrong-proj-token&project_id={other.id}")
         assert resp.status_code == 403
+
+
+class TestPortalSession:
+    @pytest.mark.asyncio
+    async def test_verify_sets_session_cookie(self, client, test_db):
+        """GET /api/portal/verify?token=xxx → Set-Cookie portal_session 90j."""
+        from core.models import Project, PortalToken
+        from datetime import datetime, timedelta
+
+        proj = Project(name="sess@example.com", plan="pro",
+                       stripe_customer_id="cus_s", stripe_subscription_id="sub_s")
+        test_db.add(proj)
+        test_db.commit()
+
+        token = PortalToken(
+            email="sess@example.com",
+            token="session-token-abc",
+            expires_at=datetime.utcnow() + timedelta(hours=1),
+        )
+        test_db.add(token)
+        test_db.commit()
+
+        resp = await client.get("/api/portal/verify?token=session-token-abc")
+        assert resp.status_code == 200
+        set_cookie = resp.headers.get("set-cookie", "").lower()
+        assert "portal_session" in set_cookie
+        assert "max-age=7776000" in set_cookie
+        assert "httponly" in set_cookie
+
+    @pytest.mark.asyncio
+    async def test_session_valid_cookie_returns_projects(self, client, test_db):
+        """GET /api/portal/session avec cookie valide → 200 + projets."""
+        from core.models import Project, PortalToken
+        from datetime import datetime, timedelta
+
+        proj = Project(name="cookie@example.com", plan="free",
+                       stripe_customer_id="cus_c", stripe_subscription_id="sub_c")
+        test_db.add(proj)
+        test_db.commit()
+
+        token = PortalToken(
+            email="cookie@example.com",
+            token="cookie-token-abc",
+            expires_at=datetime.utcnow() + timedelta(hours=1),
+        )
+        test_db.add(token)
+        test_db.commit()
+
+        resp = await client.get("/api/portal/verify?token=cookie-token-abc")
+        assert resp.status_code == 200
+        session_cookie = resp.cookies.get("portal_session")
+        assert session_cookie is not None
+
+        resp2 = await client.get("/api/portal/session",
+                                  cookies={"portal_session": session_cookie})
+        assert resp2.status_code == 200
+        body = resp2.json()
+        assert "projects" in body
+        assert len(body["projects"]) == 1
+        assert body["projects"][0]["name"] == "cookie@example.com"
+
+    @pytest.mark.asyncio
+    async def test_session_no_cookie_returns_401(self, client):
+        """GET /api/portal/session sans cookie → 401."""
+        resp = await client.get("/api/portal/session")
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_session_invalid_cookie_returns_401(self, client):
+        """GET /api/portal/session avec cookie forgé → 401."""
+        resp = await client.get("/api/portal/session",
+                                 cookies={"portal_session": "fake@example.com.invalidsig"})
+        assert resp.status_code == 401

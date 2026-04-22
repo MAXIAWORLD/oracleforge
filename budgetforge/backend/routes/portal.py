@@ -1,9 +1,11 @@
+import hmac
+import hashlib
 import logging
 import smtplib
 from datetime import datetime, timedelta, date
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -15,6 +17,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["portal"])
 
 _TOKEN_TTL_HOURS = 1
+_SESSION_MAX_AGE = 90 * 24 * 3600  # 90 jours
+
+
+def _portal_secret() -> bytes:
+    return (settings.admin_api_key or "portal-dev-secret").encode()
+
+
+def _sign_session(email: str) -> str:
+    sig = hmac.new(_portal_secret(), email.encode(), hashlib.sha256).hexdigest()
+    return f"{email}.{sig}"
+
+
+def _verify_session(cookie: str) -> str | None:
+    try:
+        email, sig = cookie.rsplit(".", 1)
+    except ValueError:
+        return None
+    expected = hmac.new(_portal_secret(), email.encode(), hashlib.sha256).hexdigest()
+    if hmac.compare_digest(sig, expected):
+        return email
+    return None
 
 
 class PortalRequestBody(BaseModel):
@@ -116,25 +139,45 @@ def portal_usage(token: str, project_id: int, db: Session = Depends(get_db)):
     return {"daily": daily}
 
 
+def _project_list(projects: list) -> list:
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "api_key": p.api_key,
+            "plan": p.plan,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in projects
+    ]
+
+
 @router.get("/api/portal/verify")
-def portal_verify(token: str, db: Session = Depends(get_db)):
+def portal_verify(token: str, response: Response, db: Session = Depends(get_db)):
     record = db.query(PortalToken).filter(PortalToken.token == token).first()
     if not record:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     if record.expires_at < datetime.utcnow():
         raise HTTPException(status_code=401, detail="Token expired")
 
+    response.set_cookie(
+        key="portal_session",
+        value=_sign_session(record.email),
+        max_age=_SESSION_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+    )
     projects = db.query(Project).filter(Project.name == record.email).all()
-    return {
-        "email": record.email,
-        "projects": [
-            {
-                "id": p.id,
-                "name": p.name,
-                "api_key": p.api_key,
-                "plan": p.plan,
-                "created_at": p.created_at.isoformat() if p.created_at else None,
-            }
-            for p in projects
-        ],
-    }
+    return {"email": record.email, "projects": _project_list(projects)}
+
+
+@router.get("/api/portal/session")
+def portal_session(request: Request, db: Session = Depends(get_db)):
+    cookie = request.cookies.get("portal_session")
+    if not cookie:
+        raise HTTPException(status_code=401, detail="No session")
+    email = _verify_session(cookie)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    projects = db.query(Project).filter(Project.name == email).all()
+    return {"email": email, "projects": _project_list(projects)}
