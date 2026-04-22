@@ -12,8 +12,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const NAV = [
   { href: "/dashboard", label: "Overview",   icon: LayoutDashboard },
   { href: "/projects",  label: "Projects",   icon: FolderKanban },
-  { href: "/activity",  label: "Activity",   icon: Zap },
   { href: "/clients",   label: "Clients",    icon: Users },
+  { href: "/activity",  label: "Activity",   icon: Zap },
   { href: "/settings",  label: "Settings",   icon: Settings },
 ];
 
