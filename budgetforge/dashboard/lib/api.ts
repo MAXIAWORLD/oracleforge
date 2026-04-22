@@ -4,6 +4,7 @@ export interface Project {
   id: number;
   name: string;
   api_key: string;
+  plan: string;
   budget_usd: number | null;
   alert_threshold_pct: number | null;
   action: "block" | "downgrade" | null;

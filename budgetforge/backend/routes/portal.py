@@ -1,14 +1,15 @@
 import logging
 import smtplib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from core.config import settings
 from core.database import get_db
-from core.models import Project, PortalToken
+from core.models import Project, PortalToken, Usage
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["portal"])
@@ -75,6 +76,44 @@ def portal_request(body: PortalRequestBody, db: Session = Depends(get_db)):
 
     send_portal_email(email, token.token)
     return {"ok": True}
+
+
+@router.get("/api/portal/usage")
+def portal_usage(token: str, project_id: int, db: Session = Depends(get_db)):
+    record = db.query(PortalToken).filter(PortalToken.token == token).first()
+    if not record:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if record.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=401, detail="Token expired")
+
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.name == record.email,
+    ).first()
+    if not project:
+        raise HTTPException(status_code=403, detail="Project not found or access denied")
+
+    today = date.today()
+    start = today - timedelta(days=29)
+    start_dt = datetime(start.year, start.month, start.day)
+
+    rows = (
+        db.query(
+            func.date(Usage.created_at).label("day"),
+            func.sum(Usage.cost_usd).label("spend"),
+        )
+        .filter(Usage.project_id == project_id, Usage.created_at >= start_dt)
+        .group_by(func.date(Usage.created_at))
+        .all()
+    )
+    by_day = {r.day: float(r.spend) for r in rows}
+
+    daily = [
+        {"date": (start + timedelta(days=i)).isoformat(),
+         "spend": round(by_day.get((start + timedelta(days=i)).isoformat(), 0.0), 9)}
+        for i in range(30)
+    ]
+    return {"daily": daily}
 
 
 @router.get("/api/portal/verify")

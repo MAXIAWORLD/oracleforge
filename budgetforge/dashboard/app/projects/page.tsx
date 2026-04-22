@@ -15,6 +15,22 @@ import { cn } from "@/lib/utils";
 
 interface ProjectWithUsage extends Project { usage: UsageSummary | null }
 
+const PLAN_COLORS: Record<string, { bg: string; text: string }> = {
+  free:   { bg: "bg-[--muted]",        text: "text-[--muted-fg]" },
+  pro:    { bg: "bg-blue-500/10",      text: "text-blue-400" },
+  agency: { bg: "bg-[--amber-dim]",    text: "text-[--amber]" },
+  ltd:    { bg: "bg-purple-500/10",    text: "text-purple-400" },
+};
+
+function PlanBadge({ plan }: { plan: string }) {
+  const c = PLAN_COLORS[plan] ?? PLAN_COLORS.free;
+  return (
+    <span className={cn("text-[9px] font-700 uppercase tracking-wider px-1.5 py-0.5 rounded-full shrink-0", c.bg, c.text)}>
+      {plan}
+    </span>
+  );
+}
+
 function StatusDot({ pct }: { pct: number }) {
   const color =
     pct >= 100 ? "#ef4444" :
@@ -240,7 +256,10 @@ export default function ProjectsPage() {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <StatusDot pct={pct} />
                       <div className="min-w-0">
-                        <h3 className="font-heading font-700 text-sm text-[--foreground] truncate">{p.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-heading font-700 text-sm text-[--foreground] truncate">{p.name}</h3>
+                          <PlanBadge plan={p.plan} />
+                        </div>
                         <p className="font-mono text-[10px] text-[--muted-fg] truncate mt-0.5">{p.api_key}</p>
                       </div>
                     </div>

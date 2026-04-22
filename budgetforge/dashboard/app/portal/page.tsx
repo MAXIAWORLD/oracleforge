@@ -2,6 +2,9 @@
 import { useEffect, useState, FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
+} from "recharts";
 
 type Project = {
   id: number;
@@ -10,6 +13,75 @@ type Project = {
   plan: string;
   created_at: string | null;
 };
+
+type DailySpend = { date: string; spend: number };
+
+function useUsage(token: string, projectId: number): DailySpend[] | null {
+  const [data, setData] = useState<DailySpend[] | null>(null);
+  useEffect(() => {
+    fetch(`/api/portal/usage?token=${token}&project_id=${projectId}`)
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((d) => setData(d.daily))
+      .catch(() => setData([]));
+  }, [token, projectId]);
+  return data;
+}
+
+function formatDay(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function UsageChart({ token, projectId }: { token: string; projectId: number }) {
+  const daily = useUsage(token, projectId);
+  if (!daily) return <div className="h-[120px] flex items-center justify-center text-xs" style={{ color: "#c8d8e8" }}>Loading…</div>;
+
+  const hasData = daily.some((d) => d.spend > 0);
+  const chartData = daily.map((d) => ({ ...d, label: formatDay(d.date) }));
+
+  return (
+    <div className="mt-4">
+      <p className="text-[10px] uppercase tracking-wider mb-2" style={{ color: "#c8d8e8" }}>
+        Usage — last 30 days
+      </p>
+      {hasData ? (
+        <ResponsiveContainer width="100%" height={120}>
+          <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 9, fill: "#c8d8e8" }}
+              tickLine={false}
+              axisLine={false}
+              interval={6}
+            />
+            <YAxis
+              tick={{ fontSize: 9, fill: "#c8d8e8" }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(v: number) => `$${v.toFixed(3)}`}
+            />
+            <Tooltip
+              contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }}
+              formatter={(v) => [`$${Number(v).toFixed(4)}`, "Spend"]}
+              labelStyle={{ color: "#c8d8e8" }}
+            />
+            <Area
+              type="monotone"
+              dataKey="spend"
+              stroke="#f59e0b"
+              fill="#f59e0b"
+              fillOpacity={0.15}
+              strokeWidth={1.5}
+              dot={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      ) : (
+        <p className="text-xs text-center py-8" style={{ color: "#c8d8e8" }}>No usage in the last 30 days</p>
+      )}
+    </div>
+  );
+}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -87,6 +159,7 @@ function PortalContent() {
                   </div>
                 </div>
               </div>
+              <UsageChart token={token!} projectId={p.id} />
               <p className="text-[10px] mt-3" style={{ color: "#c8d8e8" }}>
                 Add header <code className="text-[--amber]">X-Provider-Key: your-openai-key</code> to each request.
               </p>

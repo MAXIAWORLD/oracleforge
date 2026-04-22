@@ -124,3 +124,82 @@ class TestPortalVerify:
         """GET /api/portal/verify?token=bad → 401."""
         resp = await client.get("/api/portal/verify?token=totally-fake-token")
         assert resp.status_code == 401
+
+
+class TestPortalUsage:
+    @pytest.mark.asyncio
+    async def test_usage_valid_token_returns_daily_spend(self, client, test_db):
+        """GET /api/portal/usage?token=xxx&project_id=yyy → liste daily spend 30j."""
+        from core.models import Project, PortalToken, Usage
+        from datetime import datetime, timedelta
+
+        proj = Project(name="usage@example.com", plan="free",
+                       stripe_customer_id="cus_u", stripe_subscription_id="sub_u")
+        test_db.add(proj)
+        test_db.commit()
+
+        u = Usage(project_id=proj.id, provider="openai", model="gpt-4o",
+                  tokens_in=100, tokens_out=50, cost_usd=0.01)
+        test_db.add(u)
+        test_db.commit()
+
+        token = PortalToken(
+            email="usage@example.com",
+            token="usage-token-ok",
+            expires_at=datetime.utcnow() + timedelta(hours=1),
+        )
+        test_db.add(token)
+        test_db.commit()
+
+        resp = await client.get(f"/api/portal/usage?token=usage-token-ok&project_id={proj.id}")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "daily" in body
+        assert isinstance(body["daily"], list)
+        assert len(body["daily"]) == 30
+        total = sum(d["spend"] for d in body["daily"])
+        assert abs(total - 0.01) < 1e-6
+
+    @pytest.mark.asyncio
+    async def test_usage_expired_token_returns_401(self, client, test_db):
+        """GET /api/portal/usage avec token expiré → 401."""
+        from core.models import Project, PortalToken
+        from datetime import datetime, timedelta
+
+        proj = Project(name="exp2@example.com", plan="free",
+                       stripe_customer_id="cus_e2", stripe_subscription_id="sub_e2")
+        test_db.add(proj)
+        test_db.commit()
+
+        token = PortalToken(
+            email="exp2@example.com",
+            token="expired-usage-token",
+            expires_at=datetime.utcnow() - timedelta(minutes=1),
+        )
+        test_db.add(token)
+        test_db.commit()
+
+        resp = await client.get(f"/api/portal/usage?token=expired-usage-token&project_id={proj.id}")
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_usage_wrong_project_returns_403(self, client, test_db):
+        """GET /api/portal/usage avec project_id qui n'appartient pas au token → 403."""
+        from core.models import Project, PortalToken
+        from datetime import datetime, timedelta
+
+        other = Project(name="other@example.com", plan="free",
+                        stripe_customer_id="cus_o", stripe_subscription_id="sub_o")
+        test_db.add(other)
+        test_db.commit()
+
+        token = PortalToken(
+            email="me@example.com",
+            token="wrong-proj-token",
+            expires_at=datetime.utcnow() + timedelta(hours=1),
+        )
+        test_db.add(token)
+        test_db.commit()
+
+        resp = await client.get(f"/api/portal/usage?token=wrong-proj-token&project_id={other.id}")
+        assert resp.status_code == 403
