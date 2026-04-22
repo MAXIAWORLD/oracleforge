@@ -6,13 +6,12 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_PLAN_LABELS = {"free": "Free ($0/mo)", "pro": "Pro ($29/mo)", "agency": "Agency ($79/mo)", "ltd": "Lifetime"}
+_PLAN_LABELS = {"free": "Free ($0/mo)", "pro": "Pro ($29/mo)", "agency": "Agency ($79/mo)"}
 
 _PLAN_DETAILS = {
     "free":   "1,000 calls/month · 1 project · OpenAI + Anthropic",
     "pro":    "100,000 calls/month · 10 projects · OpenAI · Anthropic · Google · DeepSeek",
     "agency": "500,000 calls/month · Unlimited projects · All providers · Priority support",
-    "ltd":    "100,000 calls/month · Lifetime access · All providers",
 }
 
 _BODY_TEMPLATE = """\
@@ -95,4 +94,44 @@ def send_onboarding_email(to: str, api_key: str, plan: str) -> bool:
         return True
     except Exception as e:
         logger.error("Onboarding email failed for %s: %s", to, e)
+        return False
+
+
+_DOWNGRADE_BODY = """\
+Your BudgetForge subscription has been cancelled.
+
+Your account has been downgraded to the Free plan (1,000 calls/month · 1 project).
+
+To resubscribe:
+  https://llmbudget.maxiaworld.app/#pricing
+
+To access your projects via the portal:
+  https://llmbudget.maxiaworld.app/portal
+
+— The BudgetForge team
+https://llmbudget.maxiaworld.app
+"""
+
+
+def send_downgrade_email(to: str) -> bool:
+    if not settings.smtp_host:
+        logger.warning("SMTP not configured — skipping downgrade email to %s", to)
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "Your BudgetForge subscription has been cancelled"
+    msg["From"] = settings.alert_from_email
+    msg["To"] = to
+    msg.attach(MIMEText(_DOWNGRADE_BODY, "plain"))
+
+    try:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
+            server.starttls()
+            if settings.smtp_user:
+                server.login(settings.smtp_user, settings.smtp_password)
+            server.sendmail(settings.alert_from_email, to, msg.as_string())
+        logger.info("Downgrade email sent to %s", to)
+        return True
+    except Exception as e:
+        logger.error("Downgrade email failed for %s: %s", to, e)
         return False

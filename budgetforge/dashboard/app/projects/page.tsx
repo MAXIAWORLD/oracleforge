@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { BurnBar } from "@/components/burn-bar";
 import { Toast } from "@/components/toast";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { api, type Project, type UsageSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -19,7 +20,6 @@ const PLAN_COLORS: Record<string, { bg: string; text: string }> = {
   free:   { bg: "bg-[--muted]",        text: "text-[--muted-fg]" },
   pro:    { bg: "bg-blue-500/10",      text: "text-blue-400" },
   agency: { bg: "bg-[--amber-dim]",    text: "text-[--amber]" },
-  ltd:    { bg: "bg-purple-500/10",    text: "text-purple-400" },
 };
 
 function PlanBadge({ plan }: { plan: string }) {
@@ -141,6 +141,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectWithUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
   function showToast(message: string) { setToast({ show: true, message }); }
 
@@ -170,8 +171,13 @@ export default function ProjectsPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("Delete this project and all its usage history?")) return;
-    await api.projects.delete(id);
+    setConfirmDelete(id);
+  }
+
+  async function confirmDeleteProject() {
+    if (confirmDelete == null) return;
+    await api.projects.delete(confirmDelete);
+    setConfirmDelete(null);
     await refresh();
   }
 
@@ -345,7 +351,15 @@ export default function ProjectsPage() {
         )}
       </AnimatePresence>
 
-      {/* Toast — P3.3 */}
+      <ConfirmDialog
+        open={confirmDelete != null}
+        message="Delete this project and all its usage history? This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDeleteProject}
+        onCancel={() => setConfirmDelete(null)}
+      />
+
       <Toast
         show={toast.show}
         message={toast.message}

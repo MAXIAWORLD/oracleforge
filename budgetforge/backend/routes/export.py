@@ -83,7 +83,7 @@ async def export_usage(
             })
         yield output.getvalue()
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     return StreamingResponse(
         generate_csv(),
         media_type="text/csv",

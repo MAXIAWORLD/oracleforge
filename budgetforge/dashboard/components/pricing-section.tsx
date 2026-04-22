@@ -14,6 +14,7 @@ const PLANS = [
       "Email alerts",
       "Usage export (CSV/JSON)",
       "OpenAI + Anthropic",
+      "Ollama (local LLMs, free)",
     ],
     cta: "Try Free",
     highlight: false,
@@ -27,7 +28,7 @@ const PLANS = [
     projects: "10 projects",
     features: [
       "All Free features",
-      "OpenAI · Anthropic · Google · DeepSeek",
+      "OpenAI · Anthropic · Google · DeepSeek · Ollama",
       "Webhooks (Slack, custom)",
       "Auto-downgrade chains",
       "Team members",

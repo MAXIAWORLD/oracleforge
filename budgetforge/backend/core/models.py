@@ -1,5 +1,5 @@
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Enum, Boolean
 from sqlalchemy.orm import relationship
 from core.database import Base
@@ -35,7 +35,7 @@ class Project(Base):
     plan = Column(String, nullable=False, default="free")  # free / pro / agency / ltd
     stripe_customer_id = Column(String, nullable=True)
     stripe_subscription_id = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
     usages = relationship("Usage", back_populates="project", cascade="all, delete-orphan")
 
 
@@ -44,8 +44,8 @@ class SiteSetting(Base):
 
     key = Column(String, primary_key=True)
     value = Column(String, nullable=True)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-                        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(DateTime, default=lambda: datetime.utcnow(),
+                        onupdate=lambda: datetime.utcnow())
 
 
 class Member(Base):
@@ -56,7 +56,7 @@ class Member(Base):
     api_key = Column(String, unique=True, nullable=False,
                      default=lambda: f"bf-mbr-{secrets.token_urlsafe(24)}")
     role = Column(String, nullable=False, default="viewer")  # "admin" or "viewer"
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
 
 
 class PortalToken(Base):
@@ -67,7 +67,15 @@ class PortalToken(Base):
     token = Column(String, unique=True, nullable=False, index=True,
                    default=lambda: secrets.token_urlsafe(32))
     expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+
+
+class SignupAttempt(Base):
+    __tablename__ = "signup_attempts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ip = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.utcnow())
 
 
 class Usage(Base):
@@ -81,5 +89,5 @@ class Usage(Base):
     tokens_out = Column(Integer, default=0)
     cost_usd = Column(Float, default=0.0)
     agent = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
     project = relationship("Project", back_populates="usages")

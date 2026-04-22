@@ -51,6 +51,7 @@ const PROXY_ENDPOINTS = [
   { method: "POST", path: "/proxy/google/v1/chat/completions",    provider: "Google",    note: "OpenAI-compat" },
   { method: "POST", path: "/proxy/deepseek/v1/chat/completions",  provider: "DeepSeek",  note: "OpenAI-compat" },
   { method: "POST", path: "/proxy/ollama/api/chat",               provider: "Ollama",    note: "Free, tokens counted" },
+  { method: "POST", path: "/proxy/ollama/v1/chat/completions",   provider: "Ollama",    note: "OpenAI-compat (drop-in)" },
 ];
 
 function CopyButton({ text }: { text: string }) {
@@ -240,10 +241,11 @@ export default function SettingsPage() {
         >
           <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">Settings</h1>
           <p className="text-[--muted-fg] text-sm">
-            Configure provider API keys in{" "}
+            Configure provider API keys in your backend{" "}
             <code className="font-mono text-[--foreground] bg-white/5 px-1.5 py-0.5 rounded text-xs">
-              budgetforge/backend/.env
-            </code>
+              .env
+            </code>{" "}
+            file
           </p>
         </motion.div>
 
@@ -350,7 +352,7 @@ export default function SettingsPage() {
                     {method}
                   </span>
                   <code className="font-mono text-xs text-[--foreground] flex-1">{path}</code>
-                  <CopyButton text={`http://localhost:8011${path}`} />
+                  <CopyButton text={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}${path}`} />
                   <span className="text-[10px] text-[--muted-fg] shrink-0">{provider} · {note}</span>
                 </div>
               ))}

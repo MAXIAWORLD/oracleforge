@@ -8,14 +8,14 @@ from core.auth import require_admin
 
 router = APIRouter(tags=["admin"])
 
-_MRR_BY_PLAN = {"free": 0, "pro": 29, "agency": 79, "ltd": 0}
+_MRR_BY_PLAN = {"free": 0, "pro": 29, "agency": 79}
 
 
 @router.get("/api/admin/stats", dependencies=[Depends(require_admin)])
 def admin_stats(db: Session = Depends(get_db)):
     # Clients par plan
     rows = db.query(Project.plan, func.count(Project.id)).group_by(Project.plan).all()
-    clients_by_plan: dict[str, int] = {"free": 0, "pro": 0, "agency": 0, "ltd": 0}
+    clients_by_plan: dict[str, int] = {"free": 0, "pro": 0, "agency": 0}
     for plan, count in rows:
         clients_by_plan[plan] = count
 

@@ -128,9 +128,10 @@ class TestPortalVerify:
 
 class TestPortalUsage:
     @pytest.mark.asyncio
-    async def test_usage_valid_token_returns_daily_spend(self, client, test_db):
-        """GET /api/portal/usage?token=xxx&project_id=yyy → liste daily spend 30j."""
+    async def test_usage_via_session_cookie_returns_daily_spend(self, client, test_db):
+        """GET /api/portal/usage avec session cookie valide → liste daily spend 30j."""
         from core.models import Project, PortalToken, Usage
+        from routes.portal import _sign_session
         from datetime import datetime, timedelta
 
         proj = Project(name="usage@example.com", plan="free",
@@ -143,15 +144,11 @@ class TestPortalUsage:
         test_db.add(u)
         test_db.commit()
 
-        token = PortalToken(
-            email="usage@example.com",
-            token="usage-token-ok",
-            expires_at=datetime.utcnow() + timedelta(hours=1),
+        cookie = _sign_session("usage@example.com")
+        resp = await client.get(
+            f"/api/portal/usage?project_id={proj.id}",
+            cookies={"portal_session": cookie},
         )
-        test_db.add(token)
-        test_db.commit()
-
-        resp = await client.get(f"/api/portal/usage?token=usage-token-ok&project_id={proj.id}")
         assert resp.status_code == 200
         body = resp.json()
         assert "daily" in body
@@ -161,9 +158,9 @@ class TestPortalUsage:
         assert abs(total - 0.01) < 1e-6
 
     @pytest.mark.asyncio
-    async def test_usage_expired_token_returns_401(self, client, test_db):
-        """GET /api/portal/usage avec token expiré → 401."""
-        from core.models import Project, PortalToken
+    async def test_usage_no_cookie_returns_401(self, client, test_db):
+        """GET /api/portal/usage sans cookie → 401."""
+        from core.models import Project
         from datetime import datetime, timedelta
 
         proj = Project(name="exp2@example.com", plan="free",
@@ -171,37 +168,26 @@ class TestPortalUsage:
         test_db.add(proj)
         test_db.commit()
 
-        token = PortalToken(
-            email="exp2@example.com",
-            token="expired-usage-token",
-            expires_at=datetime.utcnow() - timedelta(minutes=1),
-        )
-        test_db.add(token)
-        test_db.commit()
-
-        resp = await client.get(f"/api/portal/usage?token=expired-usage-token&project_id={proj.id}")
+        resp = await client.get(f"/api/portal/usage?project_id={proj.id}")
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
     async def test_usage_wrong_project_returns_403(self, client, test_db):
-        """GET /api/portal/usage avec project_id qui n'appartient pas au token → 403."""
-        from core.models import Project, PortalToken
-        from datetime import datetime, timedelta
+        """GET /api/portal/usage avec cookie d'un email différent du projet → 403."""
+        from core.models import Project
+        from routes.portal import _sign_session
 
         other = Project(name="other@example.com", plan="free",
                         stripe_customer_id="cus_o", stripe_subscription_id="sub_o")
         test_db.add(other)
         test_db.commit()
 
-        token = PortalToken(
-            email="me@example.com",
-            token="wrong-proj-token",
-            expires_at=datetime.utcnow() + timedelta(hours=1),
+        # Cookie signé pour "me@example.com" — ne possède pas le projet "other@example.com"
+        cookie = _sign_session("me@example.com")
+        resp = await client.get(
+            f"/api/portal/usage?project_id={other.id}",
+            cookies={"portal_session": cookie},
         )
-        test_db.add(token)
-        test_db.commit()
-
-        resp = await client.get(f"/api/portal/usage?token=wrong-proj-token&project_id={other.id}")
         assert resp.status_code == 403
 
 

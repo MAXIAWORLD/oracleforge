@@ -124,7 +124,7 @@ def _compute_forecast(period_usages: list, remaining_usd: float) -> Optional[flo
     if used <= 0:
         return None
     earliest = min(u.created_at for u in period_usages)
-    days_elapsed = (datetime.now() - earliest).total_seconds() / 86400
+    days_elapsed = (datetime.utcnow() - earliest).total_seconds() / 86400
     if days_elapsed < 1 / 1440:
         return None
     burn_rate = used / days_elapsed
@@ -292,7 +292,7 @@ def get_daily_usage(project_id: int, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    today = datetime.now().date()
+    today = datetime.utcnow().date()
     start = today - timedelta(days=29)
 
     usages = db.query(Usage).filter(
@@ -318,7 +318,7 @@ def rotate_key(project_id: int, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     project.previous_api_key = project.api_key
-    project.key_rotated_at = datetime.now()
+    project.key_rotated_at = datetime.utcnow()
     project.api_key = f"bf-{secrets.token_urlsafe(32)}"
     db.commit()
     db.refresh(project)

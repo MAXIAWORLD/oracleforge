@@ -20,8 +20,13 @@ _TOKEN_TTL_HOURS = 1
 _SESSION_MAX_AGE = 90 * 24 * 3600  # 90 jours
 
 
+def cleanup_expired_tokens(db: Session) -> None:
+    db.query(PortalToken).filter(PortalToken.expires_at < datetime.utcnow()).delete()
+    db.commit()
+
+
 def _portal_secret() -> bytes:
-    return (settings.admin_api_key or "portal-dev-secret").encode()
+    return (settings.portal_secret or "portal-dev-secret").encode()
 
 
 def _sign_session(email: str) -> str:
@@ -84,6 +89,7 @@ https://llmbudget.maxiaworld.app
 
 @router.post("/api/portal/request")
 def portal_request(body: PortalRequestBody, db: Session = Depends(get_db)):
+    cleanup_expired_tokens(db)
     email = body.email.strip().lower()
     projects = db.query(Project).filter(Project.name == email).all()
     if not projects:
@@ -102,16 +108,17 @@ def portal_request(body: PortalRequestBody, db: Session = Depends(get_db)):
 
 
 @router.get("/api/portal/usage")
-def portal_usage(token: str, project_id: int, db: Session = Depends(get_db)):
-    record = db.query(PortalToken).filter(PortalToken.token == token).first()
-    if not record:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    if record.expires_at < datetime.utcnow():
-        raise HTTPException(status_code=401, detail="Token expired")
+def portal_usage(request: Request, project_id: int, db: Session = Depends(get_db)):
+    cookie = request.cookies.get("portal_session")
+    if not cookie:
+        raise HTTPException(status_code=401, detail="No session")
+    email = _verify_session(cookie)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid session")
 
     project = db.query(Project).filter(
         Project.id == project_id,
-        Project.name == record.email,
+        Project.name == email,
     ).first()
     if not project:
         raise HTTPException(status_code=403, detail="Project not found or access denied")
@@ -158,17 +165,26 @@ def portal_verify(token: str, response: Response, db: Session = Depends(get_db))
     if not record:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     if record.expires_at < datetime.utcnow():
+        db.delete(record)
+        db.commit()
         raise HTTPException(status_code=401, detail="Token expired")
 
+    email = record.email
+    # Invalider le token — usage unique (magic link)
+    db.delete(record)
+    db.commit()
+
+    secure = settings.app_url.startswith("https")
     response.set_cookie(
         key="portal_session",
-        value=_sign_session(record.email),
+        value=_sign_session(email),
         max_age=_SESSION_MAX_AGE,
         httponly=True,
         samesite="lax",
+        secure=secure,
     )
-    projects = db.query(Project).filter(Project.name == record.email).all()
-    return {"email": record.email, "projects": _project_list(projects)}
+    projects = db.query(Project).filter(Project.name == email).all()
+    return {"email": email, "projects": _project_list(projects)}
 
 
 @router.get("/api/portal/session")

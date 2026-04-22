@@ -16,6 +16,7 @@ import { Shell } from "@/components/shell";
 import { BudgetRing } from "@/components/budget-ring";
 import { BurnBar } from "@/components/burn-bar";
 import { Toast } from "@/components/toast";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ModelSelect } from "@/components/model-select";
 import { api, type Project, type UsageSummary, type UsageBreakdown, type AgentBreakdown, type DailySpend } from "@/lib/api";
 import { QuickIntegration } from "@/components/quick-integration";
@@ -161,7 +162,7 @@ function ProviderBreakdownChart({ breakdown }: { breakdown: UsageBreakdown | nul
               <div className="flex items-center gap-3 shrink-0">
                 <span className="font-mono text-[10px] text-[--muted-fg]">{e.calls}×</span>
                 <span className="font-mono text-xs font-600" style={{ color: e.color }}>
-                  ${e.value.toFixed(4)}
+                  {e.name === "ollama" ? "local" : `$${e.value.toFixed(4)}`}
                 </span>
               </div>
             </div>
@@ -229,13 +230,19 @@ export default function ProjectDetailPage({
 
   const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
   const [rotating, setRotating] = useState(false);
+  const [confirmRotate, setConfirmRotate] = useState(false);
   function showToast(message: string) {
     setToast({ show: true, message });
   }
 
   async function rotateKey() {
     if (!project) return;
-    if (!confirm("Rotate API key? The current key will stop working immediately.")) return;
+    setConfirmRotate(true);
+  }
+
+  async function confirmRotateKey() {
+    if (!project) return;
+    setConfirmRotate(false);
     setRotating(true);
     try {
       await api.projects.rotateKey(project.id);
@@ -714,7 +721,14 @@ export default function ProjectDetailPage({
         </div>
       </div>
 
-      {/* Toast — P3.3 */}
+      <ConfirmDialog
+        open={confirmRotate}
+        message="Rotate API key? The current key will stop working immediately."
+        confirmLabel="Rotate"
+        onConfirm={confirmRotateKey}
+        onCancel={() => setConfirmRotate(false)}
+      />
+
       <Toast
         show={toast.show}
         message={toast.message}

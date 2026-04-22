@@ -1,17 +1,20 @@
 import asyncio
 import logging
+import re
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from core.config import settings
 from core.database import get_db
+from core.limiter import limiter
 from core.models import Project
-from services.onboarding_email import send_onboarding_email
+from services.onboarding_email import send_onboarding_email, send_downgrade_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["billing"])
 
 _CHECKOUT_PLANS = {"free", "pro", "agency"}
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _price_ids() -> dict[str, str]:
@@ -25,7 +28,8 @@ def _price_ids() -> dict[str, str]:
 # ── Checkout ──────────────────────────────────────────────────────────────────
 
 @router.post("/api/checkout/{plan}")
-async def create_checkout_session(plan: str):
+@limiter.limit("5/hour")
+async def create_checkout_session(request: Request, plan: str):
     if plan not in _CHECKOUT_PLANS:
         raise HTTPException(status_code=400, detail=f"No checkout available for plan '{plan}'. Valid: {sorted(_CHECKOUT_PLANS)}")
 
@@ -86,11 +90,32 @@ async def _handle_checkout_completed(session: dict, db: Session) -> None:
     email = (
         (session.get("customer_details") or {}).get("email")
         or session.get("customer_email")
-        or "unknown"
     )
+    if not email or not _EMAIL_RE.match(str(email)):
+        logger.warning(
+            "Invalid or missing email in checkout — customer=%s session=%s",
+            session.get("customer"),
+            session.get("id"),
+        )
+        return
+
     plan = (session.get("metadata") or {}).get("plan", "pro")
     customer_id = session.get("customer")
     subscription_id = session.get("subscription")
+
+    # P2.1 — idempotence: upsert if subscription already exists
+    if subscription_id:
+        existing = db.query(Project).filter(
+            Project.stripe_subscription_id == subscription_id
+        ).first()
+        if existing:
+            existing.plan = plan
+            db.commit()
+            logger.info(
+                "Subscription %s already exists — plan updated to %s (project_id=%s)",
+                subscription_id, plan, existing.id,
+            )
+            return
 
     project = Project(
         name=email,
@@ -117,3 +142,4 @@ def _handle_subscription_deleted(subscription: dict, db: Session) -> None:
         project.plan = "free"
         db.commit()
         logger.info("Project %s downgraded to free (subscription %s cancelled)", project.id, subscription_id)
+        send_downgrade_email(project.name)

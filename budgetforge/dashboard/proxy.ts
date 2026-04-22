@@ -4,9 +4,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 const PROTECTED_PATHS = ["/dashboard", "/projects", "/activity", "/settings", "/clients"];
 
-function computeExpectedToken(secret: string): string {
-  return createHmac("sha256", secret).update("session").digest("hex");
-}
+const TOKEN_MAX_AGE_MS = 86_400_000; // 24 h
 
 function isProtected(pathname: string): boolean {
   return PROTECTED_PATHS.some(
@@ -14,10 +12,24 @@ function isProtected(pathname: string): boolean {
   );
 }
 
+function verifyToken(cookie: string, secret: string): boolean {
+  const dotIdx = cookie.lastIndexOf(".");
+  if (dotIdx === -1) return false;
+
+  const ts = cookie.slice(0, dotIdx);
+  const sig = cookie.slice(dotIdx + 1);
+
+  const timestamp = parseInt(ts, 10);
+  if (isNaN(timestamp) || Date.now() - timestamp > TOKEN_MAX_AGE_MS) return false;
+
+  const expected = createHmac("sha256", secret).update(ts).digest("hex");
+  if (sig.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(sig, "utf8"), Buffer.from(expected, "utf8"));
+}
+
 export function proxy(request: NextRequest): NextResponse {
   const dashboardPassword = process.env.DASHBOARD_PASSWORD ?? "";
 
-  // Dev mode: no password set → pass through
   if (!dashboardPassword) {
     return NextResponse.next();
   }
@@ -29,13 +41,9 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   const sessionSecret = process.env.SESSION_SECRET ?? "default-secret";
-  const expectedToken = computeExpectedToken(sessionSecret);
-  const sessionCookie = request.cookies.get("bf_session")?.value;
+  const sessionCookie = request.cookies.get("bf_session")?.value ?? "";
 
-  const a = Buffer.from(sessionCookie ?? "", "utf8");
-  const b = Buffer.from(expectedToken, "utf8");
-  const valid = a.length === b.length && timingSafeEqual(a, b);
-  if (valid) return NextResponse.next();
+  if (verifyToken(sessionCookie, sessionSecret)) return NextResponse.next();
 
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("from", pathname);

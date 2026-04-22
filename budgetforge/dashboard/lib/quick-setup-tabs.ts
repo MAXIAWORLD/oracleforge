@@ -74,4 +74,5 @@ export const PROXY_URLS: Record<string, string> = {
   anthropic: "/proxy/anthropic/v1",
   google:    "/proxy/google/v1",
   deepseek:  "/proxy/deepseek/v1",
+  ollama:    "/proxy/ollama/v1/chat/completions",
 };

@@ -23,7 +23,6 @@ const PLAN_COLORS: Record<string, string> = {
   free:   "#64748b",
   pro:    "#3b82f6",
   agency: "#f59e0b",
-  ltd:    "#a855f7",
 };
 
 const STAGGER = {
@@ -129,7 +128,7 @@ export default function ClientsPage() {
             {/* Plan count cards */}
             <motion.div variants={STAGGER.container} initial="hidden" animate="show"
               className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              {(["free", "pro", "agency", "ltd"] as const).map((plan) => (
+              {(["free", "pro", "agency"] as const).map((plan) => (
                 <PlanCountCard key={plan} plan={plan} count={stats.clients_by_plan[plan] ?? 0} />
               ))}
             </motion.div>
@@ -226,7 +225,7 @@ export default function ClientsPage() {
                   Revenue breakdown
                 </h2>
                 <div className="flex flex-col gap-3">
-                  {(["free", "pro", "agency", "ltd"] as const).map((plan) => {
+                  {(["free", "pro", "agency"] as const).map((plan) => {
                     const count = stats.clients_by_plan[plan] ?? 0;
                     const mrr = (plan === "pro" ? 29 : plan === "agency" ? 79 : 0) * count;
                     return (

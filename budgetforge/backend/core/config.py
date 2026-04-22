@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     stripe_pro_price_id: str = ""
     stripe_agency_price_id: str = ""
     app_url: str = "https://llmbudget.maxiaworld.app"
+    # ── Environnement ──────────────
+    app_env: str = "development"   # "production" active les guards obligatoires
+    portal_secret: str = ""        # obligatoire en production
 
 
 settings = Settings()

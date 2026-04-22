@@ -83,7 +83,7 @@ export function QuickIntegration({ apiKey, proxyBase }: { apiKey: string; proxyB
       {/* All proxy URLs */}
       <details>
         <summary className="text-[10px] text-[--muted-fg] cursor-pointer hover:text-[--foreground] transition-colors select-none">
-          All proxy URLs (OpenAI · Anthropic · Google · DeepSeek)
+          All proxy URLs (OpenAI · Anthropic · Google · DeepSeek · Ollama)
         </summary>
         <div className="mt-2 flex flex-col gap-1.5">
           {Object.entries(PROXY_URLS).map(([provider, path]) => (

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import httpx
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.responses import StreamingResponse
@@ -39,7 +40,7 @@ def _get_project_by_api_key(authorization: Optional[str], db: Session) -> Projec
 
     # Check previous key within grace period
     from datetime import timedelta
-    cutoff = datetime.now() - timedelta(minutes=_GRACE_PERIOD_MINUTES)
+    cutoff = datetime.utcnow() - timedelta(minutes=_GRACE_PERIOD_MINUTES)
     project = db.query(Project).filter(
         Project.previous_api_key == api_key,
         Project.key_rotated_at >= cutoff,
@@ -224,8 +225,187 @@ async def _maybe_send_alert(project: Project, db: Session) -> None:
 
     if email_ok or webhook_ok:
         project.alert_sent = True
-        project.alert_sent_at = datetime.now()
+        project.alert_sent_at = datetime.utcnow()
         db.commit()
+
+
+# ── Shared dispatch helpers ───────────────────────────────────────────────────
+
+async def _openai_format_stream_gen(
+    stream_payload: dict,
+    api_key: str,
+    forward_stream_fn,
+    timeout_s: float,
+    provider_name: str,
+    db: Session,
+    usage_id: int,
+    final_model: str,
+    project,
+):
+    tokens_in, tokens_out = 0, 0
+    got_usage = False
+    try:
+        async for chunk in forward_stream_fn(stream_payload, api_key, timeout_s=timeout_s):
+            text = chunk.decode("utf-8", errors="ignore")
+            for line in text.split("\n"):
+                if line.startswith("data: ") and line.strip() != "data: [DONE]":
+                    try:
+                        data = json.loads(line[6:])
+                        usage = data.get("usage")
+                        if usage:
+                            tokens_in = usage.get("prompt_tokens", tokens_in)
+                            tokens_out = usage.get("completion_tokens", tokens_out)
+                            got_usage = True
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+            yield chunk
+    except Exception as e:
+        logger.error(f"{provider_name} stream error: {e}")
+    finally:
+        if got_usage:
+            _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
+        await _maybe_send_alert(project, db)
+
+
+async def _dispatch_openai_format(
+    payload: dict,
+    project,
+    provider_name: str,
+    final_model: str,
+    usage_id: int,
+    api_key: str,
+    forward_fn,
+    forward_stream_fn,
+    timeout_s: float,
+    db: Session,
+):
+    if payload.get("stream"):
+        stream_payload = {
+            **payload,
+            "model": final_model,
+            "stream_options": {"include_usage": True},
+        }
+        return StreamingResponse(
+            _openai_format_stream_gen(
+                stream_payload, api_key, forward_stream_fn, timeout_s,
+                provider_name, db, usage_id, final_model, project,
+            ),
+            media_type="text/event-stream",
+        )
+
+    try:
+        response = await forward_fn(
+            {**payload, "model": final_model}, api_key, timeout_s=timeout_s
+        )
+    except Exception as e:
+        _cancel_usage(db, usage_id)
+        logger.error(f"{provider_name} proxy error: {e}")
+        raise HTTPException(status_code=502, detail=f"LLM API unavailable: {e}")
+
+    usage = response.get("usage", {})
+    _finalize_usage(
+        db, usage_id,
+        usage.get("prompt_tokens", 0),
+        usage.get("completion_tokens", 0),
+        final_model,
+    )
+    await _maybe_send_alert(project, db)
+    return response
+
+
+async def _anthropic_stream_gen(
+    stream_payload: dict,
+    api_key: str,
+    timeout_s: float,
+    db: Session,
+    usage_id: int,
+    final_model: str,
+    project,
+):
+    tokens_in, tokens_out = 0, 0
+    got_usage = False
+    try:
+        async for chunk in ProxyForwarder.forward_anthropic_stream(
+            stream_payload, api_key, timeout_s=timeout_s
+        ):
+            text = chunk.decode("utf-8", errors="ignore")
+            for line in text.split("\n"):
+                if line.startswith("data: "):
+                    try:
+                        data = json.loads(line[6:])
+                        event_type = data.get("type")
+                        if event_type == "message_start":
+                            usage = data.get("message", {}).get("usage", {})
+                            tokens_in = usage.get("input_tokens", 0)
+                            got_usage = True
+                        elif event_type == "message_delta":
+                            usage = data.get("usage", {})
+                            tokens_out = usage.get("output_tokens", 0)
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+            yield chunk
+    except Exception as e:
+        logger.error(f"Anthropic stream error: {e}")
+    finally:
+        if got_usage:
+            _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
+        await _maybe_send_alert(project, db)
+
+
+async def _dispatch_anthropic_format(
+    payload: dict,
+    project,
+    final_model: str,
+    usage_id: int,
+    api_key: str,
+    timeout_s: float,
+    db: Session,
+):
+    if payload.get("stream"):
+        stream_payload = {**payload, "model": final_model}
+        return StreamingResponse(
+            _anthropic_stream_gen(
+                stream_payload, api_key, timeout_s, db, usage_id, final_model, project
+            ),
+            media_type="text/event-stream",
+        )
+
+    try:
+        response = await ProxyForwarder.forward_anthropic(
+            {**payload, "model": final_model}, api_key, timeout_s=timeout_s
+        )
+    except Exception as e:
+        _cancel_usage(db, usage_id)
+        logger.error(f"Anthropic proxy error: {e}")
+        raise HTTPException(status_code=502, detail=f"LLM API unavailable: {e}")
+
+    usage = response.get("usage", {})
+    _finalize_usage(
+        db, usage_id,
+        usage.get("input_tokens", 0),
+        usage.get("output_tokens", 0),
+        final_model,
+    )
+    await _maybe_send_alert(project, db)
+    return response
+
+
+async def _dispatch_ollama_fallback(
+    payload: dict, project, final_model: str, usage_id: int, db: Session
+):
+    """Appelé quand un handler cloud reçoit final_model = 'ollama/*' (budget épuisé)."""
+    bare_model = final_model.removeprefix("ollama/")
+    try:
+        response = await ProxyForwarder.forward_ollama({**payload, "model": bare_model})
+    except Exception as e:
+        _cancel_usage(db, usage_id)
+        logger.error(f"Ollama fallback error: {e}")
+        raise HTTPException(status_code=502, detail=f"Ollama unavailable: {e}")
+    tokens_in = response.get("prompt_eval_count", 0)
+    tokens_out = response.get("eval_count", 0)
+    _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
+    await _maybe_send_alert(project, db)
+    return response
 
 
 # ── Proxy routes ──────────────────────────────────────────────────────────────
@@ -248,60 +428,17 @@ async def proxy_openai(
     async with budget_lock(project.id):
         final_model = _check_budget(project, db, model)
         _check_per_call_cap(project, payload, final_model)
-        usage_id = _prebill_usage(db, project, "openai", final_model, payload, x_budgetforge_agent)
+        provider = "ollama" if final_model.startswith("ollama/") else "openai"
+        usage_id = _prebill_usage(db, project, provider, final_model, payload, x_budgetforge_agent)
 
     timeout_s = project.proxy_timeout_ms / 1000.0 if project.proxy_timeout_ms else 60.0
-
-    if payload.get("stream"):
-        stream_payload = {
-            **payload,
-            "model": final_model,
-            "stream_options": {"include_usage": True},
-        }
-
-        async def generate_openai():
-            tokens_in, tokens_out = 0, 0
-            got_usage = False
-            try:
-                async for chunk in ProxyForwarder.forward_openai_stream(
-                    stream_payload, openai_key, timeout_s=timeout_s
-                ):
-                    text = chunk.decode("utf-8", errors="ignore")
-                    for line in text.split("\n"):
-                        if line.startswith("data: ") and line.strip() != "data: [DONE]":
-                            try:
-                                data = json.loads(line[6:])
-                                usage = data.get("usage")
-                                if usage:
-                                    tokens_in = usage.get("prompt_tokens", tokens_in)
-                                    tokens_out = usage.get("completion_tokens", tokens_out)
-                                    got_usage = True
-                            except (json.JSONDecodeError, KeyError):
-                                pass
-                    yield chunk
-            except Exception as e:
-                logger.error(f"OpenAI stream error: {e}")
-            finally:
-                # H5: si tokens réels reçus, finaliser; sinon garder l'estimation (coût conservateur)
-                if got_usage:
-                    _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
-                await _maybe_send_alert(project, db)
-
-        return StreamingResponse(generate_openai(), media_type="text/event-stream")
-
-    try:
-        response = await ProxyForwarder.forward_openai(
-            {**payload, "model": final_model}, openai_key, timeout_s=timeout_s
-        )
-    except Exception as e:
-        _cancel_usage(db, usage_id)
-        logger.error(f"OpenAI proxy error: {e}")
-        raise HTTPException(status_code=502, detail=f"LLM API unavailable: {e}")
-
-    usage = response.get("usage", {})
-    _finalize_usage(db, usage_id, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), final_model)
-    await _maybe_send_alert(project, db)
-    return response
+    if final_model.startswith("ollama/"):
+        return await _dispatch_ollama_fallback(payload, project, final_model, usage_id, db)
+    return await _dispatch_openai_format(
+        payload, project, "openai", final_model, usage_id,
+        openai_key, ProxyForwarder.forward_openai,
+        ProxyForwarder.forward_openai_stream, timeout_s, db,
+    )
 
 
 @router.post("/proxy/anthropic/v1/messages")
@@ -320,58 +457,15 @@ async def proxy_anthropic(
     check_quota(project, db)
     async with budget_lock(project.id):
         final_model = _check_budget(project, db, model)
-        usage_id = _prebill_usage(db, project, "anthropic", final_model, payload, x_budgetforge_agent)
+        provider = "ollama" if final_model.startswith("ollama/") else "anthropic"
+        usage_id = _prebill_usage(db, project, provider, final_model, payload, x_budgetforge_agent)
 
     timeout_s = project.proxy_timeout_ms / 1000.0 if project.proxy_timeout_ms else 60.0
-
-    if payload.get("stream"):
-        stream_payload = {**payload, "model": final_model}
-
-        async def generate_anthropic():
-            tokens_in, tokens_out = 0, 0
-            got_usage = False
-            try:
-                async for chunk in ProxyForwarder.forward_anthropic_stream(
-                    stream_payload, anthropic_key, timeout_s=timeout_s
-                ):
-                    text = chunk.decode("utf-8", errors="ignore")
-                    for line in text.split("\n"):
-                        if line.startswith("data: "):
-                            try:
-                                data = json.loads(line[6:])
-                                event_type = data.get("type")
-                                if event_type == "message_start":
-                                    usage = data.get("message", {}).get("usage", {})
-                                    tokens_in = usage.get("input_tokens", 0)
-                                    got_usage = True
-                                elif event_type == "message_delta":
-                                    usage = data.get("usage", {})
-                                    tokens_out = usage.get("output_tokens", 0)
-                            except (json.JSONDecodeError, KeyError):
-                                pass
-                    yield chunk
-            except Exception as e:
-                logger.error(f"Anthropic stream error: {e}")
-            finally:
-                if got_usage:
-                    _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
-                await _maybe_send_alert(project, db)
-
-        return StreamingResponse(generate_anthropic(), media_type="text/event-stream")
-
-    try:
-        response = await ProxyForwarder.forward_anthropic(
-            {**payload, "model": final_model}, anthropic_key, timeout_s=timeout_s
-        )
-    except Exception as e:
-        _cancel_usage(db, usage_id)
-        logger.error(f"Anthropic proxy error: {e}")
-        raise HTTPException(status_code=502, detail=f"LLM API unavailable: {e}")
-
-    usage = response.get("usage", {})
-    _finalize_usage(db, usage_id, usage.get("input_tokens", 0), usage.get("output_tokens", 0), final_model)
-    await _maybe_send_alert(project, db)
-    return response
+    if final_model.startswith("ollama/"):
+        return await _dispatch_ollama_fallback(payload, project, final_model, usage_id, db)
+    return await _dispatch_anthropic_format(
+        payload, project, final_model, usage_id, anthropic_key, timeout_s, db
+    )
 
 
 @router.post("/proxy/google/v1/chat/completions")
@@ -390,59 +484,17 @@ async def proxy_google(
     check_quota(project, db)
     async with budget_lock(project.id):
         final_model = _check_budget(project, db, model)
-        usage_id = _prebill_usage(db, project, "google", final_model, payload, x_budgetforge_agent)
+        provider = "ollama" if final_model.startswith("ollama/") else "google"
+        usage_id = _prebill_usage(db, project, provider, final_model, payload, x_budgetforge_agent)
 
     timeout_s = project.proxy_timeout_ms / 1000.0 if project.proxy_timeout_ms else 60.0
-
-    if payload.get("stream"):
-        stream_payload = {
-            **payload,
-            "model": final_model,
-            "stream_options": {"include_usage": True},
-        }
-
-        async def generate_google():
-            tokens_in, tokens_out = 0, 0
-            got_usage = False
-            try:
-                async for chunk in ProxyForwarder.forward_google_stream(
-                    stream_payload, google_key, timeout_s=timeout_s
-                ):
-                    text = chunk.decode("utf-8", errors="ignore")
-                    for line in text.split("\n"):
-                        if line.startswith("data: ") and line.strip() != "data: [DONE]":
-                            try:
-                                data = json.loads(line[6:])
-                                usage = data.get("usage")
-                                if usage:
-                                    tokens_in = usage.get("prompt_tokens", tokens_in)
-                                    tokens_out = usage.get("completion_tokens", tokens_out)
-                                    got_usage = True
-                            except (json.JSONDecodeError, KeyError):
-                                pass
-                    yield chunk
-            except Exception as e:
-                logger.error(f"Google stream error: {e}")
-            finally:
-                if got_usage:
-                    _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
-                await _maybe_send_alert(project, db)
-
-        return StreamingResponse(generate_google(), media_type="text/event-stream")
-
-    try:
-        response = await ProxyForwarder.forward_google(
-            {**payload, "model": final_model}, google_key, timeout_s=timeout_s
-        )
-    except Exception as e:
-        _cancel_usage(db, usage_id)
-        logger.error(f"Google proxy error: {e}")
-        raise HTTPException(status_code=502, detail=f"LLM API unavailable: {e}")
-
-    usage = response.get("usage", {})
-    _finalize_usage(db, usage_id, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), final_model)
-    await _maybe_send_alert(project, db)
-    return response
+    if final_model.startswith("ollama/"):
+        return await _dispatch_ollama_fallback(payload, project, final_model, usage_id, db)
+    return await _dispatch_openai_format(
+        payload, project, "google", final_model, usage_id,
+        google_key, ProxyForwarder.forward_google,
+        ProxyForwarder.forward_google_stream, timeout_s, db,
+    )
 
 
 @router.post("/proxy/deepseek/v1/chat/completions")
@@ -461,59 +513,17 @@ async def proxy_deepseek(
     check_quota(project, db)
     async with budget_lock(project.id):
         final_model = _check_budget(project, db, model)
-        usage_id = _prebill_usage(db, project, "deepseek", final_model, payload, x_budgetforge_agent)
+        provider = "ollama" if final_model.startswith("ollama/") else "deepseek"
+        usage_id = _prebill_usage(db, project, provider, final_model, payload, x_budgetforge_agent)
 
     timeout_s = project.proxy_timeout_ms / 1000.0 if project.proxy_timeout_ms else 60.0
-
-    if payload.get("stream"):
-        stream_payload = {
-            **payload,
-            "model": final_model,
-            "stream_options": {"include_usage": True},
-        }
-
-        async def generate_deepseek():
-            tokens_in, tokens_out = 0, 0
-            got_usage = False
-            try:
-                async for chunk in ProxyForwarder.forward_deepseek_stream(
-                    stream_payload, deepseek_key, timeout_s=timeout_s
-                ):
-                    text = chunk.decode("utf-8", errors="ignore")
-                    for line in text.split("\n"):
-                        if line.startswith("data: ") and line.strip() != "data: [DONE]":
-                            try:
-                                data = json.loads(line[6:])
-                                usage = data.get("usage")
-                                if usage:
-                                    tokens_in = usage.get("prompt_tokens", tokens_in)
-                                    tokens_out = usage.get("completion_tokens", tokens_out)
-                                    got_usage = True
-                            except (json.JSONDecodeError, KeyError):
-                                pass
-                    yield chunk
-            except Exception as e:
-                logger.error(f"DeepSeek stream error: {e}")
-            finally:
-                if got_usage:
-                    _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
-                await _maybe_send_alert(project, db)
-
-        return StreamingResponse(generate_deepseek(), media_type="text/event-stream")
-
-    try:
-        response = await ProxyForwarder.forward_deepseek(
-            {**payload, "model": final_model}, deepseek_key, timeout_s=timeout_s
-        )
-    except Exception as e:
-        _cancel_usage(db, usage_id)
-        logger.error(f"DeepSeek proxy error: {e}")
-        raise HTTPException(status_code=502, detail=f"LLM API unavailable: {e}")
-
-    usage = response.get("usage", {})
-    _finalize_usage(db, usage_id, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), final_model)
-    await _maybe_send_alert(project, db)
-    return response
+    if final_model.startswith("ollama/"):
+        return await _dispatch_ollama_fallback(payload, project, final_model, usage_id, db)
+    return await _dispatch_openai_format(
+        payload, project, "deepseek", final_model, usage_id,
+        deepseek_key, ProxyForwarder.forward_deepseek,
+        ProxyForwarder.forward_deepseek_stream, timeout_s, db,
+    )
 
 
 @router.post("/proxy/ollama/api/chat")
@@ -526,11 +536,44 @@ async def proxy_ollama(
     project = _get_project_by_api_key(authorization, db)
     _check_provider(project, "ollama")
     model = payload.get("model", "llama3")
+    final_model = f"ollama/{model}"
 
     check_quota(project, db)
     async with budget_lock(project.id):
-        _check_budget(project, db, f"ollama/{model}")
-        usage_id = _prebill_usage(db, project, "ollama", f"ollama/{model}", payload, x_budgetforge_agent)
+        _check_budget(project, db, final_model)
+        usage_id = _prebill_usage(db, project, "ollama", final_model, payload, x_budgetforge_agent)
+
+    timeout_s = project.proxy_timeout_ms / 1000.0 if project.proxy_timeout_ms else 120.0
+
+    if payload.get("stream"):
+        async def generate_ollama_native():
+            tokens_in, tokens_out = 0, 0
+            got_usage = False
+            try:
+                async for chunk in ProxyForwarder.forward_ollama_stream(
+                    payload, timeout_s=timeout_s
+                ):
+                    text = chunk.decode("utf-8", errors="ignore")
+                    for line in text.split("\n"):
+                        line = line.strip()
+                        if line:
+                            try:
+                                data = json.loads(line)
+                                if data.get("done"):
+                                    tokens_in = data.get("prompt_eval_count", tokens_in)
+                                    tokens_out = data.get("eval_count", tokens_out)
+                                    got_usage = True
+                            except (json.JSONDecodeError, KeyError):
+                                pass
+                    yield chunk
+            except Exception as e:
+                logger.error(f"Ollama stream error: {e}")
+            finally:
+                if got_usage:
+                    _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
+                await _maybe_send_alert(project, db)
+
+        return StreamingResponse(generate_ollama_native(), media_type="application/x-ndjson")
 
     try:
         response = await ProxyForwarder.forward_ollama(payload)
@@ -541,7 +584,49 @@ async def proxy_ollama(
 
     tokens_in = response.get("prompt_eval_count", 0)
     tokens_out = response.get("eval_count", 0)
-    # Ollama est local → coût toujours $0, on garde juste les tokens
-    _finalize_usage(db, usage_id, tokens_in, tokens_out, f"ollama/{model}")
+    _finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
     await _maybe_send_alert(project, db)
     return response
+
+
+@router.post("/proxy/ollama/v1/chat/completions")
+async def proxy_ollama_openai_compat(
+    payload: dict,
+    authorization: Optional[str] = Header(None),
+    x_budgetforge_agent: Optional[str] = Header(None, alias="X-BudgetForge-Agent"),
+    db: Session = Depends(get_db),
+):
+    project = _get_project_by_api_key(authorization, db)
+    _check_provider(project, "ollama")
+    model = payload.get("model", "llama3")
+    final_model = f"ollama/{model}"
+
+    check_quota(project, db)
+    async with budget_lock(project.id):
+        _check_budget(project, db, final_model)
+        usage_id = _prebill_usage(db, project, "ollama", final_model, payload, x_budgetforge_agent)
+
+    timeout_s = project.proxy_timeout_ms / 1000.0 if project.proxy_timeout_ms else 60.0
+    return await _dispatch_openai_format(
+        payload, project, "ollama", final_model, usage_id,
+        "",  # Ollama local — pas de clé API
+        ProxyForwarder.forward_ollama_openai_compat,
+        ProxyForwarder.forward_ollama_openai_compat_stream,
+        timeout_s, db,
+    )
+
+
+@router.get("/proxy/ollama/models")
+async def proxy_ollama_models(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    _get_project_by_api_key(authorization, db)
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{settings.ollama_base_url}/api/tags")
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Ollama unavailable: {e}")
+    return {"models": data.get("models", [])}

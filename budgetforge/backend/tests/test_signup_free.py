@@ -74,12 +74,13 @@ class TestSignupFree:
         assert args[0] == "bob@example.com"
         assert args[2] == "free"
 
-    def test_duplicate_email_resends_email(self, client, db):
+    def test_duplicate_email_returns_429(self, client, db):
+        """2e signup gratuit même email → 429 (quota dépassé, utiliser le portal pour récupérer la clé)."""
         with patch("routes.signup.send_onboarding_email") as mock_email:
             client.post("/api/signup/free", json={"email": "dup@example.com"})
             resp = client.post("/api/signup/free", json={"email": "dup@example.com"})
-        assert resp.status_code == 200
-        assert mock_email.call_count == 2
+        assert resp.status_code == 429
+        assert mock_email.call_count == 1  # email envoyé seulement au 1er signup
 
         from core.models import Project
         count = db.query(Project).filter_by(name="dup@example.com").count()

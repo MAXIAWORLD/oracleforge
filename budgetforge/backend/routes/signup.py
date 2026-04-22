@@ -8,8 +8,9 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from core.database import get_db
-from core.models import Project
+from core.models import Project, SignupAttempt
 from services.onboarding_email import send_onboarding_email
+from services.plan_quota import check_project_quota
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["signup"])
@@ -19,7 +20,10 @@ _ip_signups: dict[str, list[datetime]] = defaultdict(list)
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def _check_ip_rate_limit(ip: str, max_per_day: int = 3) -> bool:
+def _check_ip_rate_limit(ip: str, db: "Session | None" = None, max_per_day: int = 3) -> bool:
+    if db is not None:
+        return _check_ip_rate_limit_db(ip, db, max_per_day)
+    # in-memory fallback (unit tests sans DB)
     now = datetime.utcnow()
     cutoff = now - timedelta(hours=24)
     recent = [t for t in _ip_signups[ip] if t > cutoff]
@@ -27,6 +31,21 @@ def _check_ip_rate_limit(ip: str, max_per_day: int = 3) -> bool:
     if len(recent) >= max_per_day:
         return False
     _ip_signups[ip].append(now)
+    return True
+
+
+def _check_ip_rate_limit_db(ip: str, db: Session, max_per_day: int = 3) -> bool:
+    now = datetime.utcnow()
+    cutoff = now - timedelta(hours=24)
+    count = (
+        db.query(SignupAttempt)
+        .filter(SignupAttempt.ip == ip, SignupAttempt.created_at > cutoff)
+        .count()
+    )
+    if count >= max_per_day:
+        return False
+    db.add(SignupAttempt(ip=ip, created_at=now))
+    db.commit()
     return True
 
 
@@ -49,11 +68,13 @@ async def signup_free(
     db: Session = Depends(get_db),
 ):
     client_ip = request.client.host if request.client else "unknown"
-    if not _check_ip_rate_limit(client_ip):
+    if not _check_ip_rate_limit(client_ip, db=db):
         raise HTTPException(
             status_code=429,
             detail="Too many signup attempts from this connection. Try again tomorrow.",
         )
+
+    check_project_quota(body.email, "free", db)
 
     project = Project(name=body.email, plan="free")
     db.add(project)

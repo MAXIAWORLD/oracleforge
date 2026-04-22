@@ -1,13 +1,15 @@
+from contextlib import asynccontextmanager
 from datetime import datetime, date, timedelta
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
+from core.config import settings
 from core.database import engine, Base, get_db
+from core.limiter import limiter
 from core.models import Usage
 from core.auth import require_viewer
 from routes.projects import router as projects_router, _compute_breakdown, UsageBreakdown, DailySpend
@@ -23,14 +25,29 @@ from routes.admin import router as admin_router
 from routes.portal import router as portal_router
 from routes.signup import router as signup_router
 
-Base.metadata.create_all(bind=engine)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if settings.app_env == "production":
+        missing = [
+            name
+            for name, val in [
+                ("ADMIN_API_KEY", settings.admin_api_key),
+                ("PORTAL_SECRET", settings.portal_secret),
+            ]
+            if not val
+        ]
+        if missing:
+            raise RuntimeError(
+                f"Variables obligatoires manquantes en production : {', '.join(missing)}"
+            )
+    yield
 
-limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
 app = FastAPI(
     title="LLM BudgetForge",
     description="LLM Budget Guard — proxy layer with hard limits per project/user/agent",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.state.limiter = limiter
@@ -47,6 +64,7 @@ app.add_middleware(
     ],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 app.include_router(projects_router)

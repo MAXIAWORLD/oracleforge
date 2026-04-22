@@ -16,14 +16,14 @@ type Project = {
 
 type DailySpend = { date: string; spend: number };
 
-function useUsage(token: string, projectId: number): DailySpend[] | null {
+function useUsage(projectId: number): DailySpend[] | null {
   const [data, setData] = useState<DailySpend[] | null>(null);
   useEffect(() => {
-    fetch(`/api/portal/usage?token=${token}&project_id=${projectId}`)
+    fetch(`/api/portal/usage?project_id=${projectId}`, { credentials: "include" })
       .then((r) => r.ok ? r.json() : Promise.reject())
       .then((d) => setData(d.daily))
       .catch(() => setData([]));
-  }, [token, projectId]);
+  }, [projectId]);
   return data;
 }
 
@@ -32,8 +32,8 @@ function formatDay(iso: string): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function UsageChart({ token, projectId }: { token: string; projectId: number }) {
-  const daily = useUsage(token, projectId);
+function UsageChart({ projectId }: { projectId: number }) {
+  const daily = useUsage(projectId);
   if (!daily) return <div className="h-[120px] flex items-center justify-center text-xs" style={{ color: "#c8d8e8" }}>Loading…</div>;
 
   const hasData = daily.some((d) => d.spend > 0);
@@ -116,7 +116,7 @@ function PortalContent() {
         .catch(() => setError("This link is invalid or has expired. Request a new one below."))
         .finally(() => setChecking(false));
     } else {
-      // pas de token → essayer le cookie session existant
+      // pas de token → essayer le cookie session existant (pas de token disponible)
       fetch("/api/portal/session", { credentials: "include" })
         .then((r) => r.ok ? r.json() : Promise.reject())
         .then((data) => setProjects(data.projects))
@@ -182,10 +182,20 @@ function PortalContent() {
                     <CopyButton text={`${API_BASE}/proxy/openai/v1`} />
                   </div>
                 </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "#c8d8e8" }}>Proxy URL (Ollama)</p>
+                  <div className="flex items-center gap-2 bg-black/30 rounded-md px-3 py-2">
+                    <code className="font-mono text-xs text-[--amber] flex-1 break-all">
+                      {API_BASE}/proxy/ollama/v1/chat/completions
+                    </code>
+                    <CopyButton text={`${API_BASE}/proxy/ollama/v1/chat/completions`} />
+                  </div>
+                </div>
               </div>
-              <UsageChart token={token!} projectId={p.id} />
+              <UsageChart projectId={p.id} />
               <p className="text-[10px] mt-3" style={{ color: "#c8d8e8" }}>
                 Add header <code className="text-[--amber]">X-Provider-Key: your-openai-key</code> to each request.
+                Ollama routes require no provider key — local inference is always free.
               </p>
             </div>
           ))}
