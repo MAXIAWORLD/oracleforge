@@ -19,6 +19,11 @@ async def require_admin(
 ) -> None:
     """Allow: global admin key, OR member with role=admin, OR dev mode (no key configured)."""
     if not settings.admin_api_key:
+        if settings.app_env == "production":
+            raise HTTPException(
+                status_code=503,
+                detail="Service misconfigured: ADMIN_API_KEY not set in production",
+            )
         # Dev mode: block viewer members trying to reach write endpoints
         if x_admin_key and x_admin_key.startswith("bf-mbr-"):
             from core.models import Member
@@ -56,6 +61,11 @@ async def require_viewer(
 ) -> None:
     """Allow: global admin key, OR any member (admin or viewer), OR dev mode."""
     if not settings.admin_api_key:
+        if settings.app_env == "production":
+            raise HTTPException(
+                status_code=503,
+                detail="Service misconfigured: ADMIN_API_KEY not set in production",
+            )
         return  # dev mode
 
     # Global admin key — constant-time compare (F1: timing attack)

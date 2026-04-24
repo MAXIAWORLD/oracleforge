@@ -2,13 +2,24 @@ from datetime import datetime, timedelta, date
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from core.config import settings
 from core.database import get_db
 from core.models import Project, Usage
 from core.auth import require_admin
+from services.stripe_reconcile import reconcile_stripe_subscriptions
 
 router = APIRouter(tags=["admin"])
 
 _MRR_BY_PLAN = {"free": 0, "pro": 29, "agency": 79}
+
+
+@router.post("/api/admin/billing/sync", dependencies=[Depends(require_admin)])
+def billing_sync(db: Session = Depends(get_db)):
+    """Réconcilier les plans avec Stripe (appelable par cron systemd)."""
+    if not settings.stripe_secret_key:
+        return {"ok": False, "error": "STRIPE_SECRET_KEY not configured"}
+    result = reconcile_stripe_subscriptions(db)
+    return {"ok": True, **result}
 
 
 @router.get("/api/admin/stats", dependencies=[Depends(require_admin)])
@@ -55,9 +66,10 @@ def admin_stats(db: Session = Depends(get_db)):
     ninety_start = today - timedelta(days=89)
     ninety_dt = datetime(ninety_start.year, ninety_start.month, ninety_start.day)
 
-    baseline = db.query(func.count(Project.id)).filter(
-        Project.created_at < ninety_dt
-    ).scalar() or 0
+    baseline = (
+        db.query(func.count(Project.id)).filter(Project.created_at < ninety_dt).scalar()
+        or 0
+    )
 
     growth_rows = (
         db.query(
