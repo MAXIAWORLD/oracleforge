@@ -14,7 +14,7 @@ from core.config import settings
 from core.database import get_db
 from core.limiter import limiter
 from core.log_utils import mask_email
-from core.models import Project, PortalToken, Usage
+from core.models import Project, PortalToken, PortalRevokedSession, Usage
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["portal"])
@@ -48,9 +48,9 @@ def _sign_session(email: str) -> str:
     return f"{email}|{iat}|{sig}"
 
 
-def _verify_session(cookie: str) -> str | None:
-    """H3 — valide la signature ET l'âge du cookie (iat) pour refuser les replays
-    extraits dont le browser expire mais que l'attaquant pourrait rejouer."""
+def _verify_session(cookie: str, db: Session | None = None) -> str | None:
+    """H3 — valide la signature ET l'âge du cookie (iat).
+    H6 — vérifie que la session n'est pas révoquée (table portal_revoked_sessions)."""
     parts = cookie.split("|")
     if len(parts) != 3:
         return None
@@ -65,6 +65,16 @@ def _verify_session(cookie: str) -> str | None:
         return None
     if int(time.time()) - iat > _SESSION_MAX_AGE:
         return None
+    if db is not None:
+        revoked = (
+            db.query(PortalRevokedSession)
+            .filter(
+                PortalRevokedSession.email == email, PortalRevokedSession.iat == iat
+            )
+            .first()
+        )
+        if revoked:
+            return None
     return email
 
 
@@ -141,7 +151,7 @@ def portal_usage(request: Request, project_id: int, db: Session = Depends(get_db
     cookie = request.cookies.get("portal_session")
     if not cookie:
         raise HTTPException(status_code=401, detail="No session")
-    email = _verify_session(cookie)
+    email = _verify_session(cookie, db)
     if not email:
         raise HTTPException(status_code=401, detail="Invalid session")
 
@@ -231,8 +241,35 @@ def portal_session(request: Request, db: Session = Depends(get_db)):
     cookie = request.cookies.get("portal_session")
     if not cookie:
         raise HTTPException(status_code=401, detail="No session")
-    email = _verify_session(cookie)
+    email = _verify_session(cookie, db)
     if not email:
         raise HTTPException(status_code=401, detail="Invalid session")
     projects = db.query(Project).filter(Project.name == email).all()
     return {"email": email, "projects": _project_list(projects)}
+
+
+@router.post("/api/portal/logout")
+def portal_logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    """H6 — Révoque la session courante et supprime le cookie."""
+    cookie = request.cookies.get("portal_session")
+    if cookie:
+        parts = cookie.split("|")
+        if len(parts) == 3:
+            email, iat_str, _ = parts
+            try:
+                iat = int(iat_str)
+                existing = (
+                    db.query(PortalRevokedSession)
+                    .filter(
+                        PortalRevokedSession.email == email,
+                        PortalRevokedSession.iat == iat,
+                    )
+                    .first()
+                )
+                if not existing:
+                    db.add(PortalRevokedSession(email=email, iat=iat))
+                    db.commit()
+            except ValueError:
+                pass
+    response.delete_cookie("portal_session", httponly=True, samesite="lax")
+    return {"ok": True}

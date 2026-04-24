@@ -123,6 +123,17 @@ class SignupAttempt(Base):
     )
 
 
+class PortalRevokedSession(Base):
+    __tablename__ = "portal_revoked_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, nullable=False, index=True)
+    iat = Column(Integer, nullable=False)
+    revoked_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+
+
 class StripeEvent(Base):
     __tablename__ = "stripe_events"
 
