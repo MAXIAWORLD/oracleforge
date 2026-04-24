@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "AI Agent Framework",
+    "user": "Alexis",
+    "role": "Admin"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "missions": "Missies",
+    "chat": "Chat",
+    "observability": "Observability",
+    "ragStore": "RAG Opslag"
+  },
+  "shell": {
+    "live": "LIVE",
+    "offline": "OFFLINE",
+    "backendOffline": "Backend offline",
+    "language": "Taal",
+    "theme": "Thema"
+  },
+  "common": {
+    "loading": "Laden...",
+    "refresh": "Vernieuwen",
+    "reload": "Herladen",
+    "run": "Uitvoeren",
+    "running": "Bezig...",
+    "runNow": "Nu uitvoeren",
+    "send": "Verzenden",
+    "save": "Opslaan",
+    "cancel": "Annuleren",
+    "back": "Terug",
+    "total": "totaal",
+    "today": "vandaag",
+    "manual": "handmatig",
+    "scheduled": "Gepland",
+    "none": "geen",
+    "healthy": "Gezond",
+    "degraded": "Verslechterd",
+    "success": "succes",
+    "failed": "mislukt",
+    "status": "Status",
+    "noDescription": "Geen beschrijving",
+    "dataAvailable": "Gegevens beschikbaar na backend-verbinding",
+    "connectBackend": "Verbind backend om gegevens te zien",
+    "noMissions": "Geen missies geconfigureerd",
+    "noCollections": "Geen collecties gevonden"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "LLM-aanroepen",
+      "totalCost": "Totale kosten",
+      "ragChunks": "RAG-chunks",
+      "costLabel": "Kosten:",
+      "todaysSpend": "Uitgaven vandaag",
+      "statusLabel": "Status:",
+      "apiHealth": "API-gezondheid",
+      "ragPipeline": "RAG-pipeline",
+      "callsPerDay": "{count} aanroepen/dag",
+      "chunksUnit": "{count} chunks",
+      "offlineUnit": "offline"
+    },
+    "donut": {
+      "label": "Missies"
+    },
+    "tierBreakdown": {
+      "title": "LLM-gebruik — Per niveau",
+      "empty": "Geen LLM-aanroepen geregistreerd",
+      "calls": "{count} aanroepen"
+    },
+    "performance": {
+      "title": "Prestatie-indicatoren",
+      "avgLatency": "Gem. latentie",
+      "ragCache": "RAG-cache",
+      "memoryItems": "Geheugen-items",
+      "costPerCall": "Kosten/aanroep"
+    },
+    "miniMetrics": {
+      "queue": "Wachtrij",
+      "memory": "Geheugen",
+      "active": "Actief",
+      "tiers": "Niveaus"
+    },
+    "missionsSummary": {
+      "title": "Missies overzicht",
+      "totalLoaded": "Totaal geladen missies"
+    },
+    "missionsTable": {
+      "title": "Missies",
+      "totalSuffix": "totaal",
+      "headers": {
+        "status": "Status",
+        "name": "Naam",
+        "tier": "Niveau",
+        "steps": "Stappen",
+        "schedule": "Planning"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count} missies geladen",
+    "subtitle": "Beheer en voer uw agent-missies uit",
+    "stepsCount": "{count} stappen",
+    "run": {
+      "title": "Uitvoering:",
+      "steps": "Stappen",
+      "duration": "Duur",
+      "tokens": "Tokens",
+      "cost": "Kosten"
+    },
+    "errors": {
+      "load": "Laden mislukt",
+      "run": "Uitvoering mislukt",
+      "reload": "Herladen mislukt"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "Terug naar missies",
+    "agentConfig": "Agent-configuratie",
+    "steps": "Stappen ({count})",
+    "execution": "Uitvoering —"
+  },
+  "chat": {
+    "subtitle": "Praat met uw agent met op RAG gebaseerde antwoorden",
+    "empty": {
+      "title": "Stuur een bericht om het gesprek te starten.",
+      "subtitle": "De agent gebruikt RAG om antwoorden te funderen in uw kennisbank."
+    },
+    "placeholder": "Typ een bericht... (Enter om te verzenden, Shift+Enter voor nieuwe regel)",
+    "tokensSuffix": "tokens",
+    "error": "Chat mislukt"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "Totaal LLM-aanroepen",
+      "totalCost": "Totale kosten",
+      "avgLatency": "Gem. latentie",
+      "activeTiers": "Actieve niveaus",
+      "acrossAllTiers": "over alle niveaus",
+      "usdToday": "USD vandaag"
+    },
+    "tierDistribution": {
+      "title": "Aanroep-verdeling per niveau",
+      "activeCount": "{count} actieve niveaus",
+      "empty": "Geen niveau-gegevens",
+      "connect": "Verbind backend om niveau-gegevens te zien",
+      "calls": "{count} aanroepen"
+    },
+    "tierDetail": {
+      "latency": "Latentie",
+      "cost": "Kosten",
+      "costPerCall": "Kosten/aanroep",
+      "connect": "Verbind backend om niveau-details te zien"
+    },
+    "memory": {
+      "title": "Geheugen",
+      "totalItems": "Totaal items",
+      "backend": "Backend",
+      "collections": "Collecties",
+      "connect": "Verbind backend om geheugen-statistieken te zien"
+    },
+    "rag": {
+      "title": "RAG-pipeline",
+      "status": "Status",
+      "chunks": "Chunks",
+      "cached": "Gecached",
+      "connect": "Verbind backend om RAG-statistieken te zien"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "RAG-status",
+      "pipelineStatus": "pipeline-status",
+      "indexedChunks": "Geindexeerde chunks",
+      "inVectorStore": "in vectoropslag",
+      "cachedEntries": "Gecachede vermeldingen",
+      "hitRate": "Hit-ratio:",
+      "memoryItems": "Geheugen-items",
+      "backendSuffix": "backend"
+    },
+    "cache": {
+      "title": "Cache-uitsplitsing",
+      "chunks": "Chunks",
+      "cached": "Gecached",
+      "hitRate": "Hit-ratio",
+      "connect": "Verbind backend om cache-statistieken te zien"
+    },
+    "collections": {
+      "title": "Geheugen-collecties",
+      "connect": "Verbind backend om collecties te zien"
+    }
+  }
+}

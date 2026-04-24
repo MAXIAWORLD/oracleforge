@@ -19,6 +19,7 @@ import os
 import time
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from glob import glob
 from typing import Any, Literal
 
@@ -82,6 +83,7 @@ class MissionDefinition(BaseModel):
             return v
         try:
             from croniter import croniter
+
             croniter(v)
         except (ValueError, KeyError) as e:
             raise ValueError(f"Invalid cron expression: {v}") from e
@@ -141,6 +143,26 @@ def _safe_interpolate(template: str, variables: dict[str, str]) -> str:
     return re.sub(r"\{(\w+)\}", replacer, template)
 
 
+# ── ORM → dataclass converter ────────────────────────────────────
+
+
+def _orm_to_dataclass(row: Any) -> ExecutionLog:
+    """Convert an ExecutionLog ORM row to the ExecutionLog dataclass."""
+    return ExecutionLog(
+        mission_name=row.mission_name,
+        run_id=row.run_id or "",
+        status=row.status,
+        steps_completed=row.steps_completed,
+        total_steps=row.total_steps,
+        tokens_used=row.tokens_used,
+        cost_usd=row.cost_usd,
+        error_message=row.error_message,
+        logs=[],
+        started_at=row.started_at.timestamp() if row.started_at else time.time(),
+        finished_at=row.finished_at.timestamp() if row.finished_at else None,
+    )
+
+
 # ── Mission Engine ───────────────────────────────────────────────
 
 
@@ -194,7 +216,9 @@ class MissionEngine:
                     mission = self.load_from_yaml(path)
                     self.register_mission(mission)
                     loaded.append(mission)
-                    logger.info("[engine] loaded mission '%s' from %s", mission.name, path)
+                    logger.info(
+                        "[engine] loaded mission '%s' from %s", mission.name, path
+                    )
                 except Exception as e:
                     logger.warning("[engine] failed to load %s: %s", path, e)
         return loaded
@@ -227,7 +251,9 @@ class MissionEngine:
         try:
             ip = ipaddress.ip_address(hostname)
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-                raise ValueError(f"Webhook URL blocked: {ip} is a private/reserved address")
+                raise ValueError(
+                    f"Webhook URL blocked: {ip} is a private/reserved address"
+                )
         except ValueError:
             pass  # hostname is a domain, not an IP — allow
 
@@ -253,9 +279,7 @@ class MissionEngine:
 
     # ── Step execution ───────────────────────────────────────────
 
-    async def _execute_step(
-        self, step: MissionStep, ctx: ExecutionContext
-    ) -> str:
+    async def _execute_step(self, step: MissionStep, ctx: ExecutionContext) -> str:
         """Execute a single mission step and return the result."""
         action = step.action
         result = ""
@@ -277,6 +301,7 @@ class MissionEngine:
             tier = None
             if tier_val:
                 from services.llm_router import Tier
+
                 try:
                     tier = Tier(tier_val)
                 except ValueError:
@@ -299,11 +324,16 @@ class MissionEngine:
             payload = None
             if step.payload_template:
                 import json
+
                 try:
-                    payload_str = self._interpolate(step.payload_template, ctx.variables)
+                    payload_str = self._interpolate(
+                        step.payload_template, ctx.variables
+                    )
                     payload = json.loads(payload_str)
                 except (json.JSONDecodeError, Exception):
-                    payload = {"text": self._interpolate(step.payload_template, ctx.variables)}
+                    payload = {
+                        "text": self._interpolate(step.payload_template, ctx.variables)
+                    }
 
             resp = await self._http.request(method, url, json=payload)
             resp.raise_for_status()
@@ -329,6 +359,36 @@ class MissionEngine:
             ctx.variables[step.output_var] = result
 
         return result
+
+    # ── DB persistence ───────────────────────────────────────────
+
+    async def _persist_log(self, log: ExecutionLog) -> None:
+        """Persist an ExecutionLog dataclass to the database. No-op if no factory."""
+        if self._db_factory is None:
+            return
+
+        from core.models import ExecutionLog as ExecutionLogORM
+
+        orm_row = ExecutionLogORM(
+            run_id=log.run_id,
+            mission_id=None,
+            mission_name=log.mission_name,
+            status=log.status,
+            steps_completed=log.steps_completed,
+            total_steps=log.total_steps,
+            tokens_used=log.tokens_used,
+            cost_usd=log.cost_usd,
+            error_message=log.error_message,
+            started_at=datetime.fromtimestamp(log.started_at, tz=timezone.utc),
+            finished_at=(
+                datetime.fromtimestamp(log.finished_at, tz=timezone.utc)
+                if log.finished_at is not None
+                else None
+            ),
+        )
+        async with self._db_factory() as session:
+            session.add(orm_row)
+            await session.commit()
 
     # ── Mission run ──────────────────────────────────────────────
 
@@ -357,7 +417,9 @@ class MissionEngine:
         except Exception as e:
             log.status = "failed"
             log.error_message = str(e)
-            logger.error("[mission:%s] failed at step %d: %s", name, log.steps_completed + 1, e)
+            logger.error(
+                "[mission:%s] failed at step %d: %s", name, log.steps_completed + 1, e
+            )
 
         log.tokens_used = ctx.tokens_used
         log.cost_usd = ctx.cost_usd
@@ -369,14 +431,41 @@ class MissionEngine:
         if len(self._run_history) > 100:
             self._run_history = self._run_history[-100:]
 
+        await self._persist_log(log)
+
         return log
 
-    def get_run_history(self, mission_name: str | None = None, limit: int = 20) -> list[ExecutionLog]:
-        """Return recent execution logs, optionally filtered by mission."""
-        runs = self._run_history
-        if mission_name:
-            runs = [r for r in runs if r.mission_name == mission_name]
-        return list(reversed(runs[-limit:]))
+    async def get_run_history(
+        self,
+        mission_name: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        status: str | None = None,
+    ) -> list[ExecutionLog]:
+        """Return execution logs, from DB if available, else from memory."""
+        if self._db_factory is None:
+            # Fallback: in-memory list
+            runs = self._run_history
+            if mission_name:
+                runs = [r for r in runs if r.mission_name == mission_name]
+            if status:
+                runs = [r for r in runs if r.status == status]
+            runs = list(reversed(runs))
+            return runs[offset : offset + limit]
+
+        from core.models import ExecutionLog as ExecutionLogORM
+        from sqlalchemy import select, desc
+
+        async with self._db_factory() as session:
+            q = select(ExecutionLogORM)
+            if mission_name:
+                q = q.where(ExecutionLogORM.mission_name == mission_name)
+            if status:
+                q = q.where(ExecutionLogORM.status == status)
+            q = q.order_by(desc(ExecutionLogORM.started_at)).offset(offset).limit(limit)
+            rows = (await session.execute(q)).scalars().all()
+
+        return [_orm_to_dataclass(row) for row in rows]
 
     # ── Scheduling (async background tasks) ──────────────────────
 
@@ -389,7 +478,9 @@ class MissionEngine:
                     self._safe_task(self._schedule_loop(mission), name)
                 )
                 self._tasks.append(task)
-                logger.info("[engine] scheduled '%s' with cron '%s'", name, mission.schedule)
+                logger.info(
+                    "[engine] scheduled '%s' with cron '%s'", name, mission.schedule
+                )
 
     async def stop(self) -> None:
         """Cancel all scheduled tasks."""

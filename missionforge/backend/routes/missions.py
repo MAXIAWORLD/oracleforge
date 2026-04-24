@@ -14,9 +14,7 @@ Endpoints:
 
 from __future__ import annotations
 
-import asyncio
 import json
-import time
 
 from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import StreamingResponse
@@ -114,7 +112,9 @@ async def run_mission(name: str, request: Request) -> RunResponse:
     except KeyError:
         raise HTTPException(404, f"Mission '{name}' not found")
 
-    duration_ms = int((log.finished_at - log.started_at) * 1000) if log.finished_at else 0
+    duration_ms = (
+        int((log.finished_at - log.started_at) * 1000) if log.finished_at else 0
+    )
     return RunResponse(
         mission_name=log.mission_name,
         run_id=log.run_id,
@@ -142,7 +142,9 @@ async def run_mission_stream(name: str, request: Request):
             log = await engine.run_mission(name)
             for line in log.logs:
                 yield f"data: {json.dumps({'event': 'log', 'message': line})}\n\n"
-            duration = int((log.finished_at - log.started_at) * 1000) if log.finished_at else 0
+            duration = (
+                int((log.finished_at - log.started_at) * 1000) if log.finished_at else 0
+            )
             yield f"data: {json.dumps({'event': 'complete', 'status': log.status, 'steps': log.steps_completed, 'total': log.total_steps, 'tokens': log.tokens_used, 'duration_ms': duration, 'error': log.error_message})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
@@ -151,10 +153,18 @@ async def run_mission_stream(name: str, request: Request):
 
 
 @router.get("/api/missions/{name}/history")
-async def mission_history(name: str, request: Request, limit: int = 20) -> dict:
+async def mission_history(
+    name: str,
+    request: Request,
+    limit: int = 20,
+    offset: int = 0,
+    status: str | None = None,
+) -> dict:
     """Get execution history for a mission."""
     engine = _get_engine(request)
-    runs = engine.get_run_history(mission_name=name, limit=limit)
+    runs = await engine.get_run_history(
+        mission_name=name, limit=limit, offset=offset, status=status
+    )
     return {
         "mission": name,
         "runs": [
@@ -165,7 +175,9 @@ async def mission_history(name: str, request: Request, limit: int = 20) -> dict:
                 "total_steps": r.total_steps,
                 "tokens_used": r.tokens_used,
                 "cost_usd": r.cost_usd,
-                "duration_ms": int((r.finished_at - r.started_at) * 1000) if r.finished_at else 0,
+                "duration_ms": int((r.finished_at - r.started_at) * 1000)
+                if r.finished_at
+                else 0,
                 "logs": r.logs,
                 "error_message": r.error_message,
             }
@@ -179,7 +191,7 @@ async def mission_history(name: str, request: Request, limit: int = 20) -> dict:
 async def all_history(request: Request, limit: int = 50) -> dict:
     """Get global execution history across all missions."""
     engine = _get_engine(request)
-    runs = engine.get_run_history(limit=limit)
+    runs = await engine.get_run_history(limit=limit)
     return {
         "runs": [
             {
@@ -189,7 +201,9 @@ async def all_history(request: Request, limit: int = 50) -> dict:
                 "steps_completed": r.steps_completed,
                 "total_steps": r.total_steps,
                 "tokens_used": r.tokens_used,
-                "duration_ms": int((r.finished_at - r.started_at) * 1000) if r.finished_at else 0,
+                "duration_ms": int((r.finished_at - r.started_at) * 1000)
+                if r.finished_at
+                else 0,
             }
             for r in runs
         ],
@@ -202,6 +216,7 @@ async def reload_missions(request: Request) -> dict:
     """Hot-reload missions from the missions directory."""
     engine = _get_engine(request)
     from core.config import get_settings
+
     settings = get_settings()
     loaded = engine.load_all_missions(settings.missions_dir)
     return {
@@ -223,6 +238,7 @@ async def ingest_docs(req: IngestRequest, request: Request) -> dict:
     """Ingest documents into the RAG knowledge base."""
     import os
     from core.config import get_settings
+
     settings = get_settings()
     base_dir = os.path.realpath(settings.missions_dir)
 
@@ -236,7 +252,9 @@ async def ingest_docs(req: IngestRequest, request: Request) -> dict:
         # Path traversal protection
         real = os.path.realpath(path)
         if not real.startswith(base_dir):
-            raise HTTPException(403, f"Path not allowed: must be under {settings.missions_dir}")
+            raise HTTPException(
+                403, f"Path not allowed: must be under {settings.missions_dir}"
+            )
         sources.append((real, tag))
     if not sources:
         raise HTTPException(400, "No valid sources provided")

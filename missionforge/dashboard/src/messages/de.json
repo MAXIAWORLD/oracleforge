@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "KI-Agent-Framework",
+    "user": "Alexis",
+    "role": "Admin"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "missions": "Missionen",
+    "chat": "Chat",
+    "observability": "Observability",
+    "ragStore": "RAG-Speicher"
+  },
+  "shell": {
+    "live": "LIVE",
+    "offline": "OFFLINE",
+    "backendOffline": "Backend offline",
+    "language": "Sprache",
+    "theme": "Design"
+  },
+  "common": {
+    "loading": "Laden...",
+    "refresh": "Aktualisieren",
+    "reload": "Neu laden",
+    "run": "Ausfuhren",
+    "running": "Lauft...",
+    "runNow": "Jetzt ausfuhren",
+    "send": "Senden",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "back": "Zuruck",
+    "total": "gesamt",
+    "today": "heute",
+    "manual": "manuell",
+    "scheduled": "Geplant",
+    "none": "keine",
+    "healthy": "Gesund",
+    "degraded": "Beeintrachtigt",
+    "success": "erfolgreich",
+    "failed": "fehlgeschlagen",
+    "status": "Status",
+    "noDescription": "Keine Beschreibung",
+    "dataAvailable": "Daten verfugbar nach Backend-Verbindung",
+    "connectBackend": "Backend verbinden, um Daten zu sehen",
+    "noMissions": "Keine Missionen konfiguriert",
+    "noCollections": "Keine Sammlungen gefunden"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "LLM-Aufrufe",
+      "totalCost": "Gesamtkosten",
+      "ragChunks": "RAG-Chunks",
+      "costLabel": "Kosten:",
+      "todaysSpend": "Heutige Ausgaben",
+      "statusLabel": "Status:",
+      "apiHealth": "API-Gesundheit",
+      "ragPipeline": "RAG-Pipeline",
+      "callsPerDay": "{count} Aufrufe/Tag",
+      "chunksUnit": "{count} Chunks",
+      "offlineUnit": "offline"
+    },
+    "donut": {
+      "label": "Missionen"
+    },
+    "tierBreakdown": {
+      "title": "LLM-Nutzung — Stufenaufschlusselung",
+      "empty": "Keine LLM-Aufrufe erfasst",
+      "calls": "{count} Aufrufe"
+    },
+    "performance": {
+      "title": "Leistungsmetriken",
+      "avgLatency": "Durchschn. Latenz",
+      "ragCache": "RAG-Cache",
+      "memoryItems": "Speichereintrage",
+      "costPerCall": "Kosten/Aufruf"
+    },
+    "miniMetrics": {
+      "queue": "Warteschlange",
+      "memory": "Speicher",
+      "active": "Aktiv",
+      "tiers": "Stufen"
+    },
+    "missionsSummary": {
+      "title": "Missionsubersicht",
+      "totalLoaded": "Geladene Missionen insgesamt"
+    },
+    "missionsTable": {
+      "title": "Missionen",
+      "totalSuffix": "gesamt",
+      "headers": {
+        "status": "Status",
+        "name": "Name",
+        "tier": "Stufe",
+        "steps": "Schritte",
+        "schedule": "Zeitplan"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count} Missionen geladen",
+    "subtitle": "Verwalten und fuhren Sie Ihre Agent-Missionen aus",
+    "stepsCount": "{count} Schritte",
+    "run": {
+      "title": "Ausfuhrung:",
+      "steps": "Schritte",
+      "duration": "Dauer",
+      "tokens": "Tokens",
+      "cost": "Kosten"
+    },
+    "errors": {
+      "load": "Laden fehlgeschlagen",
+      "run": "Ausfuhrung fehlgeschlagen",
+      "reload": "Neuladen fehlgeschlagen"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "Zuruck zu Missionen",
+    "agentConfig": "Agent-Konfiguration",
+    "steps": "Schritte ({count})",
+    "execution": "Ausfuhrung —"
+  },
+  "chat": {
+    "subtitle": "Sprechen Sie mit Ihrem Agenten mit RAG-fundierten Antworten",
+    "empty": {
+      "title": "Senden Sie eine Nachricht, um die Unterhaltung zu starten.",
+      "subtitle": "Der Agent nutzt RAG, um seine Antworten in Ihrer Wissensbasis zu verankern."
+    },
+    "placeholder": "Nachricht eingeben... (Enter zum Senden, Shift+Enter fur neue Zeile)",
+    "tokensSuffix": "Tokens",
+    "error": "Chat fehlgeschlagen"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "LLM-Aufrufe gesamt",
+      "totalCost": "Gesamtkosten",
+      "avgLatency": "Durchschn. Latenz",
+      "activeTiers": "Aktive Stufen",
+      "acrossAllTiers": "uber alle Stufen",
+      "usdToday": "USD heute"
+    },
+    "tierDistribution": {
+      "title": "Aufrufverteilung nach Stufe",
+      "activeCount": "{count} aktive Stufen",
+      "empty": "Keine Stufendaten",
+      "connect": "Backend verbinden, um Stufendaten zu sehen",
+      "calls": "{count} Aufrufe"
+    },
+    "tierDetail": {
+      "latency": "Latenz",
+      "cost": "Kosten",
+      "costPerCall": "Kosten/Aufruf",
+      "connect": "Backend verbinden, um Stufendetails zu sehen"
+    },
+    "memory": {
+      "title": "Speicher",
+      "totalItems": "Gesamtelemente",
+      "backend": "Backend",
+      "collections": "Sammlungen",
+      "connect": "Backend verbinden, um Speicherstatistiken zu sehen"
+    },
+    "rag": {
+      "title": "RAG-Pipeline",
+      "status": "Status",
+      "chunks": "Chunks",
+      "cached": "Im Cache",
+      "connect": "Backend verbinden, um RAG-Statistiken zu sehen"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "RAG-Status",
+      "pipelineStatus": "Pipeline-Status",
+      "indexedChunks": "Indizierte Chunks",
+      "inVectorStore": "im Vektorspeicher",
+      "cachedEntries": "Gecachte Eintrage",
+      "hitRate": "Trefferquote:",
+      "memoryItems": "Speichereintrage",
+      "backendSuffix": "Backend"
+    },
+    "cache": {
+      "title": "Cache-Aufschlusselung",
+      "chunks": "Chunks",
+      "cached": "Im Cache",
+      "hitRate": "Trefferquote",
+      "connect": "Backend verbinden, um Cache-Statistiken zu sehen"
+    },
+    "collections": {
+      "title": "Speichersammlungen",
+      "connect": "Backend verbinden, um Sammlungen zu sehen"
+    }
+  }
+}

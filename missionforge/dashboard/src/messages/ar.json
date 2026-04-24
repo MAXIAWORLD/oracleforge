@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "إطار عمل وكلاء الذكاء الاصطناعي",
+    "user": "Alexis",
+    "role": "مدير"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "missions": "المهام",
+    "chat": "الدردشة",
+    "observability": "القابلية للملاحظة",
+    "ragStore": "مخزن RAG"
+  },
+  "shell": {
+    "live": "مباشر",
+    "offline": "غير متصل",
+    "backendOffline": "الخادم الخلفي غير متصل",
+    "language": "اللغة",
+    "theme": "السمة"
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "refresh": "تحديث",
+    "reload": "إعادة تحميل",
+    "run": "تشغيل",
+    "running": "قيد التشغيل...",
+    "runNow": "تشغيل الآن",
+    "send": "إرسال",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "back": "رجوع",
+    "total": "الإجمالي",
+    "today": "اليوم",
+    "manual": "يدوي",
+    "scheduled": "مجدول",
+    "none": "لا شيء",
+    "healthy": "سليم",
+    "degraded": "متدهور",
+    "success": "نجاح",
+    "failed": "فشل",
+    "status": "الحالة",
+    "noDescription": "لا يوجد وصف",
+    "dataAvailable": "البيانات متاحة بعد الاتصال بالخادم الخلفي",
+    "connectBackend": "قم بتوصيل الخادم الخلفي لرؤية البيانات",
+    "noMissions": "لا توجد مهام مكونة",
+    "noCollections": "لا توجد مجموعات"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "مكالمات LLM",
+      "totalCost": "التكلفة الإجمالية",
+      "ragChunks": "قطع RAG",
+      "costLabel": "التكلفة:",
+      "todaysSpend": "إنفاق اليوم",
+      "statusLabel": "الحالة:",
+      "apiHealth": "صحة API",
+      "ragPipeline": "خط أنابيب RAG",
+      "callsPerDay": "{count} مكالمة/يوم",
+      "chunksUnit": "{count} قطعة",
+      "offlineUnit": "غير متصل"
+    },
+    "donut": {
+      "label": "المهام"
+    },
+    "tierBreakdown": {
+      "title": "استخدام LLM — حسب المستوى",
+      "empty": "لا توجد مكالمات LLM مسجلة",
+      "calls": "{count} مكالمة"
+    },
+    "performance": {
+      "title": "مقاييس الأداء",
+      "avgLatency": "متوسط زمن الاستجابة",
+      "ragCache": "ذاكرة RAG المؤقتة",
+      "memoryItems": "عناصر الذاكرة",
+      "costPerCall": "التكلفة/المكالمة"
+    },
+    "miniMetrics": {
+      "queue": "قائمة الانتظار",
+      "memory": "الذاكرة",
+      "active": "نشط",
+      "tiers": "المستويات"
+    },
+    "missionsSummary": {
+      "title": "ملخص المهام",
+      "totalLoaded": "إجمالي المهام المحملة"
+    },
+    "missionsTable": {
+      "title": "المهام",
+      "totalSuffix": "الإجمالي",
+      "headers": {
+        "status": "الحالة",
+        "name": "الاسم",
+        "tier": "المستوى",
+        "steps": "الخطوات",
+        "schedule": "الجدول"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count} مهمة محملة",
+    "subtitle": "إدارة وتشغيل مهام الوكيل",
+    "stepsCount": "{count} خطوة",
+    "run": {
+      "title": "التشغيل:",
+      "steps": "الخطوات",
+      "duration": "المدة",
+      "tokens": "الرموز",
+      "cost": "التكلفة"
+    },
+    "errors": {
+      "load": "فشل التحميل",
+      "run": "فشل التشغيل",
+      "reload": "فشلت إعادة التحميل"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "العودة إلى المهام",
+    "agentConfig": "تكوين الوكيل",
+    "steps": "الخطوات ({count})",
+    "execution": "التنفيذ —"
+  },
+  "chat": {
+    "subtitle": "تحدث مع وكيلك بردود مستندة إلى RAG",
+    "empty": {
+      "title": "أرسل رسالة لبدء المحادثة.",
+      "subtitle": "يستخدم الوكيل RAG لتأصيل ردوده في قاعدة معرفتك."
+    },
+    "placeholder": "اكتب رسالة... (Enter للإرسال، Shift+Enter لسطر جديد)",
+    "tokensSuffix": "رموز",
+    "error": "فشلت الدردشة"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "إجمالي مكالمات LLM",
+      "totalCost": "التكلفة الإجمالية",
+      "avgLatency": "متوسط زمن الاستجابة",
+      "activeTiers": "المستويات النشطة",
+      "acrossAllTiers": "عبر جميع المستويات",
+      "usdToday": "USD اليوم"
+    },
+    "tierDistribution": {
+      "title": "توزيع المكالمات حسب المستوى",
+      "activeCount": "{count} مستوى نشط",
+      "empty": "لا توجد بيانات مستوى",
+      "connect": "قم بتوصيل الخادم الخلفي لرؤية بيانات المستوى",
+      "calls": "{count} مكالمة"
+    },
+    "tierDetail": {
+      "latency": "زمن الاستجابة",
+      "cost": "التكلفة",
+      "costPerCall": "التكلفة/المكالمة",
+      "connect": "قم بتوصيل الخادم الخلفي لرؤية تفاصيل المستوى"
+    },
+    "memory": {
+      "title": "مخزن الذاكرة",
+      "totalItems": "إجمالي العناصر",
+      "backend": "الخادم الخلفي",
+      "collections": "المجموعات",
+      "connect": "قم بتوصيل الخادم الخلفي لرؤية إحصائيات الذاكرة"
+    },
+    "rag": {
+      "title": "خط أنابيب RAG",
+      "status": "الحالة",
+      "chunks": "القطع",
+      "cached": "مخزن مؤقتاً",
+      "connect": "قم بتوصيل الخادم الخلفي لرؤية إحصائيات RAG"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "حالة RAG",
+      "pipelineStatus": "حالة خط الأنابيب",
+      "indexedChunks": "القطع المفهرسة",
+      "inVectorStore": "في المخزن المتجه",
+      "cachedEntries": "الإدخالات المخزنة مؤقتاً",
+      "hitRate": "معدل النجاح:",
+      "memoryItems": "عناصر الذاكرة",
+      "backendSuffix": "خادم خلفي"
+    },
+    "cache": {
+      "title": "تفصيل ذاكرة التخزين المؤقت",
+      "chunks": "القطع",
+      "cached": "مخزن مؤقتاً",
+      "hitRate": "معدل النجاح",
+      "connect": "قم بتوصيل الخادم الخلفي لرؤية إحصائيات ذاكرة التخزين المؤقت"
+    },
+    "collections": {
+      "title": "مجموعات الذاكرة",
+      "connect": "قم بتوصيل الخادم الخلفي لرؤية المجموعات"
+    }
+  }
+}

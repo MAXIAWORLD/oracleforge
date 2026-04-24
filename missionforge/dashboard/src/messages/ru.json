@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "Фреймворк ИИ-агентов",
+    "user": "Alexis",
+    "role": "Админ"
+  },
+  "nav": {
+    "dashboard": "Панель",
+    "missions": "Миссии",
+    "chat": "Чат",
+    "observability": "Наблюдаемость",
+    "ragStore": "Хранилище RAG"
+  },
+  "shell": {
+    "live": "В ЭФИРЕ",
+    "offline": "ОФЛАЙН",
+    "backendOffline": "Бэкенд офлайн",
+    "language": "Язык",
+    "theme": "Тема"
+  },
+  "common": {
+    "loading": "Загрузка...",
+    "refresh": "Обновить",
+    "reload": "Перезагрузить",
+    "run": "Запустить",
+    "running": "Выполняется...",
+    "runNow": "Запустить сейчас",
+    "send": "Отправить",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "back": "Назад",
+    "total": "всего",
+    "today": "сегодня",
+    "manual": "вручную",
+    "scheduled": "По расписанию",
+    "none": "нет",
+    "healthy": "Здоров",
+    "degraded": "Деградирован",
+    "success": "успех",
+    "failed": "неудача",
+    "status": "Статус",
+    "noDescription": "Без описания",
+    "dataAvailable": "Данные доступны после подключения бэкенда",
+    "connectBackend": "Подключите бэкенд чтобы увидеть данные",
+    "noMissions": "Миссии не настроены",
+    "noCollections": "Коллекции не найдены"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "Вызовы LLM",
+      "totalCost": "Общая стоимость",
+      "ragChunks": "RAG-чанки",
+      "costLabel": "Стоимость:",
+      "todaysSpend": "Расходы сегодня",
+      "statusLabel": "Статус:",
+      "apiHealth": "Здоровье API",
+      "ragPipeline": "Пайплайн RAG",
+      "callsPerDay": "{count} вызовов/день",
+      "chunksUnit": "{count} чанков",
+      "offlineUnit": "офлайн"
+    },
+    "donut": {
+      "label": "Миссии"
+    },
+    "tierBreakdown": {
+      "title": "Использование LLM — По уровням",
+      "empty": "Нет записанных вызовов LLM",
+      "calls": "{count} вызовов"
+    },
+    "performance": {
+      "title": "Метрики производительности",
+      "avgLatency": "Средняя задержка",
+      "ragCache": "Кэш RAG",
+      "memoryItems": "Элементы памяти",
+      "costPerCall": "Стоимость/вызов"
+    },
+    "miniMetrics": {
+      "queue": "Очередь",
+      "memory": "Память",
+      "active": "Активно",
+      "tiers": "Уровни"
+    },
+    "missionsSummary": {
+      "title": "Сводка миссий",
+      "totalLoaded": "Всего загружено миссий"
+    },
+    "missionsTable": {
+      "title": "Миссии",
+      "totalSuffix": "всего",
+      "headers": {
+        "status": "Статус",
+        "name": "Название",
+        "tier": "Уровень",
+        "steps": "Шаги",
+        "schedule": "Расписание"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count} миссий загружено",
+    "subtitle": "Управляйте и запускайте свои миссии агентов",
+    "stepsCount": "{count} шагов",
+    "run": {
+      "title": "Запуск:",
+      "steps": "Шаги",
+      "duration": "Длительность",
+      "tokens": "Токены",
+      "cost": "Стоимость"
+    },
+    "errors": {
+      "load": "Ошибка загрузки",
+      "run": "Ошибка запуска",
+      "reload": "Ошибка перезагрузки"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "Назад к миссиям",
+    "agentConfig": "Конфигурация агента",
+    "steps": "Шаги ({count})",
+    "execution": "Выполнение —"
+  },
+  "chat": {
+    "subtitle": "Общайтесь с агентом с ответами на основе RAG",
+    "empty": {
+      "title": "Отправьте сообщение чтобы начать разговор.",
+      "subtitle": "Агент использует RAG для обоснования ответов в вашей базе знаний."
+    },
+    "placeholder": "Введите сообщение... (Enter для отправки, Shift+Enter для новой строки)",
+    "tokensSuffix": "токенов",
+    "error": "Ошибка чата"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "Всего вызовов LLM",
+      "totalCost": "Общая стоимость",
+      "avgLatency": "Средняя задержка",
+      "activeTiers": "Активные уровни",
+      "acrossAllTiers": "по всем уровням",
+      "usdToday": "USD сегодня"
+    },
+    "tierDistribution": {
+      "title": "Распределение вызовов по уровням",
+      "activeCount": "{count} активных уровней",
+      "empty": "Нет данных уровней",
+      "connect": "Подключите бэкенд чтобы увидеть данные уровней",
+      "calls": "{count} вызовов"
+    },
+    "tierDetail": {
+      "latency": "Задержка",
+      "cost": "Стоимость",
+      "costPerCall": "Стоимость/вызов",
+      "connect": "Подключите бэкенд чтобы увидеть детали уровней"
+    },
+    "memory": {
+      "title": "Хранилище памяти",
+      "totalItems": "Всего элементов",
+      "backend": "Бэкенд",
+      "collections": "Коллекции",
+      "connect": "Подключите бэкенд чтобы увидеть статистику памяти"
+    },
+    "rag": {
+      "title": "Пайплайн RAG",
+      "status": "Статус",
+      "chunks": "Чанки",
+      "cached": "В кэше",
+      "connect": "Подключите бэкенд чтобы увидеть статистику RAG"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "Статус RAG",
+      "pipelineStatus": "статус пайплайна",
+      "indexedChunks": "Индексированные чанки",
+      "inVectorStore": "в векторном хранилище",
+      "cachedEntries": "Записи в кэше",
+      "hitRate": "Частота попаданий:",
+      "memoryItems": "Элементы памяти",
+      "backendSuffix": "бэкенд"
+    },
+    "cache": {
+      "title": "Разбивка кэша",
+      "chunks": "Чанки",
+      "cached": "В кэше",
+      "hitRate": "Частота попаданий",
+      "connect": "Подключите бэкенд чтобы увидеть статистику кэша"
+    },
+    "collections": {
+      "title": "Коллекции памяти",
+      "connect": "Подключите бэкенд чтобы увидеть коллекции"
+    }
+  }
+}

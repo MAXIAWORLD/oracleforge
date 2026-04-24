@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "Framework Agentow AI",
+    "user": "Alexis",
+    "role": "Admin"
+  },
+  "nav": {
+    "dashboard": "Panel",
+    "missions": "Misje",
+    "chat": "Czat",
+    "observability": "Obserwowalnosc",
+    "ragStore": "Magazyn RAG"
+  },
+  "shell": {
+    "live": "NA ZYWO",
+    "offline": "OFFLINE",
+    "backendOffline": "Backend offline",
+    "language": "Jezyk",
+    "theme": "Motyw"
+  },
+  "common": {
+    "loading": "Ladowanie...",
+    "refresh": "Odswiez",
+    "reload": "Przeladuj",
+    "run": "Uruchom",
+    "running": "Uruchamianie...",
+    "runNow": "Uruchom teraz",
+    "send": "Wyslij",
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "back": "Wstecz",
+    "total": "lacznie",
+    "today": "dzisiaj",
+    "manual": "reczne",
+    "scheduled": "Zaplanowane",
+    "none": "brak",
+    "healthy": "Zdrowy",
+    "degraded": "Pogorszony",
+    "success": "sukces",
+    "failed": "niepowodzenie",
+    "status": "Status",
+    "noDescription": "Brak opisu",
+    "dataAvailable": "Dane dostepne po polaczeniu z backendem",
+    "connectBackend": "Polacz backend aby zobaczyc dane",
+    "noMissions": "Brak skonfigurowanych misji",
+    "noCollections": "Nie znaleziono kolekcji"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "Wywolania LLM",
+      "totalCost": "Calkowity koszt",
+      "ragChunks": "Fragmenty RAG",
+      "costLabel": "Koszt:",
+      "todaysSpend": "Dzisiejsze wydatki",
+      "statusLabel": "Status:",
+      "apiHealth": "Stan API",
+      "ragPipeline": "Pipeline RAG",
+      "callsPerDay": "{count} wywolan/dzien",
+      "chunksUnit": "{count} fragmentow",
+      "offlineUnit": "offline"
+    },
+    "donut": {
+      "label": "Misje"
+    },
+    "tierBreakdown": {
+      "title": "Uzycie LLM — Wg poziomu",
+      "empty": "Brak zarejestrowanych wywolan LLM",
+      "calls": "{count} wywolan"
+    },
+    "performance": {
+      "title": "Metryki wydajnosci",
+      "avgLatency": "Srednia latencja",
+      "ragCache": "Cache RAG",
+      "memoryItems": "Elementy pamieci",
+      "costPerCall": "Koszt/wywolanie"
+    },
+    "miniMetrics": {
+      "queue": "Kolejka",
+      "memory": "Pamiec",
+      "active": "Aktywne",
+      "tiers": "Poziomy"
+    },
+    "missionsSummary": {
+      "title": "Podsumowanie misji",
+      "totalLoaded": "Laczna liczba zaladowanych misji"
+    },
+    "missionsTable": {
+      "title": "Misje",
+      "totalSuffix": "lacznie",
+      "headers": {
+        "status": "Status",
+        "name": "Nazwa",
+        "tier": "Poziom",
+        "steps": "Kroki",
+        "schedule": "Harmonogram"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count} misji zaladowanych",
+    "subtitle": "Zarzadzaj i uruchamiaj misje agenta",
+    "stepsCount": "{count} krokow",
+    "run": {
+      "title": "Uruchomienie:",
+      "steps": "Kroki",
+      "duration": "Czas trwania",
+      "tokens": "Tokeny",
+      "cost": "Koszt"
+    },
+    "errors": {
+      "load": "Nie udalo sie zaladowac",
+      "run": "Uruchomienie nie powiodlo sie",
+      "reload": "Przeladowanie nie powiodlo sie"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "Powrot do misji",
+    "agentConfig": "Konfiguracja agenta",
+    "steps": "Kroki ({count})",
+    "execution": "Wykonanie —"
+  },
+  "chat": {
+    "subtitle": "Rozmawiaj z agentem z odpowiedziami opartymi na RAG",
+    "empty": {
+      "title": "Wyslij wiadomosc aby rozpoczac rozmowe.",
+      "subtitle": "Agent uzywa RAG aby zakotwiczyc swoje odpowiedzi w bazie wiedzy."
+    },
+    "placeholder": "Wpisz wiadomosc... (Enter aby wyslac, Shift+Enter dla nowej linii)",
+    "tokensSuffix": "tokenow",
+    "error": "Czat nie powiodl sie"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "Lacznie wywolan LLM",
+      "totalCost": "Calkowity koszt",
+      "avgLatency": "Srednia latencja",
+      "activeTiers": "Aktywne poziomy",
+      "acrossAllTiers": "we wszystkich poziomach",
+      "usdToday": "USD dzisiaj"
+    },
+    "tierDistribution": {
+      "title": "Dystrybucja wywolan wg poziomu",
+      "activeCount": "{count} aktywnych poziomow",
+      "empty": "Brak danych poziomow",
+      "connect": "Polacz backend aby zobaczyc dane poziomow",
+      "calls": "{count} wywolan"
+    },
+    "tierDetail": {
+      "latency": "Latencja",
+      "cost": "Koszt",
+      "costPerCall": "Koszt/wywolanie",
+      "connect": "Polacz backend aby zobaczyc szczegoly poziomow"
+    },
+    "memory": {
+      "title": "Magazyn pamieci",
+      "totalItems": "Lacznie elementow",
+      "backend": "Backend",
+      "collections": "Kolekcje",
+      "connect": "Polacz backend aby zobaczyc statystyki pamieci"
+    },
+    "rag": {
+      "title": "Pipeline RAG",
+      "status": "Status",
+      "chunks": "Fragmenty",
+      "cached": "W cache",
+      "connect": "Polacz backend aby zobaczyc statystyki RAG"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "Status RAG",
+      "pipelineStatus": "status pipeline",
+      "indexedChunks": "Zaindeksowane fragmenty",
+      "inVectorStore": "w magazynie wektorowym",
+      "cachedEntries": "Wpisy w cache",
+      "hitRate": "Wskaznik trafien:",
+      "memoryItems": "Elementy pamieci",
+      "backendSuffix": "backend"
+    },
+    "cache": {
+      "title": "Rozklad cache",
+      "chunks": "Fragmenty",
+      "cached": "W cache",
+      "hitRate": "Wskaznik trafien",
+      "connect": "Polacz backend aby zobaczyc statystyki cache"
+    },
+    "collections": {
+      "title": "Kolekcje pamieci",
+      "connect": "Polacz backend aby zobaczyc kolekcje"
+    }
+  }
+}

@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "AI エージェントフレームワーク",
+    "user": "Alexis",
+    "role": "管理者"
+  },
+  "nav": {
+    "dashboard": "ダッシュボード",
+    "missions": "ミッション",
+    "chat": "チャット",
+    "observability": "オブザーバビリティ",
+    "ragStore": "RAG ストア"
+  },
+  "shell": {
+    "live": "ライブ",
+    "offline": "オフライン",
+    "backendOffline": "バックエンドオフライン",
+    "language": "言語",
+    "theme": "テーマ"
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "refresh": "更新",
+    "reload": "再読み込み",
+    "run": "実行",
+    "running": "実行中...",
+    "runNow": "今すぐ実行",
+    "send": "送信",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "back": "戻る",
+    "total": "合計",
+    "today": "今日",
+    "manual": "手動",
+    "scheduled": "スケジュール済み",
+    "none": "なし",
+    "healthy": "正常",
+    "degraded": "劣化",
+    "success": "成功",
+    "failed": "失敗",
+    "status": "ステータス",
+    "noDescription": "説明なし",
+    "dataAvailable": "バックエンド接続後にデータが利用可能",
+    "connectBackend": "データを表示するにはバックエンドに接続してください",
+    "noMissions": "ミッションが設定されていません",
+    "noCollections": "コレクションが見つかりません"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "LLM コール",
+      "totalCost": "総コスト",
+      "ragChunks": "RAG チャンク",
+      "costLabel": "コスト：",
+      "todaysSpend": "本日の支出",
+      "statusLabel": "ステータス：",
+      "apiHealth": "API ヘルス",
+      "ragPipeline": "RAG パイプライン",
+      "callsPerDay": "1 日 {count} コール",
+      "chunksUnit": "{count} チャンク",
+      "offlineUnit": "オフライン"
+    },
+    "donut": {
+      "label": "ミッション"
+    },
+    "tierBreakdown": {
+      "title": "LLM 使用状況 — ティア別",
+      "empty": "LLM コールの記録がありません",
+      "calls": "{count} コール"
+    },
+    "performance": {
+      "title": "パフォーマンス指標",
+      "avgLatency": "平均レイテンシー",
+      "ragCache": "RAG キャッシュ",
+      "memoryItems": "メモリアイテム",
+      "costPerCall": "コール単価"
+    },
+    "miniMetrics": {
+      "queue": "キュー",
+      "memory": "メモリ",
+      "active": "アクティブ",
+      "tiers": "ティア"
+    },
+    "missionsSummary": {
+      "title": "ミッション概要",
+      "totalLoaded": "読み込まれたミッション総数"
+    },
+    "missionsTable": {
+      "title": "ミッション",
+      "totalSuffix": "合計",
+      "headers": {
+        "status": "ステータス",
+        "name": "名前",
+        "tier": "ティア",
+        "steps": "ステップ",
+        "schedule": "スケジュール"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count} ミッション読み込み済み",
+    "subtitle": "エージェントミッションを管理して実行",
+    "stepsCount": "{count} ステップ",
+    "run": {
+      "title": "実行：",
+      "steps": "ステップ",
+      "duration": "時間",
+      "tokens": "トークン",
+      "cost": "コスト"
+    },
+    "errors": {
+      "load": "読み込みに失敗",
+      "run": "実行に失敗",
+      "reload": "再読み込みに失敗"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "ミッション一覧に戻る",
+    "agentConfig": "エージェント設定",
+    "steps": "ステップ ({count})",
+    "execution": "実行 —"
+  },
+  "chat": {
+    "subtitle": "RAG ベースの応答でエージェントと対話",
+    "empty": {
+      "title": "メッセージを送信して会話を開始します。",
+      "subtitle": "エージェントは RAG を使用して、応答を知識ベースに基づいて生成します。"
+    },
+    "placeholder": "メッセージを入力... (Enter で送信、Shift+Enter で改行)",
+    "tokensSuffix": "トークン",
+    "error": "チャットに失敗"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "LLM コール総数",
+      "totalCost": "総コスト",
+      "avgLatency": "平均レイテンシー",
+      "activeTiers": "アクティブティア",
+      "acrossAllTiers": "すべてのティアで",
+      "usdToday": "本日 USD"
+    },
+    "tierDistribution": {
+      "title": "ティア別コール分布",
+      "activeCount": "{count} アクティブティア",
+      "empty": "ティアデータなし",
+      "connect": "ティアデータを表示するにはバックエンドに接続してください",
+      "calls": "{count} コール"
+    },
+    "tierDetail": {
+      "latency": "レイテンシー",
+      "cost": "コスト",
+      "costPerCall": "コール単価",
+      "connect": "ティア詳細を表示するにはバックエンドに接続してください"
+    },
+    "memory": {
+      "title": "メモリストア",
+      "totalItems": "総アイテム数",
+      "backend": "バックエンド",
+      "collections": "コレクション",
+      "connect": "メモリ統計を表示するにはバックエンドに接続してください"
+    },
+    "rag": {
+      "title": "RAG パイプライン",
+      "status": "ステータス",
+      "chunks": "チャンク",
+      "cached": "キャッシュ済み",
+      "connect": "RAG 統計を表示するにはバックエンドに接続してください"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "RAG ステータス",
+      "pipelineStatus": "パイプラインステータス",
+      "indexedChunks": "インデックス済みチャンク",
+      "inVectorStore": "ベクトルストア内",
+      "cachedEntries": "キャッシュエントリ",
+      "hitRate": "ヒット率：",
+      "memoryItems": "メモリアイテム",
+      "backendSuffix": "バックエンド"
+    },
+    "cache": {
+      "title": "キャッシュ内訳",
+      "chunks": "チャンク",
+      "cached": "キャッシュ済み",
+      "hitRate": "ヒット率",
+      "connect": "キャッシュ統計を表示するにはバックエンドに接続してください"
+    },
+    "collections": {
+      "title": "メモリコレクション",
+      "connect": "コレクションを表示するにはバックエンドに接続してください"
+    }
+  }
+}

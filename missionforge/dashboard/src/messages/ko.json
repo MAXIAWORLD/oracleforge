@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "AI 에이전트 프레임워크",
+    "user": "Alexis",
+    "role": "관리자"
+  },
+  "nav": {
+    "dashboard": "대시보드",
+    "missions": "미션",
+    "chat": "채팅",
+    "observability": "관측 가능성",
+    "ragStore": "RAG 저장소"
+  },
+  "shell": {
+    "live": "라이브",
+    "offline": "오프라인",
+    "backendOffline": "백엔드 오프라인",
+    "language": "언어",
+    "theme": "테마"
+  },
+  "common": {
+    "loading": "로딩 중...",
+    "refresh": "새로고침",
+    "reload": "다시 로드",
+    "run": "실행",
+    "running": "실행 중...",
+    "runNow": "지금 실행",
+    "send": "보내기",
+    "save": "저장",
+    "cancel": "취소",
+    "back": "뒤로",
+    "total": "총계",
+    "today": "오늘",
+    "manual": "수동",
+    "scheduled": "예약됨",
+    "none": "없음",
+    "healthy": "정상",
+    "degraded": "저하됨",
+    "success": "성공",
+    "failed": "실패",
+    "status": "상태",
+    "noDescription": "설명 없음",
+    "dataAvailable": "백엔드 연결 후 데이터 사용 가능",
+    "connectBackend": "백엔드를 연결하여 데이터 확인",
+    "noMissions": "구성된 미션 없음",
+    "noCollections": "컬렉션을 찾을 수 없습니다"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "LLM 호출",
+      "totalCost": "총 비용",
+      "ragChunks": "RAG 청크",
+      "costLabel": "비용:",
+      "todaysSpend": "오늘 지출",
+      "statusLabel": "상태:",
+      "apiHealth": "API 상태",
+      "ragPipeline": "RAG 파이프라인",
+      "callsPerDay": "일일 {count}회 호출",
+      "chunksUnit": "{count} 청크",
+      "offlineUnit": "오프라인"
+    },
+    "donut": {
+      "label": "미션"
+    },
+    "tierBreakdown": {
+      "title": "LLM 사용량 — 티어별",
+      "empty": "기록된 LLM 호출이 없습니다",
+      "calls": "{count}회 호출"
+    },
+    "performance": {
+      "title": "성능 지표",
+      "avgLatency": "평균 지연",
+      "ragCache": "RAG 캐시",
+      "memoryItems": "메모리 항목",
+      "costPerCall": "호출당 비용"
+    },
+    "miniMetrics": {
+      "queue": "대기열",
+      "memory": "메모리",
+      "active": "활성",
+      "tiers": "티어"
+    },
+    "missionsSummary": {
+      "title": "미션 요약",
+      "totalLoaded": "로드된 미션 총계"
+    },
+    "missionsTable": {
+      "title": "미션",
+      "totalSuffix": "총계",
+      "headers": {
+        "status": "상태",
+        "name": "이름",
+        "tier": "티어",
+        "steps": "단계",
+        "schedule": "일정"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count}개 미션 로드됨",
+    "subtitle": "에이전트 미션 관리 및 실행",
+    "stepsCount": "{count} 단계",
+    "run": {
+      "title": "실행:",
+      "steps": "단계",
+      "duration": "시간",
+      "tokens": "토큰",
+      "cost": "비용"
+    },
+    "errors": {
+      "load": "로드 실패",
+      "run": "실행 실패",
+      "reload": "재로드 실패"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "미션 목록으로",
+    "agentConfig": "에이전트 구성",
+    "steps": "단계 ({count})",
+    "execution": "실행 —"
+  },
+  "chat": {
+    "subtitle": "RAG 기반 응답으로 에이전트와 대화",
+    "empty": {
+      "title": "메시지를 보내 대화를 시작하세요.",
+      "subtitle": "에이전트는 RAG를 사용하여 지식 베이스에 기반한 응답을 생성합니다."
+    },
+    "placeholder": "메시지 입력... (Enter로 전송, Shift+Enter로 줄바꿈)",
+    "tokensSuffix": "토큰",
+    "error": "채팅 실패"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "총 LLM 호출",
+      "totalCost": "총 비용",
+      "avgLatency": "평균 지연",
+      "activeTiers": "활성 티어",
+      "acrossAllTiers": "모든 티어",
+      "usdToday": "오늘 USD"
+    },
+    "tierDistribution": {
+      "title": "티어별 호출 분포",
+      "activeCount": "{count}개 활성 티어",
+      "empty": "티어 데이터 없음",
+      "connect": "백엔드를 연결하여 티어 데이터 확인",
+      "calls": "{count}회 호출"
+    },
+    "tierDetail": {
+      "latency": "지연",
+      "cost": "비용",
+      "costPerCall": "호출당 비용",
+      "connect": "백엔드를 연결하여 티어 세부정보 확인"
+    },
+    "memory": {
+      "title": "메모리 저장소",
+      "totalItems": "총 항목",
+      "backend": "백엔드",
+      "collections": "컬렉션",
+      "connect": "백엔드를 연결하여 메모리 통계 확인"
+    },
+    "rag": {
+      "title": "RAG 파이프라인",
+      "status": "상태",
+      "chunks": "청크",
+      "cached": "캐시됨",
+      "connect": "백엔드를 연결하여 RAG 통계 확인"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "RAG 상태",
+      "pipelineStatus": "파이프라인 상태",
+      "indexedChunks": "인덱싱된 청크",
+      "inVectorStore": "벡터 저장소에",
+      "cachedEntries": "캐시된 항목",
+      "hitRate": "히트율:",
+      "memoryItems": "메모리 항목",
+      "backendSuffix": "백엔드"
+    },
+    "cache": {
+      "title": "캐시 분석",
+      "chunks": "청크",
+      "cached": "캐시됨",
+      "hitRate": "히트율",
+      "connect": "백엔드를 연결하여 캐시 통계 확인"
+    },
+    "collections": {
+      "title": "메모리 컬렉션",
+      "connect": "백엔드를 연결하여 컬렉션 확인"
+    }
+  }
+}

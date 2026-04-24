@@ -1,12 +1,19 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Bot, Send, User, Zap, Database } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DashboardShell,
+  NEON,
+  containerVariants,
+  itemVariants,
+} from "@/components/dashboard-shell";
 import { api, type ChatResponse } from "@/lib/api";
 
 interface Message {
@@ -21,6 +28,7 @@ interface Message {
 }
 
 export default function ChatPage() {
+  const t = useTranslations();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -56,7 +64,7 @@ export default function ChatPage() {
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chat failed");
+      setError(e instanceof Error ? e.message : t("chat.error"));
     } finally {
       setLoading(false);
     }
@@ -70,127 +78,136 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3rem)]">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Bot className="h-6 w-6 text-blue-500" />
-          Chat
-        </h1>
-        <p className="text-gray-500 text-sm">
-          Talk to your agent with RAG-grounded responses
-        </p>
-      </div>
+    <DashboardShell>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="flex flex-col h-[calc(100vh-7rem)] max-w-[1600px] mx-auto"
+      >
+        {/* Description */}
+        <motion.div variants={itemVariants} className="mb-4">
+          <p className="text-sm text-muted-foreground">{t("chat.subtitle")}</p>
+        </motion.div>
 
-      {/* Messages */}
-      <Card className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full p-4">
-          <div className="space-y-4 pb-4">
-            {messages.length === 0 && (
-              <div className="text-center text-gray-400 py-16">
-                <Bot className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p>Send a message to start the conversation.</p>
-                <p className="text-sm mt-1">
-                  The agent uses RAG to ground its responses in your knowledge
-                  base.
-                </p>
-              </div>
-            )}
+        {/* Messages area */}
+        <motion.div
+          variants={itemVariants}
+          className="flex-1 glass-card neon-card overflow-hidden"
+          style={{ "--glow": NEON.blue } as React.CSSProperties}
+        >
+          <ScrollArea className="h-full p-4">
+            <div className="space-y-4 pb-4">
+              {messages.length === 0 && (
+                <div className="text-center py-16">
+                  <Bot className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
+                  <p className="text-muted-foreground">
+                    {t("chat.empty.title")}
+                  </p>
+                  <p className="text-sm mt-1 text-muted-foreground/60">
+                    {t("chat.empty.subtitle")}
+                  </p>
+                </div>
+              )}
 
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex gap-3 ${
-                  msg.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                {msg.role === "assistant" && (
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-blue-600" />
-                  </div>
-                )}
+              {messages.map((msg, i) => (
                 <div
-                  className={`max-w-[70%] rounded-lg p-3 ${
-                    msg.role === "user"
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-900"
+                  key={i}
+                  className={`flex gap-3 ${
+                    msg.role === "user" ? "justify-end" : "justify-start"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                  {msg.meta && (
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <Badge
-                        variant="outline"
-                        className="text-xs bg-white/80"
-                      >
-                        <Zap className="h-3 w-3 mr-1" />
-                        {msg.meta.tier_used}
-                      </Badge>
-                      <span className="text-xs opacity-70">
-                        {msg.meta.latency_ms}ms
-                      </span>
-                      {msg.meta.rag_context_used && (
+                  {msg.role === "assistant" && (
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-cyan-500/15 flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-cyan-400" />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[70%] rounded-xl p-3 ${
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted/40 border border-border text-foreground"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    {msg.meta && (
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <Badge
                           variant="outline"
-                          className="text-xs bg-white/80"
+                          className="text-xs border-border"
                         >
-                          <Database className="h-3 w-3 mr-1" />
-                          RAG
+                          <Zap className="h-3 w-3 mr-1" />
+                          {msg.meta.tier_used}
                         </Badge>
-                      )}
-                      <span className="text-xs opacity-70">
-                        ~{msg.meta.tokens_estimated} tokens
-                      </span>
+                        <span className="text-xs text-muted-foreground">
+                          {msg.meta.latency_ms}ms
+                        </span>
+                        {msg.meta.rag_context_used && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs border-border"
+                          >
+                            <Database className="h-3 w-3 mr-1" />
+                            RAG
+                          </Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          ~{msg.meta.tokens_estimated} {t("chat.tokensSuffix")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {msg.role === "user" && (
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary-foreground" />
                     </div>
                   )}
                 </div>
-                {msg.role === "user" && (
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
-                    <User className="h-4 w-4 text-white" />
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
 
-            {loading && (
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-blue-600 animate-pulse" />
-                </div>
-                <div className="bg-gray-100 rounded-lg p-3">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.1s]" />
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+              {loading && (
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-cyan-500/15 flex items-center justify-center">
+                    <Bot className="h-4 w-4 text-cyan-400 animate-pulse" />
+                  </div>
+                  <div className="bg-muted/40 border border-border rounded-xl p-3">
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce" />
+                      <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:0.1s]" />
+                      <div className="w-2 h-2 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:0.2s]" />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div ref={scrollRef} />
-          </div>
-        </ScrollArea>
-      </Card>
+              <div ref={scrollRef} />
+            </div>
+          </ScrollArea>
+        </motion.div>
 
-      {/* Error */}
-      {error && (
-        <p className="text-red-500 text-sm mt-2">{error}</p>
-      )}
+        {/* Error */}
+        {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
 
-      {/* Input */}
-      <div className="flex gap-2 mt-3">
-        <Textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
-          className="resize-none min-h-[44px] max-h-[120px]"
-          rows={1}
-          disabled={loading}
-        />
-        <Button onClick={handleSend} disabled={loading || !input.trim()}>
-          <Send className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
+        {/* Input */}
+        <motion.div variants={itemVariants} className="flex gap-2 mt-3">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t("chat.placeholder")}
+            className="resize-none min-h-[44px] max-h-[120px] bg-card border-border"
+            rows={1}
+            disabled={loading}
+          />
+          <Button
+            onClick={handleSend}
+            disabled={loading || !input.trim()}
+            className="bg-primary hover:bg-primary/90"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </motion.div>
+      </motion.div>
+    </DashboardShell>
   );
 }

@@ -3,16 +3,24 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { ArrowLeft, Bot, Play } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import {
+  DashboardShell,
+  NEON,
+  containerVariants,
+  itemVariants,
+} from "@/components/dashboard-shell";
 import { api, type MissionDetail, type RunResponse } from "@/lib/api";
 
 export default function MissionDetailPage() {
+  const t = useTranslations();
   const params = useParams();
-  const name = typeof params.name === "string" ? decodeURIComponent(params.name) : "";
+  const name =
+    typeof params.name === "string" ? decodeURIComponent(params.name) : "";
   const [mission, setMission] = useState<MissionDetail | null>(null);
   const [runResult, setRunResult] = useState<RunResponse | null>(null);
   const [running, setRunning] = useState(false);
@@ -20,7 +28,10 @@ export default function MissionDetailPage() {
 
   useEffect(() => {
     if (!name) return;
-    api.getMission(name).then(setMission).catch((e) => setError(e.message));
+    api
+      .getMission(name)
+      .then(setMission)
+      .catch((e) => setError(e.message));
   }, [name]);
 
   const handleRun = async () => {
@@ -30,7 +41,7 @@ export default function MissionDetailPage() {
       const result = await api.runMission(name);
       setRunResult(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Run failed");
+      setError(e instanceof Error ? e.message : t("missions.errors.run"));
     } finally {
       setRunning(false);
     }
@@ -38,75 +49,116 @@ export default function MissionDetailPage() {
 
   if (error) {
     return (
-      <div className="p-8">
-        <p className="text-red-600">{error}</p>
-      </div>
+      <DashboardShell>
+        <div
+          className="glass-card neon-card p-6"
+          style={{ "--glow": NEON.pink } as React.CSSProperties}
+        >
+          <p className="text-red-400 text-sm">{error}</p>
+        </div>
+      </DashboardShell>
     );
   }
+
   if (!mission) {
-    return <div className="p-8 text-gray-400">Loading...</div>;
+    return (
+      <DashboardShell>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
+        </div>
+      </DashboardShell>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/missions" className="text-gray-400 hover:text-gray-600">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Bot className="h-6 w-6 text-blue-500" />
-            {mission.name}
-          </h1>
-          <p className="text-gray-500 text-sm">{mission.description}</p>
-        </div>
-        <Button onClick={handleRun} disabled={running}>
-          <Play className="h-4 w-4 mr-2" />
-          {running ? "Running..." : "Run Now"}
-        </Button>
-      </div>
+    <DashboardShell>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="space-y-5 max-w-[1600px] mx-auto"
+      >
+        {/* Header */}
+        <motion.div variants={itemVariants} className="flex items-center gap-4">
+          <Link
+            href="/missions"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label={t("missionDetail.backToMissions")}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <Bot className="h-5 w-5 text-cyan-400" />
+              <h2 className="text-xl font-bold">{mission.name}</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {mission.description}
+            </p>
+          </div>
+          <Button
+            onClick={handleRun}
+            disabled={running}
+            className="bg-primary hover:bg-primary/90"
+          >
+            <Play className="h-4 w-4 mr-2" />
+            {running ? t("common.running") : t("common.runNow")}
+          </Button>
+        </motion.div>
 
-      {/* Agent config */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm text-gray-500">Agent</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3 mb-2">
-            <Badge>{mission.agent.llm_tier}</Badge>
+        {/* Agent config card */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -3, boxShadow: "0 0 20px rgba(180,74,255,0.12)" }}
+          className="glass-card neon-card p-5"
+          style={{ "--glow": NEON.violet } as React.CSSProperties}
+        >
+          <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
+            {t("missionDetail.agentConfig")}
+          </h3>
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-medium bg-violet-500/15 text-violet-400">
+              {mission.agent.llm_tier}
+            </span>
             {mission.schedule && (
-              <Badge variant="outline" className="font-mono">
+              <Badge
+                variant="outline"
+                className="font-mono text-xs border-border"
+              >
                 {mission.schedule}
               </Badge>
             )}
           </div>
-          <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
-            {mission.agent.system_prompt}
-          </p>
-        </CardContent>
-      </Card>
+          <div className="p-3 rounded-lg bg-muted/30 border border-border">
+            <p className="text-sm text-foreground leading-relaxed">
+              {mission.agent.system_prompt}
+            </p>
+          </div>
+        </motion.div>
 
-      {/* Steps */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm text-gray-500">
-            Steps ({mission.steps.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        {/* Steps card */}
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ y: -3, boxShadow: "0 0 20px rgba(0,229,255,0.12)" }}
+          className="glass-card neon-card p-5"
+          style={{ "--glow": NEON.cyan } as React.CSSProperties}
+        >
+          <h3 className="text-xs font-medium text-muted-foreground mb-4 uppercase tracking-wider">
+            {t("missionDetail.steps", { count: mission.steps.length })}
+          </h3>
           <div className="space-y-3">
             {mission.steps.map((step, i) => (
               <div key={i}>
-                {i > 0 && <Separator className="mb-3" />}
+                {i > 0 && <div className="border-t border-border/50 mb-3" />}
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
+                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-cyan-500/15 text-cyan-400 flex items-center justify-center text-xs font-bold">
                     {i + 1}
                   </div>
                   <div className="flex-1">
-                    <Badge variant="secondary" className="mb-1">
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full font-medium bg-blue-500/15 text-blue-400 mb-1 inline-block">
                       {String(step.action)}
-                    </Badge>
-                    <pre className="text-xs bg-gray-50 p-2 rounded mt-1 overflow-x-auto">
+                    </span>
+                    <pre className="text-xs p-2 rounded-lg mt-1 overflow-x-auto bg-muted/30 border border-border text-muted-foreground">
                       {JSON.stringify(
                         Object.fromEntries(
                           Object.entries(step).filter(
@@ -115,11 +167,11 @@ export default function MissionDetailPage() {
                               v !== null &&
                               v !== 500 &&
                               v !== 6 &&
-                              v !== "POST"
-                          )
+                              v !== "POST",
+                          ),
                         ),
                         null,
-                        2
+                        2,
                       )}
                     </pre>
                   </div>
@@ -127,59 +179,85 @@ export default function MissionDetailPage() {
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </motion.div>
 
-      {/* Run result */}
-      {runResult && (
-        <Card
-          className={
-            runResult.status === "success"
-              ? "border-green-200 bg-green-50"
-              : "border-red-200 bg-red-50"
-          }
-        >
-          <CardHeader>
-            <CardTitle className="text-sm">
-              Execution — {runResult.status}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* Run result */}
+        {runResult && (
+          <motion.div
+            variants={itemVariants}
+            initial="hidden"
+            animate="show"
+            className="glass-card neon-card p-5"
+            style={
+              {
+                "--glow":
+                  runResult.status === "success" ? NEON.green : NEON.pink,
+              } as React.CSSProperties
+            }
+          >
+            <h4 className="text-sm font-semibold mb-3">
+              {t("missionDetail.execution")}{" "}
+              <span
+                className={
+                  runResult.status === "success"
+                    ? "text-emerald-400"
+                    : "text-red-400"
+                }
+              >
+                {runResult.status === "success"
+                  ? t("common.success")
+                  : runResult.status === "failed"
+                    ? t("common.failed")
+                    : runResult.status}
+              </span>
+            </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
               <div>
-                <span className="text-gray-500">Steps:</span>{" "}
-                {runResult.steps_completed}/{runResult.total_steps}
+                <span className="text-muted-foreground text-xs">
+                  {t("missions.run.steps")}
+                </span>
+                <p className="font-semibold">
+                  {runResult.steps_completed}/{runResult.total_steps}
+                </p>
               </div>
               <div>
-                <span className="text-gray-500">Duration:</span>{" "}
-                {runResult.duration_ms}ms
+                <span className="text-muted-foreground text-xs">
+                  {t("missions.run.duration")}
+                </span>
+                <p className="font-semibold">{runResult.duration_ms}ms</p>
               </div>
               <div>
-                <span className="text-gray-500">Tokens:</span>{" "}
-                {runResult.tokens_used}
+                <span className="text-muted-foreground text-xs">
+                  {t("missions.run.tokens")}
+                </span>
+                <p className="font-semibold">{runResult.tokens_used}</p>
               </div>
               <div>
-                <span className="text-gray-500">Cost:</span> $
-                {runResult.cost_usd.toFixed(4)}
+                <span className="text-muted-foreground text-xs">
+                  {t("missions.run.cost")}
+                </span>
+                <p className="font-semibold">
+                  ${runResult.cost_usd.toFixed(4)}
+                </p>
               </div>
             </div>
             {runResult.logs.length > 0 && (
-              <div className="p-3 bg-white rounded border text-xs font-mono space-y-1">
+              <div className="p-3 rounded-lg bg-muted/30 border border-border text-xs font-mono space-y-1">
                 {runResult.logs.map((log, i) => (
-                  <div key={i} className="text-gray-600">
+                  <div key={i} className="text-muted-foreground">
                     {log}
                   </div>
                 ))}
               </div>
             )}
             {runResult.error_message && (
-              <p className="mt-2 text-red-600 text-sm">
+              <p className="mt-2 text-red-400 text-sm">
                 {runResult.error_message}
               </p>
             )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
+          </motion.div>
+        )}
+      </motion.div>
+    </DashboardShell>
   );
 }

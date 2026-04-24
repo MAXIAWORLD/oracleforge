@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "AI 智能体框架",
+    "user": "Alexis",
+    "role": "管理员"
+  },
+  "nav": {
+    "dashboard": "仪表板",
+    "missions": "任务",
+    "chat": "对话",
+    "observability": "可观测性",
+    "ragStore": "RAG 存储"
+  },
+  "shell": {
+    "live": "在线",
+    "offline": "离线",
+    "backendOffline": "后端离线",
+    "language": "语言",
+    "theme": "主题"
+  },
+  "common": {
+    "loading": "加载中...",
+    "refresh": "刷新",
+    "reload": "重新加载",
+    "run": "运行",
+    "running": "运行中...",
+    "runNow": "立即运行",
+    "send": "发送",
+    "save": "保存",
+    "cancel": "取消",
+    "back": "返回",
+    "total": "总计",
+    "today": "今天",
+    "manual": "手动",
+    "scheduled": "已计划",
+    "none": "无",
+    "healthy": "健康",
+    "degraded": "降级",
+    "success": "成功",
+    "failed": "失败",
+    "status": "状态",
+    "noDescription": "无描述",
+    "dataAvailable": "连接后端后数据可用",
+    "connectBackend": "连接后端以查看数据",
+    "noMissions": "未配置任务",
+    "noCollections": "未找到集合"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "LLM 调用",
+      "totalCost": "总费用",
+      "ragChunks": "RAG 块",
+      "costLabel": "费用：",
+      "todaysSpend": "今日支出",
+      "statusLabel": "状态：",
+      "apiHealth": "API 健康",
+      "ragPipeline": "RAG 管道",
+      "callsPerDay": "每日 {count} 次调用",
+      "chunksUnit": "{count} 块",
+      "offlineUnit": "离线"
+    },
+    "donut": {
+      "label": "任务"
+    },
+    "tierBreakdown": {
+      "title": "LLM 使用情况 — 按层级",
+      "empty": "尚无 LLM 调用记录",
+      "calls": "{count} 次调用"
+    },
+    "performance": {
+      "title": "性能指标",
+      "avgLatency": "平均延迟",
+      "ragCache": "RAG 缓存",
+      "memoryItems": "内存项",
+      "costPerCall": "每次调用费用"
+    },
+    "miniMetrics": {
+      "queue": "队列",
+      "memory": "内存",
+      "active": "活跃",
+      "tiers": "层级"
+    },
+    "missionsSummary": {
+      "title": "任务摘要",
+      "totalLoaded": "已加载任务总数"
+    },
+    "missionsTable": {
+      "title": "任务",
+      "totalSuffix": "总计",
+      "headers": {
+        "status": "状态",
+        "name": "名称",
+        "tier": "层级",
+        "steps": "步骤",
+        "schedule": "计划"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "已加载 {count} 个任务",
+    "subtitle": "管理和执行您的智能体任务",
+    "stepsCount": "{count} 个步骤",
+    "run": {
+      "title": "运行：",
+      "steps": "步骤",
+      "duration": "时长",
+      "tokens": "令牌",
+      "cost": "费用"
+    },
+    "errors": {
+      "load": "加载失败",
+      "run": "运行失败",
+      "reload": "重新加载失败"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "返回任务列表",
+    "agentConfig": "智能体配置",
+    "steps": "步骤 ({count})",
+    "execution": "执行 —"
+  },
+  "chat": {
+    "subtitle": "与您的智能体对话，获取基于 RAG 的响应",
+    "empty": {
+      "title": "发送消息开始对话。",
+      "subtitle": "智能体使用 RAG 将响应基于您的知识库。"
+    },
+    "placeholder": "输入消息... (Enter 发送, Shift+Enter 换行)",
+    "tokensSuffix": "令牌",
+    "error": "对话失败"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "LLM 调用总数",
+      "totalCost": "总费用",
+      "avgLatency": "平均延迟",
+      "activeTiers": "活跃层级",
+      "acrossAllTiers": "所有层级",
+      "usdToday": "今日美元"
+    },
+    "tierDistribution": {
+      "title": "层级调用分布",
+      "activeCount": "{count} 个活跃层级",
+      "empty": "暂无层级数据",
+      "connect": "连接后端以查看层级数据",
+      "calls": "{count} 次调用"
+    },
+    "tierDetail": {
+      "latency": "延迟",
+      "cost": "费用",
+      "costPerCall": "每次调用费用",
+      "connect": "连接后端以查看层级详情"
+    },
+    "memory": {
+      "title": "内存存储",
+      "totalItems": "总项数",
+      "backend": "后端",
+      "collections": "集合",
+      "connect": "连接后端以查看内存统计"
+    },
+    "rag": {
+      "title": "RAG 管道",
+      "status": "状态",
+      "chunks": "块",
+      "cached": "已缓存",
+      "connect": "连接后端以查看 RAG 统计"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "RAG 状态",
+      "pipelineStatus": "管道状态",
+      "indexedChunks": "已索引块",
+      "inVectorStore": "在向量存储中",
+      "cachedEntries": "缓存条目",
+      "hitRate": "命中率：",
+      "memoryItems": "内存项",
+      "backendSuffix": "后端"
+    },
+    "cache": {
+      "title": "缓存细分",
+      "chunks": "块",
+      "cached": "已缓存",
+      "hitRate": "命中率",
+      "connect": "连接后端以查看缓存统计"
+    },
+    "collections": {
+      "title": "内存集合",
+      "connect": "连接后端以查看集合"
+    }
+  }
+}

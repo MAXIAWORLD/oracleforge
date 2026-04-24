@@ -16,11 +16,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import get_settings
 from core.database import close_db, init_db
+import core.database as _db_module
 from core.models import HealthResponse
 from routes.llm import router as llm_router
 from routes.missions import router as missions_router
 from routes.chat import router as chat_router
 from routes.observability import router as observability_router
+from routes.mcp import router as mcp_router, sse_transport
 
 logger = logging.getLogger(__name__)
 
@@ -73,12 +75,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from services.llm_router import LLMRouter
 
     llm = LLMRouter(settings=settings, http_client=app.state.http_client)
+    app.state.llm_router = llm
     app.state.mission_engine = MissionEngine(
         llm_router=llm,
         rag_service=app.state.rag_service,
         memory=app.state.memory,
         http_client=app.state.http_client,
         allowed_env_vars=settings.allowed_env_vars,
+        db_session_factory=_db_module._session_factory,
     )
 
     # Load missions from disk
@@ -108,6 +112,7 @@ def create_app() -> FastAPI:
 
     # Security middleware (auth + rate limit + headers)
     from core.middleware import add_security_middleware
+
     add_security_middleware(app, settings.secret_key)
 
     # CORS
@@ -124,6 +129,10 @@ def create_app() -> FastAPI:
     app.include_router(missions_router)
     app.include_router(chat_router)
     app.include_router(observability_router)
+    app.include_router(mcp_router)
+
+    # SSE messages endpoint — mounted as raw ASGI app
+    app.mount("/mcp/messages", sse_transport.handle_post_message)
 
     # ── Health endpoint ──────────────────────────────────────────
     @app.get("/health", response_model=HealthResponse)

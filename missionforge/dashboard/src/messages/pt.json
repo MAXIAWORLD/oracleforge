@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "Framework de Agentes IA",
+    "user": "Alexis",
+    "role": "Admin"
+  },
+  "nav": {
+    "dashboard": "Painel",
+    "missions": "Missoes",
+    "chat": "Chat",
+    "observability": "Observabilidade",
+    "ragStore": "Armazem RAG"
+  },
+  "shell": {
+    "live": "AO VIVO",
+    "offline": "OFFLINE",
+    "backendOffline": "Backend offline",
+    "language": "Idioma",
+    "theme": "Tema"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "refresh": "Atualizar",
+    "reload": "Recarregar",
+    "run": "Executar",
+    "running": "Executando...",
+    "runNow": "Executar agora",
+    "send": "Enviar",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "back": "Voltar",
+    "total": "total",
+    "today": "hoje",
+    "manual": "manual",
+    "scheduled": "Agendado",
+    "none": "nenhum",
+    "healthy": "Saudavel",
+    "degraded": "Degradado",
+    "success": "sucesso",
+    "failed": "falhou",
+    "status": "Status",
+    "noDescription": "Sem descricao",
+    "dataAvailable": "Dados disponiveis apos conexao com backend",
+    "connectBackend": "Conecte o backend para ver dados",
+    "noMissions": "Nenhuma missao configurada",
+    "noCollections": "Nenhuma colecao encontrada"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "Chamadas LLM",
+      "totalCost": "Custo total",
+      "ragChunks": "Chunks RAG",
+      "costLabel": "Custo:",
+      "todaysSpend": "Gasto de hoje",
+      "statusLabel": "Status:",
+      "apiHealth": "Saude da API",
+      "ragPipeline": "Pipeline RAG",
+      "callsPerDay": "{count} chamadas/dia",
+      "chunksUnit": "{count} chunks",
+      "offlineUnit": "offline"
+    },
+    "donut": {
+      "label": "Missoes"
+    },
+    "tierBreakdown": {
+      "title": "Uso LLM — Por nivel",
+      "empty": "Nenhuma chamada LLM registrada",
+      "calls": "{count} chamadas"
+    },
+    "performance": {
+      "title": "Metricas de desempenho",
+      "avgLatency": "Latencia media",
+      "ragCache": "Cache RAG",
+      "memoryItems": "Itens de memoria",
+      "costPerCall": "Custo/chamada"
+    },
+    "miniMetrics": {
+      "queue": "Fila",
+      "memory": "Memoria",
+      "active": "Ativas",
+      "tiers": "Niveis"
+    },
+    "missionsSummary": {
+      "title": "Resumo de missoes",
+      "totalLoaded": "Missoes carregadas no total"
+    },
+    "missionsTable": {
+      "title": "Missoes",
+      "totalSuffix": "no total",
+      "headers": {
+        "status": "Status",
+        "name": "Nome",
+        "tier": "Nivel",
+        "steps": "Passos",
+        "schedule": "Agendamento"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count} missoes carregadas",
+    "subtitle": "Gerencie e execute suas missoes de agente",
+    "stepsCount": "{count} passos",
+    "run": {
+      "title": "Execucao:",
+      "steps": "Passos",
+      "duration": "Duracao",
+      "tokens": "Tokens",
+      "cost": "Custo"
+    },
+    "errors": {
+      "load": "Falha ao carregar",
+      "run": "Falha na execucao",
+      "reload": "Falha ao recarregar"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "Voltar para missoes",
+    "agentConfig": "Configuracao do agente",
+    "steps": "Passos ({count})",
+    "execution": "Execucao —"
+  },
+  "chat": {
+    "subtitle": "Fale com seu agente com respostas ancoradas em RAG",
+    "empty": {
+      "title": "Envie uma mensagem para iniciar a conversa.",
+      "subtitle": "O agente usa RAG para ancorar suas respostas em sua base de conhecimento."
+    },
+    "placeholder": "Digite uma mensagem... (Enter para enviar, Shift+Enter para nova linha)",
+    "tokensSuffix": "tokens",
+    "error": "Falha no chat"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "Total de chamadas LLM",
+      "totalCost": "Custo total",
+      "avgLatency": "Latencia media",
+      "activeTiers": "Niveis ativos",
+      "acrossAllTiers": "em todos os niveis",
+      "usdToday": "USD hoje"
+    },
+    "tierDistribution": {
+      "title": "Distribuicao de chamadas por nivel",
+      "activeCount": "{count} niveis ativos",
+      "empty": "Sem dados de nivel",
+      "connect": "Conecte o backend para ver dados de nivel",
+      "calls": "{count} chamadas"
+    },
+    "tierDetail": {
+      "latency": "Latencia",
+      "cost": "Custo",
+      "costPerCall": "Custo/chamada",
+      "connect": "Conecte o backend para ver detalhes dos niveis"
+    },
+    "memory": {
+      "title": "Memoria",
+      "totalItems": "Itens totais",
+      "backend": "Backend",
+      "collections": "Colecoes",
+      "connect": "Conecte o backend para ver estatisticas de memoria"
+    },
+    "rag": {
+      "title": "Pipeline RAG",
+      "status": "Status",
+      "chunks": "Chunks",
+      "cached": "Em cache",
+      "connect": "Conecte o backend para ver estatisticas RAG"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "Status RAG",
+      "pipelineStatus": "status do pipeline",
+      "indexedChunks": "Chunks indexados",
+      "inVectorStore": "no armazem vetorial",
+      "cachedEntries": "Entradas em cache",
+      "hitRate": "Taxa de acerto:",
+      "memoryItems": "Itens de memoria",
+      "backendSuffix": "backend"
+    },
+    "cache": {
+      "title": "Desmembramento do cache",
+      "chunks": "Chunks",
+      "cached": "Em cache",
+      "hitRate": "Taxa de acerto",
+      "connect": "Conecte o backend para ver estatisticas do cache"
+    },
+    "collections": {
+      "title": "Colecoes de memoria",
+      "connect": "Conecte o backend para ver colecoes"
+    }
+  }
+}

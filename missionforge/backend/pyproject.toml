@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "missionforge"
+version = "0.1.0"
+description = "YAML-based AI agent framework — run autonomous missions with LLMs, RAG, and webhooks"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+authors = [
+    { name = "MAXIA", email = "hello@maxiaworld.app" }
+]
+keywords = ["ai", "agents", "missions", "llm", "rag", "mcp", "automation", "yaml"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.34,<1.0",
+    "httpx>=0.28,<1.0",
+    "pydantic>=2.11,<3.0",
+    "pydantic-settings>=2.0,<3.0",
+    "sqlalchemy>=2.0,<3.0",
+    "alembic>=1.13,<2.0",
+    "aiosqlite>=0.20,<1.0",
+    "PyYAML>=6.0,<7.0",
+    "python-dotenv>=1.0,<2.0",
+    "mcp==1.27.0",
+    "croniter>=3.0,<4.0",
+]
+
+[project.optional-dependencies]
+chroma = ["chromadb>=0.5,<1.0"]
+postgres = ["asyncpg>=0.29,<1.0"]
+dev = [
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=0.23,<1.0",
+    "twine>=5.0,<6.0",
+    "hatch",
+]
+
+[project.scripts]
+missionforge = "main:app"
+
+[project.urls]
+Homepage = "https://mission.maxiaworld.app"
+Repository = "https://github.com/maxia/missionforge"
+Documentation = "https://mission.maxiaworld.app/docs"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "core",
+    "services",
+    "routes",
+    "mcp_server",
+    "main.py",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

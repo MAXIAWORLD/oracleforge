@@ -41,21 +41,59 @@ class Tier(StrEnum):
 # Keywords for auto-classification (from MAXIA V12, works well in practice)
 _TIER_KEYWORDS: dict[Tier, list[str]] = {
     Tier.LOCAL: [
-        "classify", "parse", "extract", "summarize", "resume", "format",
-        "count", "list", "filter", "monitor", "check", "health", "status",
-        "translate", "categorize", "tag",
+        "classify",
+        "parse",
+        "extract",
+        "summarize",
+        "resume",
+        "format",
+        "count",
+        "list",
+        "filter",
+        "monitor",
+        "check",
+        "health",
+        "status",
+        "translate",
+        "categorize",
+        "tag",
     ],
     Tier.FAST: [
-        "tweet", "write", "draft", "respond", "reply", "analyze market",
-        "negotiate", "prospect", "outreach", "content", "message",
+        "tweet",
+        "write",
+        "draft",
+        "respond",
+        "reply",
+        "analyze market",
+        "negotiate",
+        "prospect",
+        "outreach",
+        "content",
+        "message",
     ],
     Tier.MID: [
-        "swot", "strategy", "plan", "evaluate", "compare", "assess",
-        "diagnose", "multi-step", "report", "weekly",
+        "swot",
+        "strategy",
+        "plan",
+        "evaluate",
+        "compare",
+        "assess",
+        "diagnose",
+        "multi-step",
+        "report",
+        "weekly",
     ],
     Tier.STRATEGIC: [
-        "vision", "expansion", "red team", "critical", "okr", "roadmap",
-        "invest", "crisis", "long-term", "global",
+        "vision",
+        "expansion",
+        "red team",
+        "critical",
+        "okr",
+        "roadmap",
+        "invest",
+        "crisis",
+        "long-term",
+        "global",
     ],
 }
 
@@ -71,12 +109,21 @@ TIER_COSTS: dict[Tier, tuple[float, float]] = {
 
 # Provider/model names per tier (for observability)
 _TIER_PROVIDERS: dict[Tier, str] = {
-    Tier.LOCAL: "ollama", Tier.FAST: "cerebras", Tier.FAST2: "gemini",
-    Tier.FAST3: "groq", Tier.MID: "mistral", Tier.STRATEGIC: "anthropic",
+    Tier.LOCAL: "ollama",
+    Tier.FAST: "cerebras",
+    Tier.FAST2: "gemini",
+    Tier.FAST3: "groq",
+    Tier.MID: "mistral",
+    Tier.STRATEGIC: "anthropic",
 }
 
 _FALLBACK_CHAIN: list[Tier] = [
-    Tier.LOCAL, Tier.FAST, Tier.FAST2, Tier.FAST3, Tier.MID, Tier.STRATEGIC,
+    Tier.LOCAL,
+    Tier.FAST,
+    Tier.FAST2,
+    Tier.FAST3,
+    Tier.MID,
+    Tier.STRATEGIC,
 ]
 
 
@@ -90,8 +137,7 @@ class LLMRouter:
         self._groq_last_call: float = 0.0
         self._groq_min_interval: float = 2.0
         self._stats: dict[str, dict] = {
-            t.value: {"calls": 0, "cost": 0.0, "last_latency_ms": 0}
-            for t in Tier
+            t.value: {"calls": 0, "cost": 0.0, "last_latency_ms": 0} for t in Tier
         }
 
     # ── Classification ───────────────────────────────────────────
@@ -143,7 +189,9 @@ class LLMRouter:
                     self._track(t, len(prompt), len(result), latency_ms)
                     return result
             except asyncio.TimeoutError:
-                logger.warning("[LLMRouter] %s timeout (%.1fs), trying next...", t.value, timeout)
+                logger.warning(
+                    "[LLMRouter] %s timeout (%.1fs), trying next...", t.value, timeout
+                )
             except Exception as e:
                 logger.warning("[LLMRouter] %s failed: %s, trying next...", t.value, e)
 
@@ -274,7 +322,7 @@ class LLMRouter:
                 "content-type": "application/json",
             },
             json={
-                "model": "claude-sonnet-4-20250514",
+                "model": self._settings.anthropic_model,
                 "max_tokens": max_tokens,
                 "system": system or "You are a helpful assistant.",
                 "messages": [{"role": "user", "content": prompt}],
@@ -317,8 +365,7 @@ class LLMRouter:
         today = time.strftime("%Y-%m-%d")
         if self._date != today:
             self._stats = {
-                t.value: {"calls": 0, "cost": 0.0, "last_latency_ms": 0}
-                for t in Tier
+                t.value: {"calls": 0, "cost": 0.0, "last_latency_ms": 0} for t in Tier
             }
             self._date = today
 
@@ -349,6 +396,18 @@ class LLMRouter:
                 available.append(tier)
         return available
 
+    def model_for_tier(self, tier: Tier) -> str:
+        """Return the model name used for a given tier."""
+        model_map: dict[Tier, str] = {
+            Tier.LOCAL: self._settings.ollama_model,
+            Tier.FAST: self._settings.cerebras_model,
+            Tier.FAST2: self._settings.google_ai_model,
+            Tier.FAST3: "llama-3.3-70b-versatile",
+            Tier.MID: self._settings.mistral_model,
+            Tier.STRATEGIC: self._settings.anthropic_model,
+        }
+        return model_map.get(tier, "")
+
     def get_tier_info(self, tier: Tier) -> dict:
         """Return provider/model info for a tier."""
         model_map: dict[Tier, str] = {
@@ -357,7 +416,7 @@ class LLMRouter:
             Tier.FAST2: self._settings.google_ai_model,
             Tier.FAST3: "llama-3.3-70b-versatile",
             Tier.MID: self._settings.mistral_model,
-            Tier.STRATEGIC: "claude-sonnet-4-20250514",
+            Tier.STRATEGIC: self._settings.anthropic_model,
         }
         return {
             "tier": tier.value,

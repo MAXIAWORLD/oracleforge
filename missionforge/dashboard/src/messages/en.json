@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "AI Agent Framework",
+    "user": "Alexis",
+    "role": "Admin"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "missions": "Missions",
+    "chat": "Chat",
+    "observability": "Observability",
+    "ragStore": "RAG Store"
+  },
+  "shell": {
+    "live": "LIVE",
+    "offline": "OFFLINE",
+    "backendOffline": "Backend offline",
+    "language": "Language",
+    "theme": "Theme"
+  },
+  "common": {
+    "loading": "Loading...",
+    "refresh": "Refresh",
+    "reload": "Reload",
+    "run": "Run",
+    "running": "Running...",
+    "runNow": "Run Now",
+    "send": "Send",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "total": "total",
+    "today": "today",
+    "manual": "manual",
+    "scheduled": "Scheduled",
+    "none": "none",
+    "healthy": "Healthy",
+    "degraded": "Degraded",
+    "success": "success",
+    "failed": "failed",
+    "status": "Status",
+    "noDescription": "No description",
+    "dataAvailable": "Data available after backend connection",
+    "connectBackend": "Connect backend to see data",
+    "noMissions": "No missions configured",
+    "noCollections": "No collections found"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "LLM Calls",
+      "totalCost": "Total Cost",
+      "ragChunks": "RAG Chunks",
+      "costLabel": "Cost:",
+      "todaysSpend": "Today's spend",
+      "statusLabel": "Status:",
+      "apiHealth": "API Health",
+      "ragPipeline": "RAG Pipeline",
+      "callsPerDay": "{count} calls/day",
+      "chunksUnit": "{count} chunks",
+      "offlineUnit": "offline"
+    },
+    "donut": {
+      "label": "Missions"
+    },
+    "tierBreakdown": {
+      "title": "LLM Usage — Tier Breakdown",
+      "empty": "No LLM calls recorded yet",
+      "calls": "{count} calls"
+    },
+    "performance": {
+      "title": "Performance Metrics",
+      "avgLatency": "Avg Latency",
+      "ragCache": "RAG Cache",
+      "memoryItems": "Memory Items",
+      "costPerCall": "Cost/Call"
+    },
+    "miniMetrics": {
+      "queue": "Queue",
+      "memory": "Memory",
+      "active": "Active",
+      "tiers": "Tiers"
+    },
+    "missionsSummary": {
+      "title": "Missions Summary",
+      "totalLoaded": "Total missions loaded"
+    },
+    "missionsTable": {
+      "title": "Missions",
+      "totalSuffix": "total",
+      "headers": {
+        "status": "Status",
+        "name": "Name",
+        "tier": "Tier",
+        "steps": "Steps",
+        "schedule": "Schedule"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count} missions loaded",
+    "subtitle": "Manage and execute your agent missions",
+    "stepsCount": "{count} steps",
+    "run": {
+      "title": "Run:",
+      "steps": "Steps",
+      "duration": "Duration",
+      "tokens": "Tokens",
+      "cost": "Cost"
+    },
+    "errors": {
+      "load": "Failed to load",
+      "run": "Run failed",
+      "reload": "Reload failed"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "Back to missions",
+    "agentConfig": "Agent Configuration",
+    "steps": "Steps ({count})",
+    "execution": "Execution —"
+  },
+  "chat": {
+    "subtitle": "Talk to your agent with RAG-grounded responses",
+    "empty": {
+      "title": "Send a message to start the conversation.",
+      "subtitle": "The agent uses RAG to ground its responses in your knowledge base."
+    },
+    "placeholder": "Type a message... (Enter to send, Shift+Enter for newline)",
+    "tokensSuffix": "tokens",
+    "error": "Chat failed"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "Total LLM Calls",
+      "totalCost": "Total Cost",
+      "avgLatency": "Avg Latency",
+      "activeTiers": "Active Tiers",
+      "acrossAllTiers": "across all tiers",
+      "usdToday": "USD today"
+    },
+    "tierDistribution": {
+      "title": "Tier Call Distribution",
+      "activeCount": "{count} active tiers",
+      "empty": "No tier data yet",
+      "connect": "Connect backend to see tier data",
+      "calls": "{count} calls"
+    },
+    "tierDetail": {
+      "latency": "Latency",
+      "cost": "Cost",
+      "costPerCall": "Cost/Call",
+      "connect": "Connect backend to see tier details"
+    },
+    "memory": {
+      "title": "Memory Store",
+      "totalItems": "Total Items",
+      "backend": "Backend",
+      "collections": "Collections",
+      "connect": "Connect backend to see memory stats"
+    },
+    "rag": {
+      "title": "RAG Pipeline",
+      "status": "Status",
+      "chunks": "Chunks",
+      "cached": "Cached",
+      "connect": "Connect backend to see RAG stats"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "RAG Status",
+      "pipelineStatus": "pipeline status",
+      "indexedChunks": "Indexed Chunks",
+      "inVectorStore": "in vector store",
+      "cachedEntries": "Cached Entries",
+      "hitRate": "Hit rate:",
+      "memoryItems": "Memory Items",
+      "backendSuffix": "backend"
+    },
+    "cache": {
+      "title": "Cache Breakdown",
+      "chunks": "Chunks",
+      "cached": "Cached",
+      "hitRate": "Hit Rate",
+      "connect": "Connect backend to see cache stats"
+    },
+    "collections": {
+      "title": "Memory Collections",
+      "connect": "Connect backend to see collections"
+    }
+  }
+}

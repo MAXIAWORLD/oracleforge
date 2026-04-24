@@ -61,6 +61,7 @@ class Settings(BaseSettings):
 
     # Tier STRATEGIC — Anthropic Claude
     anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-6"
 
 
 @lru_cache

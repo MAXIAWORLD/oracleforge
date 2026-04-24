@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "AI एजेंट फ्रेमवर्क",
+    "user": "Alexis",
+    "role": "एडमिन"
+  },
+  "nav": {
+    "dashboard": "डैशबोर्ड",
+    "missions": "मिशन",
+    "chat": "चैट",
+    "observability": "अवलोकनीयता",
+    "ragStore": "RAG स्टोर"
+  },
+  "shell": {
+    "live": "लाइव",
+    "offline": "ऑफलाइन",
+    "backendOffline": "बैकएंड ऑफलाइन",
+    "language": "भाषा",
+    "theme": "थीम"
+  },
+  "common": {
+    "loading": "लोड हो रहा है...",
+    "refresh": "रिफ्रेश",
+    "reload": "रीलोड",
+    "run": "चलाएं",
+    "running": "चल रहा है...",
+    "runNow": "अभी चलाएं",
+    "send": "भेजें",
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "back": "वापस",
+    "total": "कुल",
+    "today": "आज",
+    "manual": "मैनुअल",
+    "scheduled": "निर्धारित",
+    "none": "कोई नहीं",
+    "healthy": "स्वस्थ",
+    "degraded": "खराब",
+    "success": "सफलता",
+    "failed": "विफल",
+    "status": "स्थिति",
+    "noDescription": "कोई विवरण नहीं",
+    "dataAvailable": "बैकएंड कनेक्शन के बाद डेटा उपलब्ध",
+    "connectBackend": "डेटा देखने के लिए बैकएंड कनेक्ट करें",
+    "noMissions": "कोई मिशन कॉन्फ़िगर नहीं",
+    "noCollections": "कोई संग्रह नहीं मिला"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "LLM कॉल्स",
+      "totalCost": "कुल लागत",
+      "ragChunks": "RAG चंक्स",
+      "costLabel": "लागत:",
+      "todaysSpend": "आज का खर्च",
+      "statusLabel": "स्थिति:",
+      "apiHealth": "API स्वास्थ्य",
+      "ragPipeline": "RAG पाइपलाइन",
+      "callsPerDay": "{count} कॉल्स/दिन",
+      "chunksUnit": "{count} चंक्स",
+      "offlineUnit": "ऑफलाइन"
+    },
+    "donut": {
+      "label": "मिशन"
+    },
+    "tierBreakdown": {
+      "title": "LLM उपयोग — स्तर के अनुसार",
+      "empty": "कोई LLM कॉल रिकॉर्ड नहीं",
+      "calls": "{count} कॉल्स"
+    },
+    "performance": {
+      "title": "प्रदर्शन मेट्रिक्स",
+      "avgLatency": "औसत विलंब",
+      "ragCache": "RAG कैश",
+      "memoryItems": "मेमोरी आइटम्स",
+      "costPerCall": "प्रति कॉल लागत"
+    },
+    "miniMetrics": {
+      "queue": "क्यू",
+      "memory": "मेमोरी",
+      "active": "सक्रिय",
+      "tiers": "स्तर"
+    },
+    "missionsSummary": {
+      "title": "मिशन सारांश",
+      "totalLoaded": "कुल लोड किए गए मिशन"
+    },
+    "missionsTable": {
+      "title": "मिशन",
+      "totalSuffix": "कुल",
+      "headers": {
+        "status": "स्थिति",
+        "name": "नाम",
+        "tier": "स्तर",
+        "steps": "चरण",
+        "schedule": "अनुसूची"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count} मिशन लोड हुए",
+    "subtitle": "अपने एजेंट मिशन प्रबंधित करें और चलाएं",
+    "stepsCount": "{count} चरण",
+    "run": {
+      "title": "रन:",
+      "steps": "चरण",
+      "duration": "अवधि",
+      "tokens": "टोकन",
+      "cost": "लागत"
+    },
+    "errors": {
+      "load": "लोड करने में विफल",
+      "run": "रन विफल",
+      "reload": "रीलोड विफल"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "मिशन पर वापस",
+    "agentConfig": "एजेंट कॉन्फ़िगरेशन",
+    "steps": "चरण ({count})",
+    "execution": "निष्पादन —"
+  },
+  "chat": {
+    "subtitle": "RAG-आधारित प्रतिक्रियाओं के साथ अपने एजेंट से बात करें",
+    "empty": {
+      "title": "बातचीत शुरू करने के लिए संदेश भेजें।",
+      "subtitle": "एजेंट अपने ज्ञान आधार में अपनी प्रतिक्रियाओं को आधार बनाने के लिए RAG का उपयोग करता है।"
+    },
+    "placeholder": "संदेश टाइप करें... (भेजने के लिए Enter, नई पंक्ति के लिए Shift+Enter)",
+    "tokensSuffix": "टोकन",
+    "error": "चैट विफल"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "कुल LLM कॉल्स",
+      "totalCost": "कुल लागत",
+      "avgLatency": "औसत विलंब",
+      "activeTiers": "सक्रिय स्तर",
+      "acrossAllTiers": "सभी स्तरों पर",
+      "usdToday": "USD आज"
+    },
+    "tierDistribution": {
+      "title": "स्तर के अनुसार कॉल वितरण",
+      "activeCount": "{count} सक्रिय स्तर",
+      "empty": "कोई स्तर डेटा नहीं",
+      "connect": "स्तर डेटा देखने के लिए बैकएंड कनेक्ट करें",
+      "calls": "{count} कॉल्स"
+    },
+    "tierDetail": {
+      "latency": "विलंब",
+      "cost": "लागत",
+      "costPerCall": "प्रति कॉल लागत",
+      "connect": "स्तर विवरण देखने के लिए बैकएंड कनेक्ट करें"
+    },
+    "memory": {
+      "title": "मेमोरी स्टोर",
+      "totalItems": "कुल आइटम",
+      "backend": "बैकएंड",
+      "collections": "संग्रह",
+      "connect": "मेमोरी आंकड़े देखने के लिए बैकएंड कनेक्ट करें"
+    },
+    "rag": {
+      "title": "RAG पाइपलाइन",
+      "status": "स्थिति",
+      "chunks": "चंक्स",
+      "cached": "कैश",
+      "connect": "RAG आंकड़े देखने के लिए बैकएंड कनेक्ट करें"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "RAG स्थिति",
+      "pipelineStatus": "पाइपलाइन स्थिति",
+      "indexedChunks": "अनुक्रमित चंक्स",
+      "inVectorStore": "वेक्टर स्टोर में",
+      "cachedEntries": "कैश्ड प्रविष्टियां",
+      "hitRate": "हिट दर:",
+      "memoryItems": "मेमोरी आइटम",
+      "backendSuffix": "बैकएंड"
+    },
+    "cache": {
+      "title": "कैश विभाजन",
+      "chunks": "चंक्स",
+      "cached": "कैश्ड",
+      "hitRate": "हिट दर",
+      "connect": "कैश आंकड़े देखने के लिए बैकएंड कनेक्ट करें"
+    },
+    "collections": {
+      "title": "मेमोरी संग्रह",
+      "connect": "संग्रह देखने के लिए बैकएंड कनेक्ट करें"
+    }
+  }
+}

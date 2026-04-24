@@ -1,0 +1,193 @@
+{
+  "brand": {
+    "name": "MissionForge",
+    "tagline": "AI Ajan Cercevesi",
+    "user": "Alexis",
+    "role": "Yonetici"
+  },
+  "nav": {
+    "dashboard": "Pano",
+    "missions": "Gorevler",
+    "chat": "Sohbet",
+    "observability": "Gozlemlenebilirlik",
+    "ragStore": "RAG Deposu"
+  },
+  "shell": {
+    "live": "CANLI",
+    "offline": "CEVRIMDISI",
+    "backendOffline": "Backend cevrimdisi",
+    "language": "Dil",
+    "theme": "Tema"
+  },
+  "common": {
+    "loading": "Yukleniyor...",
+    "refresh": "Yenile",
+    "reload": "Yeniden yukle",
+    "run": "Calistir",
+    "running": "Calistiriliyor...",
+    "runNow": "Simdi calistir",
+    "send": "Gonder",
+    "save": "Kaydet",
+    "cancel": "Iptal",
+    "back": "Geri",
+    "total": "toplam",
+    "today": "bugun",
+    "manual": "manuel",
+    "scheduled": "Zamanlanmis",
+    "none": "yok",
+    "healthy": "Saglikli",
+    "degraded": "Bozulmus",
+    "success": "basari",
+    "failed": "basarisiz",
+    "status": "Durum",
+    "noDescription": "Aciklama yok",
+    "dataAvailable": "Backend baglantisindan sonra veri kullanilabilir",
+    "connectBackend": "Verileri gormek icin backend'i baglayin",
+    "noMissions": "Yapilandirilmis gorev yok",
+    "noCollections": "Koleksiyon bulunamadi"
+  },
+  "dashboard": {
+    "kpi": {
+      "llmCalls": "LLM Cagrilari",
+      "totalCost": "Toplam maliyet",
+      "ragChunks": "RAG Parcalari",
+      "costLabel": "Maliyet:",
+      "todaysSpend": "Bugunun harcamasi",
+      "statusLabel": "Durum:",
+      "apiHealth": "API Sagligi",
+      "ragPipeline": "RAG Pipeline",
+      "callsPerDay": "Gunluk {count} cagri",
+      "chunksUnit": "{count} parca",
+      "offlineUnit": "cevrimdisi"
+    },
+    "donut": {
+      "label": "Gorevler"
+    },
+    "tierBreakdown": {
+      "title": "LLM Kullanimi — Katman bazli",
+      "empty": "Kayitli LLM cagrisi yok",
+      "calls": "{count} cagri"
+    },
+    "performance": {
+      "title": "Performans metrikleri",
+      "avgLatency": "Ortalama gecikme",
+      "ragCache": "RAG Onbellegi",
+      "memoryItems": "Bellek ogeleri",
+      "costPerCall": "Cagri basina maliyet"
+    },
+    "miniMetrics": {
+      "queue": "Kuyruk",
+      "memory": "Bellek",
+      "active": "Aktif",
+      "tiers": "Katmanlar"
+    },
+    "missionsSummary": {
+      "title": "Gorev ozeti",
+      "totalLoaded": "Yuklenen toplam gorev"
+    },
+    "missionsTable": {
+      "title": "Gorevler",
+      "totalSuffix": "toplam",
+      "headers": {
+        "status": "Durum",
+        "name": "Isim",
+        "tier": "Katman",
+        "steps": "Adimlar",
+        "schedule": "Zamanlama"
+      }
+    }
+  },
+  "missions": {
+    "loadedCount": "{count} gorev yuklendi",
+    "subtitle": "Ajan gorevlerinizi yonetin ve calistirin",
+    "stepsCount": "{count} adim",
+    "run": {
+      "title": "Calistirma:",
+      "steps": "Adimlar",
+      "duration": "Sure",
+      "tokens": "Tokenlar",
+      "cost": "Maliyet"
+    },
+    "errors": {
+      "load": "Yukleme basarisiz",
+      "run": "Calistirma basarisiz",
+      "reload": "Yeniden yukleme basarisiz"
+    }
+  },
+  "missionDetail": {
+    "backToMissions": "Gorevlere don",
+    "agentConfig": "Ajan yapilandirmasi",
+    "steps": "Adimlar ({count})",
+    "execution": "Calistirma —"
+  },
+  "chat": {
+    "subtitle": "RAG tabanli yanitlarla ajanla konusun",
+    "empty": {
+      "title": "Konusmayi baslatmak icin mesaj gonderin.",
+      "subtitle": "Ajan, yanitlarini bilgi tabaninizda temellendirmek icin RAG kullanir."
+    },
+    "placeholder": "Mesaj yazin... (Enter ile gonder, Shift+Enter ile yeni satir)",
+    "tokensSuffix": "token",
+    "error": "Sohbet basarisiz"
+  },
+  "observability": {
+    "kpi": {
+      "totalCalls": "Toplam LLM cagrilari",
+      "totalCost": "Toplam maliyet",
+      "avgLatency": "Ortalama gecikme",
+      "activeTiers": "Aktif katmanlar",
+      "acrossAllTiers": "tum katmanlarda",
+      "usdToday": "Bugun USD"
+    },
+    "tierDistribution": {
+      "title": "Katman bazli cagri dagilimi",
+      "activeCount": "{count} aktif katman",
+      "empty": "Katman verisi yok",
+      "connect": "Katman verilerini gormek icin backend'i baglayin",
+      "calls": "{count} cagri"
+    },
+    "tierDetail": {
+      "latency": "Gecikme",
+      "cost": "Maliyet",
+      "costPerCall": "Cagri basina maliyet",
+      "connect": "Katman detaylarini gormek icin backend'i baglayin"
+    },
+    "memory": {
+      "title": "Bellek deposu",
+      "totalItems": "Toplam oge",
+      "backend": "Backend",
+      "collections": "Koleksiyonlar",
+      "connect": "Bellek istatistiklerini gormek icin backend'i baglayin"
+    },
+    "rag": {
+      "title": "RAG Pipeline",
+      "status": "Durum",
+      "chunks": "Parcalar",
+      "cached": "Onbellekte",
+      "connect": "RAG istatistiklerini gormek icin backend'i baglayin"
+    }
+  },
+  "rag": {
+    "kpi": {
+      "status": "RAG Durumu",
+      "pipelineStatus": "pipeline durumu",
+      "indexedChunks": "Indekslenmis parcalar",
+      "inVectorStore": "vektor deposunda",
+      "cachedEntries": "Onbellege alinmis girdiler",
+      "hitRate": "Isabet orani:",
+      "memoryItems": "Bellek ogeleri",
+      "backendSuffix": "backend"
+    },
+    "cache": {
+      "title": "Onbellek dokumantasi",
+      "chunks": "Parcalar",
+      "cached": "Onbellekte",
+      "hitRate": "Isabet orani",
+      "connect": "Onbellek istatistiklerini gormek icin backend'i baglayin"
+    },
+    "collections": {
+      "title": "Bellek koleksiyonlari",
+      "connect": "Koleksiyonlari gormek icin backend'i baglayin"
+    }
+  }
+}

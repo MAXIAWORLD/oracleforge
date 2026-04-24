@@ -6,7 +6,7 @@ Schemas: corresponding read-only Pydantic models for API responses.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
@@ -40,7 +40,9 @@ class Mission(Base):
     __tablename__ = "missions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(
+        String(255), unique=True, nullable=False, index=True
+    )
     description: Mapped[str] = mapped_column(Text, default="")
     yaml_content: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default=MissionStatus.IDLE)
@@ -63,7 +65,8 @@ class ExecutionLog(Base):
     __tablename__ = "execution_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    mission_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    run_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    mission_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     mission_name: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default=ExecutionStatus.RUNNING)
     steps_completed: Mapped[int] = mapped_column(Integer, default=0)
@@ -118,7 +121,8 @@ class ExecutionLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    mission_id: int
+    run_id: str | None
+    mission_id: int | None
     mission_name: str
     status: str
     steps_completed: int
