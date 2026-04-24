@@ -1,4 +1,5 @@
 """TDD RED — Rate limiting: 60 req/min on /api/* endpoints."""
+
 import pytest
 from httpx import AsyncClient, ASGITransport
 
@@ -50,11 +51,13 @@ def override_db(db):
 
 @pytest.mark.asyncio
 async def test_rate_limit_enforced(override_db):
-    """61st request to /api/projects within 1 minute must return 429."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    """61st request to /api/public/test within 1 minute must return 429."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         responses = []
         for _ in range(61):
-            r = await client.get("/api/projects")
+            r = await client.get("/api/public/test")
             responses.append(r.status_code)
         assert 429 in responses, "Expected a 429 after exceeding rate limit"
 
@@ -62,16 +65,20 @@ async def test_rate_limit_enforced(override_db):
 @pytest.mark.asyncio
 async def test_rate_limit_first_60_ok(override_db):
     """First 60 requests must all succeed (200)."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         for i in range(60):
-            r = await client.get("/api/projects")
-            assert r.status_code == 200, f"Request {i+1} failed with {r.status_code}"
+            r = await client.get("/api/public/test")
+            assert r.status_code == 200, f"Request {i + 1} failed with {r.status_code}"
 
 
 @pytest.mark.asyncio
 async def test_rate_limit_does_not_affect_health(override_db):
     """/health endpoint must never be rate-limited."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
         for _ in range(70):
             r = await client.get("/health")
             assert r.status_code == 200
