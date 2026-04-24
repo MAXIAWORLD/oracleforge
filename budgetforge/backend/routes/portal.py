@@ -31,7 +31,14 @@ def cleanup_expired_tokens(db: Session) -> None:
 
 
 def _portal_secret() -> bytes:
-    return (settings.portal_secret or "portal-dev-secret").encode()
+    if not settings.portal_secret:
+        if settings.app_env == "production":
+            raise HTTPException(
+                status_code=503,
+                detail="Service misconfigured: PORTAL_SECRET not set in production",
+            )
+        return b"portal-dev-secret"
+    return settings.portal_secret.encode()
 
 
 def _sign_session(email: str) -> str:
