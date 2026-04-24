@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-BASE = "http://localhost:3011"
+BASE = "https://llmbudget.maxiaworld.app"
 SCREENSHOTS = Path(__file__).parent / "qa_screenshots"
 SCREENSHOTS.mkdir(exist_ok=True)
 
@@ -30,7 +30,7 @@ with sync_playwright() as p:
     page.goto(BASE, wait_until="networkidle")
     page.screenshot(path=str(SCREENSHOTS / "01_landing.png"), full_page=True)
 
-    check("Page loads (HTTP 200)", page.url.startswith(BASE))
+    check("Page loads (HTTP 200)", "llmbudget.maxiaworld.app" in page.url)
     check("Logo visible", page.locator("img[alt='BudgetForge']").is_visible())
     check("Nav: How it works", page.locator("a:text('How it works')").is_visible())
     check("Nav: Pricing", page.locator("a:text('Pricing')").is_visible())
@@ -53,15 +53,15 @@ with sync_playwright() as p:
     pricing = page.locator("#pricing")
     check(
         "Provider badge: OpenAI",
-        pricing.locator("span.rounded-full", has_text="OpenAI").is_visible(),
+        pricing.locator("span.rounded-full", has_text="OpenAI").first.is_visible(),
     )
     check(
         "Provider badge: Anthropic",
-        pricing.locator("span.rounded-full", has_text="Anthropic").is_visible(),
+        pricing.locator("span.rounded-full", has_text="Anthropic").first.is_visible(),
     )
     check(
         "Provider badge: Google AI",
-        pricing.locator("span.rounded-full", has_text="Google AI").is_visible(),
+        pricing.locator("span.rounded-full", has_text="Google AI").first.is_visible(),
     )
 
     # ── 3. FAQ section ─────────────────────────────────────────────────────────
