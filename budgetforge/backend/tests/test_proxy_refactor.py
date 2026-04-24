@@ -106,7 +106,7 @@ class TestProxyRefactor:
 
     def test_provider_validation_still_works(self, db: Session):
         """Teste que la validation des fournisseurs fonctionne toujours."""
-        from routes.proxy import _check_provider
+        from services.proxy_dispatcher import check_provider
 
         # Crée un projet avec fournisseurs autorisés
         project = Project(
@@ -118,11 +118,11 @@ class TestProxyRefactor:
         db.commit()
 
         # Teste fournisseur autorisé
-        _check_provider(project, "openai")  # Ne doit pas lever d'exception
+        check_provider(project, "openai")  # Ne doit pas lever d'exception
 
         # Teste fournisseur non autorisé
         with pytest.raises(Exception):
-            _check_provider(project, "google")
+            check_provider(project, "google")
 
     @pytest.mark.asyncio
     async def test_streaming_functionality(self):
