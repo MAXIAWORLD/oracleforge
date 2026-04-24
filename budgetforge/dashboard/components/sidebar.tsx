@@ -4,17 +4,23 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, FolderKanban, Zap, Settings, Users } from "lucide-react";
+import {
+  LayoutDashboard,
+  FolderKanban,
+  Zap,
+  Settings,
+  Users,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV = [
-  { href: "/dashboard", label: "Overview",   icon: LayoutDashboard },
-  { href: "/projects",  label: "Projects",   icon: FolderKanban },
-  { href: "/clients",   label: "Clients",    icon: Users },
-  { href: "/activity",  label: "Activity",   icon: Zap },
-  { href: "/settings",  label: "Settings",   icon: Settings },
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/clients", label: "Clients", icon: Users },
+  { href: "/activity", label: "Activity", icon: Zap },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
@@ -34,7 +40,10 @@ export function Sidebar() {
     }
     check();
     const id = setInterval(check, 10_000);
-    return () => { cancelled = true; clearInterval(id); };
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
 
   return (
@@ -48,11 +57,19 @@ export function Sidebar() {
       >
         {open ? (
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            <path
+              fillRule="evenodd"
+              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+              clipRule="evenodd"
+            />
           </svg>
         ) : (
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+            <path
+              fillRule="evenodd"
+              d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+              clipRule="evenodd"
+            />
           </svg>
         )}
       </button>
@@ -70,7 +87,7 @@ export function Sidebar() {
         className={cn(
           "fixed sm:static inset-y-0 left-0 z-40 transition-transform duration-200 sm:translate-x-0",
           "flex flex-col w-[220px] min-h-screen border-r border-[--border] bg-[--card]/60 backdrop-blur-sm shrink-0",
-          open ? "translate-x-0" : "-translate-x-full"
+          open ? "translate-x-0" : "-translate-x-full",
         )}
       >
         {/* Logo */}
@@ -112,23 +129,31 @@ export function Sidebar() {
         {/* Footer — theme + API status */}
         <div className="p-4 border-t border-[--border]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] text-[--muted-fg] uppercase tracking-widest font-600">Theme</span>
+            <span className="text-[10px] text-[--muted-fg] uppercase tracking-widest font-600">
+              Theme
+            </span>
             <ThemeToggle />
           </div>
           {online === null ? (
             <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-white/5">
               <span className="w-1.5 h-1.5 rounded-full bg-[--muted-fg] animate-pulse" />
-              <span className="text-[11px] text-[--muted-fg] font-mono">Checking…</span>
+              <span className="text-[11px] text-[--muted-fg] font-mono">
+                Checking…
+              </span>
             </div>
           ) : online ? (
             <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[--green-dim]">
               <span className="w-1.5 h-1.5 rounded-full bg-[--green] animate-pulse" />
-              <span className="text-[11px] text-[--green] font-mono">API online</span>
+              <span className="text-[11px] text-[--green] font-mono">
+                API online
+              </span>
             </div>
           ) : (
             <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[--red-dim]">
               <span className="w-1.5 h-1.5 rounded-full bg-[--red]" />
-              <span className="text-[11px] text-[--red] font-mono">API offline</span>
+              <span className="text-[11px] text-[--red] font-mono">
+                API offline
+              </span>
             </div>
           )}
         </div>

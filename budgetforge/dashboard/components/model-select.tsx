@@ -9,8 +9,12 @@ const PROVIDER_COLORS: Record<string, string> = {
   anthropic: "#d4622a",
   google: "#4285f4",
   deepseek: "#5c67f2",
+  mistral: "#f54e42",
   ollama: "#22c55e",
   openrouter: "#9333ea",
+  together: "#3b82f6",
+  "azure-openai": "#0078d4",
+  "aws-bedrock": "#ff9900",
 };
 
 interface ModelSelectProps {

@@ -243,7 +243,7 @@ export default function LandingPage() {
           </Link>
           {" · "}
           <a
-            href="mailto:hello@maxiaworld.app"
+            href="mailto:ceo@maxiaworld.app"
             className="hover:opacity-80"
             style={{ color: "var(--amber)" }}
           >

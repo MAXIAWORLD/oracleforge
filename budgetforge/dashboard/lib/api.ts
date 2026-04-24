@@ -1,5 +1,18 @@
 const API_BASE = "";
 
+const ADMIN_KEY_STORAGE = "bf_admin_key";
+
+export function getStoredAdminKey(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(ADMIN_KEY_STORAGE) ?? "";
+}
+
+export function setStoredAdminKey(key: string): void {
+  if (typeof window === "undefined") return;
+  if (key) localStorage.setItem(ADMIN_KEY_STORAGE, key);
+  else localStorage.removeItem(ADMIN_KEY_STORAGE);
+}
+
 export interface Project {
   id: number;
   name: string;
@@ -31,8 +44,12 @@ export interface BudgetPayload {
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const adminKey = getStoredAdminKey();
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(adminKey ? { "X-Admin-Key": adminKey } : {}),
+    },
     ...init,
   });
   if (!res.ok) {

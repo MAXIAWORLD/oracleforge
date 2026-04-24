@@ -105,5 +105,5 @@ Le dashboard est compatible avec toutes les plateformes supportant Next.js :
 ## Support
 
 - 📚 [Documentation API](../docs/api-reference.md)
-- 💬 [Support technique](mailto:hello@maxiaworld.app)
+- 💬 [Support technique](mailto:ceo@maxiaworld.app)
 - 🐛 [Signaler un bug](https://github.com/maxia-lab/budgetforge/issues)

@@ -14,6 +14,7 @@ import {
   Plus,
   X,
   Calendar,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -24,9 +25,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 import { BudgetRing } from "@/components/budget-ring";
 import { QuickIntegration } from "@/components/quick-integration";
@@ -39,8 +37,12 @@ const PROVIDER_COLORS: Record<string, string> = {
   anthropic: "#d4622a",
   google: "#4285f4",
   deepseek: "#5c67f2",
-  ollama: "#22c55e",
+  mistral: "#f54e42",
   openrouter: "#9333ea",
+  together: "#3b82f6",
+  "azure-openai": "#0078d4",
+  "aws-bedrock": "#ff9900",
+  ollama: "#22c55e",
 };
 
 const ALL_PROVIDERS = [
@@ -48,8 +50,12 @@ const ALL_PROVIDERS = [
   "anthropic",
   "google",
   "deepseek",
-  "ollama",
+  "mistral",
   "openrouter",
+  "together",
+  "azure-openai",
+  "aws-bedrock",
+  "ollama",
 ] as const;
 
 const MODELS_BY_PROVIDER: Record<string, string[]> = {
@@ -57,12 +63,29 @@ const MODELS_BY_PROVIDER: Record<string, string[]> = {
   anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
   google: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
   deepseek: ["deepseek-chat", "deepseek-reasoner"],
-  ollama: ["llama3", "mistral", "gemma4:31b", "qwen3"],
+  mistral: [
+    "mistral-large-latest",
+    "mistral-small-latest",
+    "mistral-nemo",
+    "codestral-latest",
+  ],
   openrouter: [
     "openrouter/anthropic/claude-3.5-sonnet",
     "openrouter/openai/gpt-4",
     "openrouter/google/gemini-pro",
   ],
+  together: [
+    "togethercomputer/llama-3-70b",
+    "togethercomputer/mistral-7b",
+    "togethercomputer/falcon-40b",
+  ],
+  "azure-openai": ["azure/gpt-4o", "azure/gpt-4o-mini", "azure/gpt-4-turbo"],
+  "aws-bedrock": [
+    "anthropic.claude-3-sonnet",
+    "anthropic.claude-3-opus",
+    "meta.llama3-70b-instruct",
+  ],
+  ollama: ["llama3", "mistral", "gemma4:31b", "qwen3"],
 };
 
 const DEMO_DAILY = Array.from({ length: 30 }, (_, i) => {
@@ -85,11 +108,12 @@ const DEMO_PROVIDERS = [
   { name: "google", value: 7.6, calls: 95, color: "#4285f4" },
 ];
 
-const DEMO_AGENTS = [
-  { name: "web-scraper", calls: 214, cost: 22.1 },
-  { name: "content-gen", calls: 180, cost: 15.8 },
-  { name: "code-assistant", calls: 200, cost: 7.33 },
-];
+function makeKey() {
+  const hex = Array.from({ length: 16 }, () =>
+    Math.floor(Math.random() * 16).toString(16),
+  ).join("");
+  return `bf-demo-${hex}`;
+}
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -191,11 +215,18 @@ export default function DemoProjectPage() {
   const [allowedProviders, setAllowedProviders] = useState<string[]>([]);
   const [downgradeChain, setDowngradeChain] = useState(projectData.chain);
   const [saved, setSaved] = useState(false);
+  const [apiKey, setApiKey] = useState("bf-demo-a3f8c2d91e4b7065");
+  const [rotated, setRotated] = useState(false);
 
   const USED = projectData.used;
   const BUDGET = parseFloat(budgetUsd) || projectData.budget;
   const PCT = Math.min(100, (USED / BUDGET) * 100);
-  const API_KEY = "bf-demo-xxxxxxxxxxxxxxxx";
+
+  function handleRotate() {
+    setApiKey(makeKey());
+    setRotated(true);
+    setTimeout(() => setRotated(false), 2000);
+  }
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -222,9 +253,20 @@ export default function DemoProjectPage() {
         </h1>
         <div className="flex items-center gap-2">
           <code className="font-mono text-xs text-[--muted-fg] bg-white/5 px-2 py-0.5 rounded">
-            {API_KEY}
+            {apiKey}
           </code>
-          <CopyButton text={API_KEY} />
+          <CopyButton text={apiKey} />
+          <button
+            onClick={handleRotate}
+            className="p-1.5 rounded-md text-[--muted-fg] hover:text-[--amber] hover:bg-[--amber-dim] transition-all"
+            title="Rotate key"
+          >
+            {rotated ? (
+              <Check className="w-3.5 h-3.5 text-green-400" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5" />
+            )}
+          </button>
         </div>
       </motion.div>
 
@@ -389,91 +431,45 @@ export default function DemoProjectPage() {
             <h2 className="font-heading font-700 text-sm mb-4">
               Provider Breakdown
             </h2>
-            <div className="flex items-center gap-5">
-              <div className="shrink-0" style={{ width: 100, height: 100 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={DEMO_PROVIDERS}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={28}
-                      outerRadius={42}
-                      paddingAngle={2}
-                      dataKey="value"
-                      strokeWidth={0}
-                    >
-                      {DEMO_PROVIDERS.map((e, i) => (
-                        <Cell key={i} fill={e.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex flex-col gap-2 flex-1">
-                {DEMO_PROVIDERS.map((e) => (
-                  <div
-                    key={e.name}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ background: e.color }}
-                      />
-                      <span className="text-xs text-[--foreground] capitalize">
-                        {e.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-mono text-[10px] text-[--muted-fg]">
-                        {e.calls}×
-                      </span>
+            <div className="flex flex-col gap-3">
+              {DEMO_PROVIDERS.map((e) => {
+                const total = DEMO_PROVIDERS.reduce((s, x) => s + x.value, 0);
+                const pct = (e.value / total) * 100;
+                return (
+                  <div key={e.name}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ background: e.color }}
+                        />
+                        <span className="text-xs text-[--foreground] capitalize">
+                          {e.name}
+                        </span>
+                        <span className="font-mono text-[10px] text-[--muted-fg]">
+                          {e.calls}×
+                        </span>
+                      </div>
                       <span
                         className="font-mono text-xs font-600"
                         style={{ color: e.color }}
                       >
-                        ${e.value.toFixed(4)}
+                        ${e.value.toFixed(2)}
                       </span>
                     </div>
+                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${pct.toFixed(1)}%`,
+                          background: e.color,
+                          opacity: 0.75,
+                        }}
+                      />
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Agent breakdown */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="card-base p-5"
-          >
-            <h2 className="font-heading font-700 text-sm mb-3">
-              Agent Breakdown
-            </h2>
-            <div className="divide-y divide-[--border]">
-              {DEMO_AGENTS.map((a) => (
-                <div
-                  key={a.name}
-                  className="flex items-center justify-between py-2"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[--amber]" />
-                    <span className="text-xs font-mono text-[--foreground]">
-                      {a.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-[10px] text-[--muted-fg]">
-                      {a.calls} calls
-                    </span>
-                    <span className="font-mono text-xs font-600 text-[--amber]">
-                      ${a.cost.toFixed(4)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </motion.div>
 
@@ -681,7 +677,7 @@ export default function DemoProjectPage() {
               How to connect your tool
             </h2>
             <QuickIntegration
-              apiKey={API_KEY}
+              apiKey={apiKey}
               proxyBase="https://llmbudget.maxiaworld.app"
             />
           </motion.div>
