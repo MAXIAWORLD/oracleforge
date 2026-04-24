@@ -1,0 +1,100 @@
+# Configuration dynamique des prix pour BudgetForge
+# Ce fichier peut être mis à jour sans redémarrage de l'application
+
+prices:
+  # OpenAI
+  gpt-4o:
+    input_per_1m_usd: 5.0
+    output_per_1m_usd: 15.0
+    provider: openai
+  gpt-4o-mini:
+    input_per_1m_usd: 0.15
+    output_per_1m_usd: 0.60
+    provider: openai
+  gpt-4:
+    input_per_1m_usd: 30.0
+    output_per_1m_usd: 60.0
+    provider: openai
+  gpt-4-turbo:
+    input_per_1m_usd: 10.0
+    output_per_1m_usd: 30.0
+    provider: openai
+  gpt-3.5-turbo:
+    input_per_1m_usd: 0.50
+    output_per_1m_usd: 1.50
+    provider: openai
+  o1:
+    input_per_1m_usd: 15.0
+    output_per_1m_usd: 60.0
+    provider: openai
+  o1-mini:
+    input_per_1m_usd: 3.0
+    output_per_1m_usd: 12.0
+    provider: openai
+  o3-mini:
+    input_per_1m_usd: 1.10
+    output_per_1m_usd: 4.40
+    provider: openai
+
+  # Anthropic
+  claude-opus-4-7:
+    input_per_1m_usd: 15.0
+    output_per_1m_usd: 75.0
+    provider: anthropic
+  claude-sonnet-4-6:
+    input_per_1m_usd: 3.0
+    output_per_1m_usd: 15.0
+    provider: anthropic
+  claude-haiku-4-5:
+    input_per_1m_usd: 0.25
+    output_per_1m_usd: 1.25
+    provider: anthropic
+  claude-haiku-4-5-20251001:
+    input_per_1m_usd: 0.25
+    output_per_1m_usd: 1.25
+    provider: anthropic
+
+  # Google Gemini
+  gemini-2.0-flash:
+    input_per_1m_usd: 0.10
+    output_per_1m_usd: 0.40
+    provider: google
+  gemini-2.0-flash-thinking:
+    input_per_1m_usd: 0.0
+    output_per_1m_usd: 3.50
+    provider: google
+  gemini-1.5-pro:
+    input_per_1m_usd: 1.25
+    output_per_1m_usd: 5.00
+    provider: google
+  gemini-1.5-flash:
+    input_per_1m_usd: 0.075
+    output_per_1m_usd: 0.30
+    provider: google
+  gemini-1.5-flash-8b:
+    input_per_1m_usd: 0.0375
+    output_per_1m_usd: 0.15
+    provider: google
+
+  # DeepSeek
+  deepseek-chat:
+    input_per_1m_usd: 0.14
+    output_per_1m_usd: 0.28
+    provider: deepseek
+  deepseek-reasoner:
+    input_per_1m_usd: 0.55
+    output_per_1m_usd: 2.19
+    provider: deepseek
+
+  # Modèles locaux (gratuits)
+  ollama/*:
+    input_per_1m_usd: 0.0
+    output_per_1m_usd: 0.0
+    provider: ollama
+
+# Métadonnées de configuration
+metadata:
+  version: "1.0"
+  last_updated: "2026-04-23"
+  source: "budgetforge-dynamic-pricing"
+  description: "Configuration dynamique des prix pour les modèles LLM"

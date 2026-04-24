@@ -1,30 +1,34 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from core.models import Usage, Project
 
 PLAN_LIMITS: dict[str, int] = {
-    "free":     1_000,
-    "pro":    100_000,
+    "free": 1_000,
+    "pro": 100_000,
     "agency": 500_000,
 }
 
 PLAN_PROJECT_LIMITS: dict[str, int] = {
-    "free":     1,
-    "pro":     10,
-    "agency":  -1,  # illimité
+    "free": 1,
+    "pro": 10,
+    "agency": -1,  # illimité
 }
 
 
 def get_calls_this_month(project_id: int, db: Session) -> int:
-    first_of_month = datetime.utcnow().replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0
+    first_of_month = datetime.now(timezone.utc).replace(
+        tzinfo=None, day=1, hour=0, minute=0, second=0, microsecond=0
     )
-    result = db.query(func.count(Usage.id)).filter(
-        Usage.project_id == project_id,
-        Usage.created_at >= first_of_month,
-    ).scalar()
+    result = (
+        db.query(func.count(Usage.id))
+        .filter(
+            Usage.project_id == project_id,
+            Usage.created_at >= first_of_month,
+        )
+        .scalar()
+    )
     return result or 0
 
 

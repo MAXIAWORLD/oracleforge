@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Optional
 
@@ -21,28 +21,28 @@ class BudgetStatus:
 
 _DOWNGRADE_MAP: dict[str, str] = {
     # OpenAI
-    "gpt-4o":                   "gpt-4o-mini",
-    "gpt-4":                    "gpt-3.5-turbo",
-    "gpt-4-turbo":              "gpt-4o-mini",
-    "o1":                       "o3-mini",
+    "gpt-4o": "gpt-4o-mini",
+    "gpt-4": "gpt-3.5-turbo",
+    "gpt-4-turbo": "gpt-4o-mini",
+    "o1": "o3-mini",
     # Anthropic
-    "claude-opus-4-7":          "claude-haiku-4-5",
-    "claude-sonnet-4-6":        "claude-haiku-4-5",
+    "claude-opus-4-7": "claude-haiku-4-5",
+    "claude-sonnet-4-6": "claude-haiku-4-5",
     # Google
-    "gemini-1.5-pro":           "gemini-1.5-flash",
+    "gemini-1.5-pro": "gemini-1.5-flash",
     "gemini-2.0-flash-thinking": "gemini-2.0-flash",
     # DeepSeek
-    "deepseek-reasoner":        "deepseek-chat",
+    "deepseek-reasoner": "deepseek-chat",
     # Ollama fallback (local, $0) — fallback de dernier recours quand le budget cloud est épuisé
-    "gpt-4o-mini":              "ollama/llama3",
-    "claude-haiku-4-5":         "ollama/llama3",
-    "gemini-1.5-flash":         "ollama/llama3",
-    "deepseek-chat":            "ollama/llama3",
+    "gpt-4o-mini": "ollama/llama3",
+    "claude-haiku-4-5": "ollama/llama3",
+    "gemini-1.5-flash": "ollama/llama3",
+    "deepseek-chat": "ollama/llama3",
 }
 
 
 def get_period_start(reset_period: str) -> datetime:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if reset_period == "monthly":
         return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     if reset_period == "weekly":
@@ -74,7 +74,9 @@ class BudgetGuard:
             return BudgetStatus(allowed=False)
         return BudgetStatus(allowed=True)
 
-    def should_alert(self, budget_usd: float, used_usd: float, threshold_pct: int) -> bool:
+    def should_alert(
+        self, budget_usd: float, used_usd: float, threshold_pct: int
+    ) -> bool:
         if budget_usd <= 0:
             return True
         pct_used = (used_usd / budget_usd) * 100
