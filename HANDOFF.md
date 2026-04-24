@@ -23,20 +23,31 @@ bedf731  fix(qa): point golden path at prod + fix strict-mode locators
 3c98244  fix(budgetforge-backend): critique A+B — test_alerts budget + token estimator conservative
 ```
 
+## Bloc 6 — SDK PyPI ✅ DONE
+
+Packages publiés sur PyPI (version 0.1.1) :
+- **`budgetforge`** → https://pypi.org/project/budgetforge/0.1.1/
+- **`langchain-budgetforge`** → https://pypi.org/project/langchain-budgetforge/0.1.1/
+
+Deliverables :
+- Setup.py + métadonnées (author, classifiers, long_description)
+- TDD integration tests (`test_sdk_integration.py`) — skipped sans `BF_TEST_API_KEY`
+- Both packages ready for `pip install budgetforge`
+
 ## Ce qui reste
 
-### Bloc 6 — SDK PyPI (seul bloc ouvert)
+### Bloc 7 — QA golden path (seul bloc ouvert)
 
-Packager et publier sur PyPI :
-- `budgetforge/sdk/budgetforge_sdk.py` → package `budgetforge`
-- `budgetforge/langchain_budgetforge/` → package `langchain-budgetforge`
-
-Étapes :
-1. Créer `budgetforge/sdk/pyproject.toml` (hatchling ou setuptools)
-2. `python -m build` → wheel + sdist
-3. `twine upload dist/*` (compte PyPI requis — token dans `.env` ou env var `TWINE_PASSWORD`)
-4. Même chose pour `langchain_budgetforge/`
-5. Mettre à jour README + docs avec `pip install budgetforge`
+Vérification complète de la chaîne utilisateur (signup → intégration → upgrade) :
+- Free signup → email reçu → clé reçu ✓
+- Curl avec clé → usage visible dans portal ✓
+- Alert : `alert_threshold_pct=1`, appel → email d'alerte reçu ✓
+- Upgrade Pro → Stripe test → email → plan upgradé ✓
+- Portal magic link → projets → usages ✓
+- Admin `/clients` → stats cohérentes ✓
+- Demo `/demo` → données + projets cliquables ✓
+- Mobile responsive ✓
+- Deploy final : rsync avec backup → service redémarre ✓
 
 ### Turnstile (action Alexis)
 
