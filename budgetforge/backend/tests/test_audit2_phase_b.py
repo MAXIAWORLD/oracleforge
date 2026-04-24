@@ -395,6 +395,7 @@ class TestAppUrlStartupWarning:
             patch.object(settings, "app_url", "https://llmbudget.maxiaworld.app"),
             patch.object(settings, "admin_api_key", "admin-ok"),
             patch.object(settings, "portal_secret", "portal-ok"),
+            patch.object(settings, "stripe_webhook_secret", "whsec_test"),
         ):
             async with lifespan(app):
                 pass
