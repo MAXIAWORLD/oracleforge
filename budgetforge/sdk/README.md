@@ -170,7 +170,7 @@ llm = BudgetForgeLangchainWrapper(api_key="votre-cle")
 
 - **Documentation**: [BudgetForge Docs](https://budget.maxiaworld.app/docs)
 - **Issues**: [GitHub Issues](https://github.com/maxia-lab/budgetforge/issues)
-- **Email**: hello@maxiaworld.app
+- **Email**: ceo@maxiaworld.app
 
 ## Licence
 

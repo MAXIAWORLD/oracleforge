@@ -12,7 +12,7 @@ class BudgetForgeLLM:
     """Langchain LLM wrapper for BudgetForge API with budget enforcement."""
 
     # BudgetForge API configuration
-    api_base_url: str = Field(default="http://localhost:8000")
+    api_base_url: str = Field(default="https://llmbudget.maxiaworld.app")
     api_key: str = Field(description="BudgetForge project API key")
 
     # LLM configuration
@@ -29,6 +29,13 @@ class BudgetForgeLLM:
     timeout: int = Field(default=30, description="Request timeout in seconds")
 
     def __init__(self, **kwargs):
+        from pydantic.fields import FieldInfo
+
+        for name in type(self).__annotations__:
+            class_val = getattr(type(self), name, None)
+            if isinstance(class_val, FieldInfo):
+                default = class_val.default
+                setattr(self, name, None if default is ... else default)
         for key, value in kwargs.items():
             setattr(self, key, value)
 

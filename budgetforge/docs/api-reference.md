@@ -384,5 +384,5 @@ async def chat_endpoint(prompt: str):
 ## Support
 
 - **Documentation** : [https://budget.maxiaworld.app/docs](https://budget.maxiaworld.app/docs)
-- **Support** : hello@maxiaworld.app
+- **Support** : ceo@maxiaworld.app
 - **Issues** : [GitHub Issues](https://github.com/maxia-lab/budgetforge/issues)
