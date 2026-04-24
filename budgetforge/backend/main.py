@@ -56,6 +56,7 @@ async def lifespan(app: FastAPI):
             for name, val in [
                 ("ADMIN_API_KEY", settings.admin_api_key),
                 ("PORTAL_SECRET", settings.portal_secret),
+                ("STRIPE_WEBHOOK_SECRET", settings.stripe_webhook_secret),
             ]
             if not val
         ]
@@ -66,6 +67,11 @@ async def lifespan(app: FastAPI):
         if not settings.app_url.startswith("https"):
             logger.warning(
                 "APP_URL='%s' doit commencer par https en production.", settings.app_url
+            )
+        if not settings.turnstile_secret_key:
+            logger.warning(
+                "TURNSTILE_SECRET_KEY absent en production — signups free seront bloqués "
+                "(fail-closed anti-bot). Configurer sur https://dash.cloudflare.com/?to=/:account/turnstile"
             )
     yield
 

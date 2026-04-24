@@ -13,19 +13,34 @@ _SLACK_HOSTS = ("hooks.slack.com", "hooks.office.com", "outlook.office.com")
 
 def get_smtp_config(db: Session) -> dict:
     """Lit la config SMTP depuis site_settings DB, fallback sur .env."""
-    rows = {r.key: r.value for r in db.query(SiteSetting).filter(
-        SiteSetting.key.in_(["smtp_host", "smtp_port", "smtp_user", "smtp_password", "alert_from_email"])
-    ).all()}
+    rows = {
+        r.key: r.value
+        for r in db.query(SiteSetting)
+        .filter(
+            SiteSetting.key.in_(
+                [
+                    "smtp_host",
+                    "smtp_port",
+                    "smtp_user",
+                    "smtp_password",
+                    "alert_from_email",
+                ]
+            )
+        )
+        .all()
+    }
 
     def _get(key: str, env_val) -> str:
         db_val = rows.get(key)
         return db_val if db_val is not None and db_val != "" else env_val
 
     return {
-        "smtp_host":        _get("smtp_host",        settings.smtp_host),
-        "smtp_port":        int(rows["smtp_port"]) if rows.get("smtp_port") else settings.smtp_port,
-        "smtp_user":        _get("smtp_user",        settings.smtp_user),
-        "smtp_password":    _get("smtp_password",    settings.smtp_password),
+        "smtp_host": _get("smtp_host", settings.smtp_host),
+        "smtp_port": int(rows["smtp_port"])
+        if rows.get("smtp_port")
+        else settings.smtp_port,
+        "smtp_user": _get("smtp_user", settings.smtp_user),
+        "smtp_password": _get("smtp_password", settings.smtp_password),
         "alert_from_email": _get("alert_from_email", settings.alert_from_email),
     }
 
@@ -34,11 +49,14 @@ class AlertService:
     @staticmethod
     def _is_slack_compatible(url: str) -> bool:
         from urllib.parse import urlparse
+
         host = urlparse(url).netloc.lower()
         return any(host.endswith(h) for h in _SLACK_HOSTS)
 
     @staticmethod
-    async def send_webhook(url: str, project_name: str, used_usd: float, budget_usd: float) -> bool:
+    async def send_webhook(
+        url: str, project_name: str, used_usd: float, budget_usd: float
+    ) -> bool:
         pct = round(used_usd / budget_usd * 100, 1) if budget_usd > 0 else 100
         if AlertService._is_slack_compatible(url):
             payload = {
@@ -64,8 +82,20 @@ class AlertService:
                 "budget_usd": budget_usd,
                 "pct_used": pct,
             }
+        # F4 — revalider l'URL immédiatement avant le POST pour mitiger le DNS rebinding.
+        # La validation au save peut être obsolète (TOCTOU) si un attaquant a modifié
+        # le DNS entre-temps. On re-résout + re-valide à la dernière seconde.
+        from core.url_validator import is_safe_webhook_url
+
+        if not is_safe_webhook_url(url):
+            logger.warning(
+                "Webhook alert refused for %s: URL failed SSRF re-check at send time",
+                project_name,
+            )
+            return False
+
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=5.0, follow_redirects=False) as client:
                 await client.post(url, json=payload)
             return True
         except Exception as e:
@@ -80,13 +110,17 @@ class AlertService:
         budget_usd: float,
         db: Session | None = None,
     ) -> bool:
-        cfg = get_smtp_config(db) if db is not None else {
-            "smtp_host":        settings.smtp_host,
-            "smtp_port":        settings.smtp_port,
-            "smtp_user":        settings.smtp_user,
-            "smtp_password":    settings.smtp_password,
-            "alert_from_email": settings.alert_from_email,
-        }
+        cfg = (
+            get_smtp_config(db)
+            if db is not None
+            else {
+                "smtp_host": settings.smtp_host,
+                "smtp_port": settings.smtp_port,
+                "smtp_user": settings.smtp_user,
+                "smtp_password": settings.smtp_password,
+                "alert_from_email": settings.alert_from_email,
+            }
+        )
         if not cfg["smtp_host"]:
             logger.warning("SMTP not configured, skipping email alert")
             return False

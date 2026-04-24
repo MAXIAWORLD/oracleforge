@@ -1,7 +1,16 @@
+import hmac
+
 from fastapi import Header, HTTPException, Depends
 from sqlalchemy.orm import Session
 from core.config import settings
 from core.database import get_db
+
+
+def _admin_key_matches(provided: str) -> bool:
+    """Constant-time comparison against the configured admin API key (F1)."""
+    if not settings.admin_api_key:
+        return False
+    return hmac.compare_digest(provided, settings.admin_api_key)
 
 
 async def require_admin(
@@ -13,23 +22,30 @@ async def require_admin(
         # Dev mode: block viewer members trying to reach write endpoints
         if x_admin_key and x_admin_key.startswith("bf-mbr-"):
             from core.models import Member
+
             member = db.query(Member).filter(Member.api_key == x_admin_key).first()
             if member and member.role == "viewer":
-                raise HTTPException(status_code=403, detail="Viewer members cannot perform write operations")
+                raise HTTPException(
+                    status_code=403,
+                    detail="Viewer members cannot perform write operations",
+                )
         return
 
-    # Global admin key
-    if x_admin_key == settings.admin_api_key:
+    # Global admin key — constant-time compare (F1: timing attack)
+    if _admin_key_matches(x_admin_key):
         return
 
     # Member key
     if x_admin_key.startswith("bf-mbr-"):
         from core.models import Member
+
         member = db.query(Member).filter(Member.api_key == x_admin_key).first()
         if member:
             if member.role == "admin":
                 return
-            raise HTTPException(status_code=403, detail="Viewer members cannot perform write operations")
+            raise HTTPException(
+                status_code=403, detail="Viewer members cannot perform write operations"
+            )
 
     raise HTTPException(status_code=401, detail="Invalid or missing admin key")
 
@@ -42,11 +58,13 @@ async def require_viewer(
     if not settings.admin_api_key:
         return  # dev mode
 
-    if x_admin_key == settings.admin_api_key:
+    # Global admin key — constant-time compare (F1: timing attack)
+    if _admin_key_matches(x_admin_key):
         return
 
     if x_admin_key.startswith("bf-mbr-"):
         from core.models import Member
+
         member = db.query(Member).filter(Member.api_key == x_admin_key).first()
         if member:
             return

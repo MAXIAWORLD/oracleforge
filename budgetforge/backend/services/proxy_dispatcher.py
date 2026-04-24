@@ -39,6 +39,7 @@ _FORWARD_NAMES: dict[str, tuple[str, str]] = {
     "anthropic": ("forward_anthropic", "forward_anthropic_stream"),
     "google": ("forward_google", "forward_google_stream"),
     "deepseek": ("forward_deepseek", "forward_deepseek_stream"),
+    "mistral": ("forward_mistral", "forward_mistral_stream"),
     "openrouter": ("forward_openrouter", "forward_openrouter_stream"),
     "together": ("forward_together", "forward_together_stream"),
     "azure-openai": ("forward_azure_openai", "forward_azure_openai_stream"),
@@ -84,7 +85,10 @@ def check_provider(project: Project, provider_name: str) -> None:
     try:
         allowed = json.loads(project.allowed_providers)
     except json.JSONDecodeError:
-        return
+        raise HTTPException(
+            status_code=500,
+            detail="Project config corrupted: allowed_providers contains invalid JSON",
+        )
     if provider_name not in allowed:
         raise HTTPException(
             status_code=403,
@@ -104,19 +108,38 @@ def resolve_provider_key(
     )
 
 
-def check_budget_model(project: Project, db: Session, model: str) -> str:
+async def check_budget_model(
+    project: Project, db: Session, model: str, payload: Optional[dict] = None
+) -> str:
+    """H2 — trigger action block/downgrade dès que le call en cours ferait dépasser
+    le budget (et pas seulement quand le budget est déjà dépassé).
+    """
     if project.budget_usd is None:
         return model
     used = get_period_used_sql(project.id, project.reset_period, db)
+
+    # H2: inclure le coût estimé du call courant dans la comparaison
+    est_cost = 0.0
+    if payload is not None:
+        try:
+            tokens_in = estimate_input_tokens(payload)
+            tokens_out = estimate_output_tokens(payload)
+            est_cost = await CostCalculator.compute_cost(model, tokens_in, tokens_out)
+        except UnknownModelError:
+            est_cost = 0.0
+
     downgrade_chain = None
     if project.downgrade_chain:
         try:
             downgrade_chain = json.loads(project.downgrade_chain)
         except (json.JSONDecodeError, TypeError):
-            pass
+            raise HTTPException(
+                status_code=500,
+                detail="Project config corrupted: downgrade_chain contains invalid JSON",
+            )
     status = guard.check(
         budget_usd=project.budget_usd,
-        used_usd=used,
+        used_usd=used + est_cost,
         action=BudgetAction(project.action),
         current_model=model,
         downgrade_chain=downgrade_chain,
@@ -131,20 +154,42 @@ def check_budget_model(project: Project, db: Session, model: str) -> str:
     return model
 
 
-async def check_per_call_cap(project: Project, payload: dict, model: str) -> None:
-    if not project.max_cost_per_call_usd:
-        return
+async def check_per_call_cap(
+    project: Project, payload: dict, model: str, db: Optional[Session] = None
+) -> None:
+    """F3 — cap per-call explicite OU implicite (= budget restant) pour éviter
+    l'overshoot du budget via estimation tokens imprécise."""
     tokens_in = estimate_input_tokens(payload)
     tokens_out = estimate_output_tokens(payload)
     try:
         estimated_cost = await CostCalculator.compute_cost(model, tokens_in, tokens_out)
     except UnknownModelError:
         return
-    if estimated_cost > project.max_cost_per_call_usd:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Estimated call cost ${estimated_cost:.6f} exceeds per-call cap ${project.max_cost_per_call_usd:.6f}",
-        )
+
+    # Cap explicite prioritaire
+    if project.max_cost_per_call_usd:
+        if estimated_cost > project.max_cost_per_call_usd:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Estimated call cost ${estimated_cost:.6f} exceeds per-call cap ${project.max_cost_per_call_usd:.6f}",
+            )
+        return
+
+    # Cap implicite : si budget défini sans cap explicite, borner à budget restant
+    if project.budget_usd is not None and project.budget_usd > 0:
+        if db is not None:
+            used = get_period_used_sql(project.id, project.reset_period, db)
+        else:
+            used = 0.0
+        remaining = max(0.0, project.budget_usd - used)
+        if estimated_cost > remaining:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Estimated call cost ${estimated_cost:.6f} exceeds remaining budget "
+                    f"${remaining:.6f}. Set max_cost_per_call_usd to control overshoot."
+                ),
+            )
 
 
 async def prepare_request(
@@ -169,8 +214,8 @@ async def prepare_request(
     check_quota(project, db)
 
     async with budget_lock(project.id):
-        final_model = check_budget_model(project, db, model)
-        await check_per_call_cap(project, payload, final_model)
+        final_model = await check_budget_model(project, db, model, payload)
+        await check_per_call_cap(project, payload, final_model, db)
         actual_provider = (
             "ollama" if final_model.startswith("ollama/") else provider_name
         )
@@ -236,7 +281,10 @@ async def prebill_usage(
     try:
         cost = await CostCalculator.compute_cost(model, tokens_in, tokens_out)
     except UnknownModelError:
-        cost = 0.0
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown model '{model}'. Configure pricing or use a supported model.",
+        )
     usage = Usage(
         project_id=project.id,
         provider=provider,

@@ -2,6 +2,7 @@ import hmac
 import hashlib
 import logging
 import smtplib
+import time
 from datetime import datetime, timedelta, date, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -34,19 +35,30 @@ def _portal_secret() -> bytes:
 
 
 def _sign_session(email: str) -> str:
-    sig = hmac.new(_portal_secret(), email.encode(), hashlib.sha256).hexdigest()
-    return f"{email}.{sig}"
+    iat = str(int(time.time()))
+    payload = f"{email}|{iat}"
+    sig = hmac.new(_portal_secret(), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{email}|{iat}|{sig}"
 
 
 def _verify_session(cookie: str) -> str | None:
+    """H3 — valide la signature ET l'âge du cookie (iat) pour refuser les replays
+    extraits dont le browser expire mais que l'attaquant pourrait rejouer."""
+    parts = cookie.split("|")
+    if len(parts) != 3:
+        return None
+    email, iat_str, sig = parts
+    payload = f"{email}|{iat_str}"
+    expected = hmac.new(_portal_secret(), payload.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return None
     try:
-        email, sig = cookie.rsplit(".", 1)
+        iat = int(iat_str)
     except ValueError:
         return None
-    expected = hmac.new(_portal_secret(), email.encode(), hashlib.sha256).hexdigest()
-    if hmac.compare_digest(sig, expected):
-        return email
-    return None
+    if int(time.time()) - iat > _SESSION_MAX_AGE:
+        return None
+    return email
 
 
 class PortalRequestBody(BaseModel):

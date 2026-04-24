@@ -3,12 +3,13 @@ import logging
 import re
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from core.config import settings
 from core.database import get_db
 from core.limiter import limiter
 from core.log_utils import mask_email
-from core.models import Project
+from core.models import Project, StripeEvent
 from services.onboarding_email import send_onboarding_email, send_downgrade_email
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,23 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         logger.warning("Stripe signature verification failed: %s", e)
         raise HTTPException(status_code=400, detail="Invalid Stripe signature")
 
+    event_id = event.get("id")
+    if event_id:
+        # F2 — idempotence : tenter l'insert en premier, catcher IntegrityError
+        # si un webhook concurrent a déjà inséré le même event_id.
+        existing = (
+            db.query(StripeEvent).filter(StripeEvent.event_id == event_id).first()
+        )
+        if existing:
+            return {"ok": True}
+        db.add(StripeEvent(event_id=event_id))
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            logger.info("Stripe event %s already processed (race)", event_id)
+            return {"ok": True}
+
     event_type = event.get("type", "")
     data_obj = event.get("data", {}).get("object", {})
 
@@ -143,6 +161,21 @@ async def _handle_checkout_completed(session: dict, db: Session) -> None:
     )
 
     await asyncio.to_thread(send_onboarding_email, email, project.api_key, plan)
+
+
+@router.get("/api/billing/reconcile/{session_id}")
+async def reconcile_stripe_session(session_id: str, db: Session = Depends(get_db)):
+    stripe.api_key = settings.stripe_secret_key
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Stripe error: {e}")
+
+    if session.get("payment_status") != "paid":
+        raise HTTPException(status_code=402, detail="Payment not completed")
+
+    await _handle_checkout_completed(session, db)
+    return {"ok": True}
 
 
 def _handle_subscription_deleted(subscription: dict, db: Session) -> None:

@@ -3,10 +3,14 @@ import logging
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from core.config import settings
 from core.database import get_db
 from core.log_utils import mask_email
 from core.models import Project, SignupAttempt
@@ -47,13 +51,33 @@ def _check_ip_rate_limit_db(ip: str, db: Session, max_per_day: int = 3) -> bool:
     )
     if count >= max_per_day:
         return False
-    db.add(SignupAttempt(ip=ip, created_at=now))
-    db.commit()
     return True
+
+
+def _check_domain_rate_limit(email: str, db: Session, max_per_day: int = 10) -> bool:
+    domain = email.split("@", 1)[-1] if "@" in email else ""
+    if not domain:
+        return True
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    cutoff = now - timedelta(hours=24)
+    count = (
+        db.query(SignupAttempt)
+        .filter(SignupAttempt.email_domain == domain, SignupAttempt.created_at > cutoff)
+        .count()
+    )
+    return count < max_per_day
+
+
+def _record_signup_attempt(ip: str, email: str, db: Session) -> None:
+    domain = email.split("@", 1)[-1] if "@" in email else None
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.add(SignupAttempt(ip=ip, email_domain=domain, created_at=now))
+    db.commit()
 
 
 class SignupFreeRequest(BaseModel):
     email: str
+    turnstile_token: Optional[str] = None
 
     @field_validator("email")
     @classmethod
@@ -64,6 +88,33 @@ class SignupFreeRequest(BaseModel):
         return v
 
 
+async def _verify_turnstile(token: Optional[str], client_ip: str) -> bool:
+    """H1 — vérifie un token Cloudflare Turnstile côté serveur.
+    Si aucune clé Turnstile n'est configurée : pass-through (déploiement progressif).
+    Un warning est loggué en production pour rappeler de configurer la clé."""
+    secret = settings.turnstile_secret_key
+    if not secret:
+        if settings.app_env == "production":
+            logger.warning(
+                "Turnstile désactivé (TURNSTILE_SECRET_KEY vide). Les signups "
+                "ne sont PAS protégés contre les bots. Configurez la clé sur Cloudflare."
+            )
+        return True
+    if not token:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.post(
+                "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                data={"secret": secret, "response": token, "remoteip": client_ip},
+            )
+            data = resp.json()
+            return bool(data.get("success"))
+    except Exception as e:
+        logger.warning("Turnstile verification error: %s", e)
+        return False
+
+
 @router.post("/api/signup/free")
 async def signup_free(
     body: SignupFreeRequest,
@@ -71,11 +122,25 @@ async def signup_free(
     db: Session = Depends(get_db),
 ):
     client_ip = request.client.host if request.client else "unknown"
+
+    # H1 — anti-bot avant tout le reste
+    if not await _verify_turnstile(body.turnstile_token, client_ip):
+        raise HTTPException(
+            status_code=400,
+            detail="Captcha verification failed. Please retry.",
+        )
+
     if not _check_ip_rate_limit(client_ip, db=db):
         raise HTTPException(
             status_code=429,
             detail="Too many signup attempts from this connection. Try again tomorrow.",
         )
+    if not _check_domain_rate_limit(body.email, db=db):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many signups from this email domain. Try again tomorrow.",
+        )
+    _record_signup_attempt(client_ip, body.email, db)
 
     check_project_quota(body.email, "free", db)
 

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     google_api_key: str = ""
     deepseek_api_key: str = ""
+    mistral_api_key: str = ""
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     together_api_key: str = ""
@@ -38,6 +39,8 @@ class Settings(BaseSettings):
     # ── Environnement ──────────────
     app_env: str = "development"  # "production" active les guards obligatoires
     portal_secret: str = ""  # obligatoire en production
+    # ── Anti-bot (Cloudflare Turnstile) ──
+    turnstile_secret_key: str = ""  # obligatoire en production
 
 
 settings = Settings()
