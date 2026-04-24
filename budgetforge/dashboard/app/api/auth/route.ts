@@ -1,9 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-function generateSessionToken(secret: string): string {
-  const ts = Date.now().toString();
-  const hmac = createHmac("sha256", secret).update(ts).digest("hex");
-  return `${ts}.${hmac}`;
+function computeSessionToken(secret: string): string {
+  return createHmac("sha256", secret).update("session").digest("hex");
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -13,12 +11,13 @@ export async function POST(req: Request): Promise<Response> {
   if (dashboardPassword && !process.env.SESSION_SECRET) {
     return new Response(
       JSON.stringify({ error: "SESSION_SECRET must be set in .env.local" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 
+  // Dev mode: no password configured → always succeed
   if (!dashboardPassword) {
-    const token = generateSessionToken(sessionSecret);
+    const token = computeSessionToken(sessionSecret);
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: {
@@ -48,7 +47,7 @@ export async function POST(req: Request): Promise<Response> {
     });
   }
 
-  const token = generateSessionToken(sessionSecret);
+  const token = computeSessionToken(sessionSecret);
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
     headers: {

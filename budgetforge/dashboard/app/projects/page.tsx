@@ -3,38 +3,29 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, Trash2, Settings2, ArrowRight, Shield,
-  AlertTriangle, CheckCircle, XCircle, ChevronDown,
+  Plus,
+  Trash2,
+  Settings2,
+  ArrowRight,
+  Shield,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { Shell } from "@/components/shell";
 import { BurnBar } from "@/components/burn-bar";
 import { Toast } from "@/components/toast";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { api, type Project, type UsageSummary } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-interface ProjectWithUsage extends Project { usage: UsageSummary | null }
-
-const PLAN_COLORS: Record<string, { bg: string; text: string }> = {
-  free:   { bg: "bg-[--muted]",        text: "text-[--muted-fg]" },
-  pro:    { bg: "bg-blue-500/10",      text: "text-blue-400" },
-  agency: { bg: "bg-[--amber-dim]",    text: "text-[--amber]" },
-};
-
-function PlanBadge({ plan }: { plan: string }) {
-  const c = PLAN_COLORS[plan] ?? PLAN_COLORS.free;
-  return (
-    <span className={cn("text-[9px] font-700 uppercase tracking-wider px-1.5 py-0.5 rounded-full shrink-0", c.bg, c.text)}>
-      {plan}
-    </span>
-  );
+interface ProjectWithUsage extends Project {
+  usage: UsageSummary | null;
 }
 
 function StatusDot({ pct }: { pct: number }) {
-  const color =
-    pct >= 100 ? "#ef4444" :
-    pct >= 80  ? "#f59e0b" : "#22c55e";
+  const color = pct >= 100 ? "#ef4444" : pct >= 80 ? "#f59e0b" : "#22c55e";
   return (
     <span
       className="inline-block w-2 h-2 rounded-full"
@@ -81,7 +72,9 @@ function CreateProjectModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0, y: 10 }}
@@ -96,16 +89,21 @@ function CreateProjectModal({
         </p>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <div>
-            <label className="text-xs text-[--muted-fg] block mb-1.5">Project name</label>
+            <label className="text-xs text-[--muted-fg] block mb-1.5">
+              Project name
+            </label>
             <input
               autoFocus
               value={name}
-              onChange={(e) => { setName(e.target.value); setError(""); }}
+              onChange={(e) => {
+                setName(e.target.value);
+                setError("");
+              }}
               placeholder="e.g. prod-chatbot"
               className={cn(
                 "w-full bg-[--muted] border border-[--border] rounded-md px-3 py-2",
                 "text-sm text-[--foreground] font-mono placeholder:text-[--muted-fg]",
-                "focus:outline-none focus:border-[--amber] transition-colors"
+                "focus:outline-none focus:border-[--amber] transition-colors",
               )}
             />
             {error && <p className="text-xs text-red-400 mt-1.5">{error}</p>}
@@ -141,27 +139,37 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectWithUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
-  const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
-  function showToast(message: string) { setToast({ show: true, message }); }
+  const [toast, setToast] = useState<{ show: boolean; message: string }>({
+    show: false,
+    message: "",
+  });
+  function showToast(message: string) {
+    setToast({ show: true, message });
+  }
 
   async function refresh() {
     try {
       const list = await api.projects.list();
       const withUsage = await Promise.all(
         list.map(async (p) => {
-          const usage = p.budget_usd != null
-            ? await api.projects.usage(p.id).catch(() => null)
-            : null;
+          const usage =
+            p.budget_usd != null
+              ? await api.projects.usage(p.id).catch(() => null)
+              : null;
           return { ...p, usage };
-        })
+        }),
       );
       setProjects(withUsage);
-    } catch { /* offline */ }
-    finally { setLoading(false); }
+    } catch {
+      /* offline */
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+  }, []);
 
   async function handleCreate(name: string) {
     const created = await api.projects.create(name);
@@ -171,13 +179,8 @@ export default function ProjectsPage() {
   }
 
   async function handleDelete(id: number) {
-    setConfirmDelete(id);
-  }
-
-  async function confirmDeleteProject() {
-    if (confirmDelete == null) return;
-    await api.projects.delete(confirmDelete);
-    setConfirmDelete(null);
+    if (!confirm("Delete this project and all its usage history?")) return;
+    await api.projects.delete(id);
     await refresh();
   }
 
@@ -192,13 +195,14 @@ export default function ProjectsPage() {
           className="flex items-center justify-between mb-8"
         >
           <div>
-            <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">Projects</h1>
-            <p className="text-[--muted-fg] text-sm">Manage projects and their LLM budgets</p>
+            <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">
+              Projects
+            </h1>
+            <p className="text-[--muted-fg] text-sm">
+              Manage projects and their LLM budgets
+            </p>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="btn-amber"
-          >
+          <button onClick={() => setShowCreate(true)} className="btn-amber">
             <Plus className="w-4 h-4" />
             New project
           </button>
@@ -213,7 +217,11 @@ export default function ProjectsPage() {
                   key={i}
                   className="w-2 h-2 rounded-full bg-[--amber]"
                   animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+                  transition={{
+                    duration: 1.2,
+                    repeat: Infinity,
+                    delay: i * 0.2,
+                  }}
                 />
               ))}
             </div>
@@ -228,13 +236,14 @@ export default function ProjectsPage() {
               <Shield className="w-6 h-6 text-[--amber]" />
             </div>
             <div className="text-center">
-              <p className="font-heading font-700 text-base mb-1">No projects yet</p>
-              <p className="text-[--muted-fg] text-sm">Create your first project to start tracking LLM spend</p>
+              <p className="font-heading font-700 text-base mb-1">
+                No projects yet
+              </p>
+              <p className="text-[--muted-fg] text-sm">
+                Create your first project to start tracking LLM spend
+              </p>
             </div>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="btn-amber"
-            >
+            <button onClick={() => setShowCreate(true)} className="btn-amber">
               <Plus className="w-4 h-4" /> Create project
             </button>
           </motion.div>
@@ -242,7 +251,10 @@ export default function ProjectsPage() {
           <motion.div
             initial="hidden"
             animate="show"
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.07 } } }}
+            variants={{
+              hidden: {},
+              show: { transition: { staggerChildren: 0.07 } },
+            }}
             className="grid gap-4 md:grid-cols-2"
           >
             {projects.map((p) => {
@@ -253,7 +265,19 @@ export default function ProjectsPage() {
                   key={p.id}
                   variants={{
                     hidden: { opacity: 0, y: 14 },
-                    show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] as [number,number,number,number] } },
+                    show: {
+                      opacity: 1,
+                      y: 0,
+                      transition: {
+                        duration: 0.4,
+                        ease: [0.16, 1, 0.3, 1] as [
+                          number,
+                          number,
+                          number,
+                          number,
+                        ],
+                      },
+                    },
                   }}
                   className="card-base p-5 flex flex-col gap-4 group"
                 >
@@ -262,11 +286,12 @@ export default function ProjectsPage() {
                     <div className="flex items-center gap-2.5 min-w-0">
                       <StatusDot pct={pct} />
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-heading font-700 text-sm text-[--foreground] truncate">{p.name}</h3>
-                          <PlanBadge plan={p.plan} />
-                        </div>
-                        <p className="font-mono text-[10px] text-[--muted-fg] truncate mt-0.5">{p.api_key}</p>
+                        <h3 className="font-heading font-700 text-sm text-[--foreground] truncate">
+                          {p.name}
+                        </h3>
+                        <p className="font-mono text-[10px] text-[--muted-fg] truncate mt-0.5">
+                          {p.api_key}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -313,11 +338,15 @@ export default function ProjectsPage() {
                   <div className="flex items-center justify-between pt-2 border-t border-[--border]">
                     <div className="flex items-center gap-2">
                       {p.action && (
-                        <span className={cn(
-                          "text-[10px] font-600 uppercase tracking-wider px-2 py-0.5 rounded-full",
-                          p.action === "block"     && "bg-red-500/10 text-red-400",
-                          p.action === "downgrade" && "bg-blue-500/10 text-blue-400",
-                        )}>
+                        <span
+                          className={cn(
+                            "text-[10px] font-600 uppercase tracking-wider px-2 py-0.5 rounded-full",
+                            p.action === "block" &&
+                              "bg-red-500/10 text-red-400",
+                            p.action === "downgrade" &&
+                              "bg-blue-500/10 text-blue-400",
+                          )}
+                        >
                           {p.action}
                         </span>
                       )}
@@ -351,15 +380,7 @@ export default function ProjectsPage() {
         )}
       </AnimatePresence>
 
-      <ConfirmDialog
-        open={confirmDelete != null}
-        message="Delete this project and all its usage history? This cannot be undone."
-        confirmLabel="Delete"
-        destructive
-        onConfirm={confirmDeleteProject}
-        onCancel={() => setConfirmDelete(null)}
-      />
-
+      {/* Toast — P3.3 */}
       <Toast
         show={toast.show}
         message={toast.message}

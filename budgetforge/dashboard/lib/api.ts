@@ -4,7 +4,6 @@ export interface Project {
   id: number;
   name: string;
   api_key: string;
-  plan: string;
   budget_usd: number | null;
   alert_threshold_pct: number | null;
   action: "block" | "downgrade" | null;
@@ -133,17 +132,29 @@ export interface SiteSettingsUpdate {
 
 export const api = {
   projects: {
-    list: ()                           => req<Project[]>("/api/projects"),
-    get:  (id: number)                 => req<Project>(`/api/projects/${id}`),
-    create: (name: string)             => req<Project>("/api/projects", { method: "POST", body: JSON.stringify({ name }) }),
-    delete: (id: number)               => req<void>(`/api/projects/${id}`, { method: "DELETE" }),
+    list: () => req<Project[]>("/api/projects"),
+    get: (id: number) => req<Project>(`/api/projects/${id}`),
+    create: (name: string) =>
+      req<Project>("/api/projects", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
+    delete: (id: number) =>
+      req<void>(`/api/projects/${id}`, { method: "DELETE" }),
     setBudget: (id: number, b: BudgetPayload) =>
-      req<Project>(`/api/projects/${id}/budget`, { method: "PUT", body: JSON.stringify(b) }),
-    usage:     (id: number)            => req<UsageSummary>(`/api/projects/${id}/usage`),
-    breakdown: (id: number)            => req<UsageBreakdown>(`/api/projects/${id}/usage/breakdown`),
-    dailyUsage: (id: number)           => req<DailySpend[]>(`/api/projects/${id}/usage/daily`),
-    rotateKey: (id: number)            => req<Project>(`/api/projects/${id}/rotate-key`, { method: "POST" }),
-    agents:    (id: number)            => req<AgentBreakdown>(`/api/projects/${id}/usage/agents`),
+      req<Project>(`/api/projects/${id}/budget`, {
+        method: "PUT",
+        body: JSON.stringify(b),
+      }),
+    usage: (id: number) => req<UsageSummary>(`/api/projects/${id}/usage`),
+    breakdown: (id: number) =>
+      req<UsageBreakdown>(`/api/projects/${id}/usage/breakdown`),
+    dailyUsage: (id: number) =>
+      req<DailySpend[]>(`/api/projects/${id}/usage/daily`),
+    rotateKey: (id: number) =>
+      req<Project>(`/api/projects/${id}/rotate-key`, { method: "POST" }),
+    agents: (id: number) =>
+      req<AgentBreakdown>(`/api/projects/${id}/usage/agents`),
   },
   usage: {
     breakdown: () => req<UsageBreakdown>("/api/usage/breakdown"),
@@ -154,18 +165,19 @@ export const api = {
     },
     exportUrl: (params: { format: "csv" | "json"; project_id?: number }) => {
       const qs = new URLSearchParams({ format: params.format });
-      if (params.project_id != null) qs.set("project_id", String(params.project_id));
+      if (params.project_id != null)
+        qs.set("project_id", String(params.project_id));
       return `${API_BASE}/api/usage/export?${qs.toString()}`;
     },
     history: (params: HistoryParams = {}) => {
       const qs = new URLSearchParams();
-      if (params.page)       qs.set("page",       String(params.page));
-      if (params.page_size)  qs.set("page_size",  String(params.page_size));
+      if (params.page) qs.set("page", String(params.page));
+      if (params.page_size) qs.set("page_size", String(params.page_size));
       if (params.project_id) qs.set("project_id", String(params.project_id));
-      if (params.provider)   qs.set("provider",   params.provider);
-      if (params.model)      qs.set("model",       params.model);
-      if (params.date_from)  qs.set("date_from",  params.date_from);
-      if (params.date_to)    qs.set("date_to",    params.date_to);
+      if (params.provider) qs.set("provider", params.provider);
+      if (params.model) qs.set("model", params.model);
+      if (params.date_from) qs.set("date_from", params.date_from);
+      if (params.date_to) qs.set("date_to", params.date_to);
       const suffix = qs.toString() ? `?${qs.toString()}` : "";
       return req<HistoryPage>(`/api/usage/history${suffix}`);
     },
@@ -173,7 +185,11 @@ export const api = {
   health: () => req<{ status: string }>("/health"),
   models: () => req<{ providers: Record<string, string[]> }>("/api/models"),
   settings: {
-    get:    ()                          => req<SiteSettings>("/api/settings"),
-    update: (body: SiteSettingsUpdate) => req<SiteSettings>("/api/settings", { method: "PUT", body: JSON.stringify(body) }),
+    get: () => req<SiteSettings>("/api/settings"),
+    update: (body: SiteSettingsUpdate) =>
+      req<SiteSettings>("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
   },
 };

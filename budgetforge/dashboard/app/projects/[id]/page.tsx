@@ -1,49 +1,102 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
-  ArrowLeft, Copy, Check, ShieldAlert, TrendingDown,
-  Zap, Key, Save, Calendar, RefreshCw, Plus, X, GripVertical,
+  ArrowLeft,
+  Copy,
+  Check,
+  ShieldAlert,
+  TrendingDown,
+  Zap,
+  Key,
+  Save,
+  Calendar,
+  RefreshCw,
+  Plus,
+  X,
+  GripVertical,
 } from "lucide-react";
 import Link from "next/link";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 import { Shell } from "@/components/shell";
 import { BudgetRing } from "@/components/budget-ring";
 import { BurnBar } from "@/components/burn-bar";
 import { Toast } from "@/components/toast";
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ModelSelect } from "@/components/model-select";
-import { api, type Project, type UsageSummary, type UsageBreakdown, type AgentBreakdown, type DailySpend } from "@/lib/api";
-import { QuickIntegration } from "@/components/quick-integration";
+import {
+  api,
+  type Project,
+  type UsageSummary,
+  type UsageBreakdown,
+  type AgentBreakdown,
+  type DailySpend,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const PROVIDER_COLORS: Record<string, string> = {
-  openai:    "#10a37f",
+  openai: "#10a37f",
   anthropic: "#d4622a",
-  google:    "#4285f4",
-  deepseek:  "#5c67f2",
-  ollama:    "#22c55e",
+  google: "#4285f4",
+  deepseek: "#5c67f2",
+  ollama: "#22c55e",
+  openrouter: "#9333ea",
 };
 
-const ALL_PROVIDERS = ["openai", "anthropic", "google", "deepseek", "ollama"] as const;
+const ALL_PROVIDERS = [
+  "openai",
+  "anthropic",
+  "google",
+  "deepseek",
+  "ollama",
+  "openrouter",
+] as const;
 
 const MODELS_BY_PROVIDER: Record<string, string[]> = {
-  openai:    ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo", "o1", "o1-mini", "o3-mini"],
+  openai: [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4-turbo",
+    "gpt-3.5-turbo",
+    "o1",
+    "o1-mini",
+    "o3-mini",
+  ],
   anthropic: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"],
-  google:    ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash-thinking"],
-  deepseek:  ["deepseek-chat", "deepseek-reasoner"],
-  ollama:    ["llama3", "mistral", "qwen3", "gemma3"],
+  google: [
+    "gemini-2.0-flash",
+    "gemini-1.5-pro",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash-thinking",
+  ],
+  deepseek: ["deepseek-chat", "deepseek-reasoner"],
+  ollama: ["llama3", "mistral", "qwen3", "gemma3"],
+  openrouter: [
+    "openrouter/anthropic/claude-3.5-sonnet",
+    "openrouter/openai/gpt-4",
+    "openrouter/google/gemini-pro",
+    "openrouter/meta-llama/llama-3.1-70b-instruct",
+  ],
 };
-
 
 function formatDailyChartData(raw: DailySpend[]) {
   return raw.map((entry) => ({
-    date: new Date(entry.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    date: new Date(entry.date + "T00:00:00").toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
     spend: entry.spend,
   }));
 }
@@ -62,27 +115,43 @@ function CopyButton({ text, onCopy }: { text: string; onCopy?: () => void }) {
       className="p-1.5 rounded-md text-[--muted-fg] hover:text-[--amber] hover:bg-[--amber-dim] transition-all"
       title="Copy"
     >
-      {copied
-        ? <Check className="w-3.5 h-3.5 text-green-400" />
-        : <Copy className="w-3.5 h-3.5" />
-      }
+      {copied ? (
+        <Check className="w-3.5 h-3.5 text-green-400" />
+      ) : (
+        <Copy className="w-3.5 h-3.5" />
+      )}
     </button>
   );
 }
 
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: { value: number }[];
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
   return (
     <div className="card-base px-3 py-2 text-xs">
       <p className="text-[--muted-fg] mb-0.5">{label}</p>
-      <p className="font-mono text-[--amber] font-500">${payload[0].value.toFixed(6)}</p>
+      <p className="font-mono text-[--amber] font-500">
+        ${payload[0].value.toFixed(6)}
+      </p>
     </div>
   );
 }
 
-function ForecastWidget({ forecastDays }: { forecastDays: number | null | undefined }) {
+function ForecastWidget({
+  forecastDays,
+}: {
+  forecastDays: number | null | undefined;
+}) {
   if (forecastDays == null) return null;
-  const color = forecastDays < 3 ? "#ef4444" : forecastDays < 7 ? "#f59e0b" : "#22c55e";
+  const color =
+    forecastDays < 3 ? "#ef4444" : forecastDays < 7 ? "#f59e0b" : "#22c55e";
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -91,18 +160,28 @@ function ForecastWidget({ forecastDays }: { forecastDays: number | null | undefi
       className="card-base p-4 flex items-center justify-between"
     >
       <div>
-        <p className="text-[11px] uppercase tracking-widest text-[--muted-fg] font-600 mb-1">Forecast</p>
+        <p className="text-[11px] uppercase tracking-widest text-[--muted-fg] font-600 mb-1">
+          Forecast
+        </p>
         <p className="font-mono font-700 text-xl" style={{ color }}>
           ~{forecastDays.toFixed(0)}d
         </p>
         <p className="text-[10px] text-[--muted-fg]">until budget exhausted</p>
       </div>
-      <Calendar className="w-5 h-5 shrink-0" style={{ color }} strokeWidth={1.5} />
+      <Calendar
+        className="w-5 h-5 shrink-0"
+        style={{ color }}
+        strokeWidth={1.5}
+      />
     </motion.div>
   );
 }
 
-function ProviderBreakdownChart({ breakdown }: { breakdown: UsageBreakdown | null }) {
+function ProviderBreakdownChart({
+  breakdown,
+}: {
+  breakdown: UsageBreakdown | null;
+}) {
   if (!breakdown || breakdown.total_calls === 0) return null;
 
   const entries = Object.entries(breakdown.providers)
@@ -131,20 +210,26 @@ function ProviderBreakdownChart({ breakdown }: { breakdown: UsageBreakdown | nul
             <PieChart>
               <Pie
                 data={entries}
-                cx="50%" cy="50%"
-                innerRadius={28} outerRadius={42}
+                cx="50%"
+                cy="50%"
+                innerRadius={28}
+                outerRadius={42}
                 paddingAngle={2}
                 dataKey="value"
                 strokeWidth={0}
               >
-                {entries.map((e, i) => <Cell key={i} fill={e.color} />)}
+                {entries.map((e, i) => (
+                  <Cell key={i} fill={e.color} />
+                ))}
               </Pie>
               <Tooltip
                 content={({ active, payload }) =>
                   active && payload?.length ? (
                     <div className="card-base px-2 py-1 text-[10px]">
-                      <span style={{ color: payload[0].payload.color }}>{payload[0].name}</span>
-                      {" "}${Number(payload[0].value).toFixed(4)}
+                      <span style={{ color: payload[0].payload.color }}>
+                        {payload[0].name}
+                      </span>{" "}
+                      ${Number(payload[0].value).toFixed(4)}
                     </div>
                   ) : null
                 }
@@ -154,15 +239,28 @@ function ProviderBreakdownChart({ breakdown }: { breakdown: UsageBreakdown | nul
         </div>
         <div className="flex flex-col gap-2 flex-1 min-w-0">
           {entries.map((e) => (
-            <div key={e.name} className="flex items-center justify-between gap-2">
+            <div
+              key={e.name}
+              className="flex items-center justify-between gap-2"
+            >
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: e.color }} />
-                <span className="text-xs text-[--foreground] capitalize truncate">{e.name}</span>
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: e.color }}
+                />
+                <span className="text-xs text-[--foreground] capitalize truncate">
+                  {e.name}
+                </span>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <span className="font-mono text-[10px] text-[--muted-fg]">{e.calls}×</span>
-                <span className="font-mono text-xs font-600" style={{ color: e.color }}>
-                  {e.name === "ollama" ? "local" : `$${e.value.toFixed(4)}`}
+                <span className="font-mono text-[10px] text-[--muted-fg]">
+                  {e.calls}×
+                </span>
+                <span
+                  className="font-mono text-xs font-600"
+                  style={{ color: e.color }}
+                >
+                  ${e.value.toFixed(4)}
                 </span>
               </div>
             </div>
@@ -175,7 +273,9 @@ function ProviderBreakdownChart({ breakdown }: { breakdown: UsageBreakdown | nul
 
 function AgentBreakdownTable({ agents }: { agents: AgentBreakdown | null }) {
   if (!agents || agents.total_calls === 0) return null;
-  const rows = Object.entries(agents.agents).sort((a, b) => b[1].calls - a[1].calls);
+  const rows = Object.entries(agents.agents).sort(
+    (a, b) => b[1].calls - a[1].calls,
+  );
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -189,11 +289,17 @@ function AgentBreakdownTable({ agents }: { agents: AgentBreakdown | null }) {
           <div key={name} className="flex items-center justify-between py-2">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-[--amber]" />
-              <span className="text-xs font-mono text-[--foreground]">{name}</span>
+              <span className="text-xs font-mono text-[--foreground]">
+                {name}
+              </span>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-[10px] text-[--muted-fg]">{stats.calls} call{stats.calls > 1 ? "s" : ""}</span>
-              <span className="font-mono text-xs font-600 text-[--amber]">${stats.cost_usd.toFixed(4)}</span>
+              <span className="text-[10px] text-[--muted-fg]">
+                {stats.calls} call{stats.calls > 1 ? "s" : ""}
+              </span>
+              <span className="font-mono text-xs font-600 text-[--amber]">
+                ${stats.cost_usd.toFixed(4)}
+              </span>
             </div>
           </div>
         ))}
@@ -214,7 +320,9 @@ export default function ProjectDetailPage({
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [breakdown, setBreakdown] = useState<UsageBreakdown | null>(null);
   const [agents, setAgents] = useState<AgentBreakdown | null>(null);
-  const [dailyData, setDailyData] = useState<{ date: string; spend: number }[]>([]);
+  const [dailyData, setDailyData] = useState<{ date: string; spend: number }[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [refreshError, setRefreshError] = useState<string | null>(null);
 
@@ -224,25 +332,30 @@ export default function ProjectDetailPage({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [action, setAction] = useState<"block" | "downgrade">("block");
   const [allowedProviders, setAllowedProviders] = useState<string[]>([]);
-  const [downgradeChain, setDowngradeChain] = useState<string[]>(["gpt-4o-mini", "claude-haiku-4-5", "gemini-2.0-flash"]);
-  const [modelsByProvider, setModelsByProvider] = useState<Record<string, string[]>>(MODELS_BY_PROVIDER);
+  const [downgradeChain, setDowngradeChain] = useState<string[]>([
+    "gpt-4o-mini",
+    "claude-haiku-4-5",
+    "gemini-2.0-flash",
+  ]);
+  const [modelsByProvider, setModelsByProvider] =
+    useState<Record<string, string[]>>(MODELS_BY_PROVIDER);
   const [saving, setSaving] = useState(false);
 
-  const [toast, setToast] = useState<{ show: boolean; message: string }>({ show: false, message: "" });
+  const [toast, setToast] = useState<{ show: boolean; message: string }>({
+    show: false,
+    message: "",
+  });
   const [rotating, setRotating] = useState(false);
-  const [confirmRotate, setConfirmRotate] = useState(false);
   function showToast(message: string) {
     setToast({ show: true, message });
   }
 
   async function rotateKey() {
     if (!project) return;
-    setConfirmRotate(true);
-  }
-
-  async function confirmRotateKey() {
-    if (!project) return;
-    setConfirmRotate(false);
+    if (
+      !confirm("Rotate API key? The current key will stop working immediately.")
+    )
+      return;
     setRotating(true);
     try {
       await api.projects.rotateKey(project.id);
@@ -253,12 +366,14 @@ export default function ProjectDetailPage({
     }
   }
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setRefreshError(null);
     try {
       const p = await api.projects.get(Number(id));
       const [u, bd, ag, daily] = await Promise.all([
-        p.budget_usd != null ? api.projects.usage(Number(id)).catch(() => null) : null,
+        p.budget_usd != null
+          ? api.projects.usage(Number(id)).catch(() => null)
+          : null,
         api.projects.breakdown(Number(id)).catch(() => null),
         api.projects.agents(Number(id)).catch(() => null),
         api.projects.dailyUsage(Number(id)).catch(() => null),
@@ -268,9 +383,10 @@ export default function ProjectDetailPage({
       setBreakdown(bd);
       setAgents(ag);
       setDailyData(daily ? formatDailyChartData(daily) : []);
-      if (p.budget_usd != null)          setBudgetUsd(String(p.budget_usd));
-      if (p.alert_threshold_pct != null) setThreshold(String(p.alert_threshold_pct));
-      if (p.action)                       setAction(p.action);
+      if (p.budget_usd != null) setBudgetUsd(String(p.budget_usd));
+      if (p.alert_threshold_pct != null)
+        setThreshold(String(p.alert_threshold_pct));
+      if (p.action) setAction(p.action);
       setAllowedProviders(p.allowed_providers ?? []);
       if (p.downgrade_chain?.length) setDowngradeChain(p.downgrade_chain);
     } catch (err) {
@@ -283,16 +399,23 @@ export default function ProjectDetailPage({
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => { refresh(); }, [id]);
+  }, [id, router]);
 
   useEffect(() => {
-    api.models().then((data) => {
-      if (data.providers && Object.keys(data.providers).length > 0) {
-        setModelsByProvider(data.providers);
-      }
-    }).catch(() => { /* keep fallback */ });
+    refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    api
+      .models()
+      .then((data) => {
+        if (data.providers && Object.keys(data.providers).length > 0) {
+          setModelsByProvider(data.providers);
+        }
+      })
+      .catch(() => {
+        /* keep fallback */
+      });
   }, []);
 
   async function saveBudget(e: React.FormEvent) {
@@ -308,7 +431,11 @@ export default function ProjectDetailPage({
     }
     // H4: valider que threshold est un entier valide
     const thresholdParsed = parseInt(threshold, 10);
-    if (isNaN(thresholdParsed) || thresholdParsed < 0 || thresholdParsed > 100) {
+    if (
+      isNaN(thresholdParsed) ||
+      thresholdParsed < 0 ||
+      thresholdParsed > 100
+    ) {
       setThresholdError("Alert threshold must be a number between 0 and 100");
       return;
     }
@@ -333,8 +460,8 @@ export default function ProjectDetailPage({
     }
   }
 
-  const pct      = usage?.pct_used ?? 0;
-  const usedUsd  = usage?.used_usd ?? 0;
+  const pct = usage?.pct_used ?? 0;
+  const usedUsd = usage?.used_usd ?? 0;
   const budgetVal = project?.budget_usd ?? 0;
   const chartData = dailyData;
 
@@ -362,7 +489,9 @@ export default function ProjectDetailPage({
       return (
         <Shell>
           <div className="p-6 max-w-xl">
-            <p className="text-red-400 text-sm font-mono">Error: {refreshError}</p>
+            <p className="text-red-400 text-sm font-mono">
+              Error: {refreshError}
+            </p>
             <button
               onClick={() => refresh()}
               className="mt-3 text-xs text-[--amber] hover:underline"
@@ -391,19 +520,26 @@ export default function ProjectDetailPage({
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Projects
           </Link>
-          <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">{project.name}</h1>
+          <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">
+            {project.name}
+          </h1>
           <div className="flex items-center gap-2">
             <code className="font-mono text-xs text-[--muted-fg] bg-white/5 px-2 py-0.5 rounded">
               {project.api_key}
             </code>
-            <CopyButton text={project.api_key} onCopy={() => showToast("API key copied")} />
+            <CopyButton
+              text={project.api_key}
+              onCopy={() => showToast("API key copied")}
+            />
             <button
               onClick={rotateKey}
               disabled={rotating}
               title="Rotate API key"
               className="p-1.5 rounded-md text-[--muted-fg] hover:text-amber-400 hover:bg-[--amber-dim] transition-all disabled:opacity-40"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${rotating ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${rotating ? "animate-spin" : ""}`}
+              />
             </button>
           </div>
         </motion.div>
@@ -418,13 +554,26 @@ export default function ProjectDetailPage({
               transition={{ duration: 0.4 }}
               className="card-base p-6 flex flex-col items-center gap-5"
             >
-              <p className="text-[11px] uppercase tracking-widest text-[--muted-fg] font-600">Budget Usage</p>
+              <p className="text-[11px] uppercase tracking-widest text-[--muted-fg] font-600">
+                Budget Usage
+              </p>
               {budgetVal > 0 ? (
-                <BudgetRing pct={pct} used={usedUsd} budget={budgetVal} size={168} strokeWidth={12} />
+                <BudgetRing
+                  pct={pct}
+                  used={usedUsd}
+                  budget={budgetVal}
+                  size={168}
+                  strokeWidth={12}
+                />
               ) : (
                 <div className="flex flex-col items-center gap-3 py-4">
-                  <ShieldAlert className="w-10 h-10 text-[--muted-fg]" strokeWidth={1.2} />
-                  <p className="text-xs text-[--muted-fg] text-center">No budget configured</p>
+                  <ShieldAlert
+                    className="w-10 h-10 text-[--muted-fg]"
+                    strokeWidth={1.2}
+                  />
+                  <p className="text-xs text-[--muted-fg] text-center">
+                    No budget configured
+                  </p>
                 </div>
               )}
             </motion.div>
@@ -437,16 +586,50 @@ export default function ProjectDetailPage({
               className="card-base divide-y divide-[--border]"
             >
               {[
-                { icon: Zap,          label: "Remaining", value: `$${(usage?.remaining_usd ?? 0).toFixed(4)}`,              color: "#22c55e" },
-                { icon: TrendingDown, label: "Action",    value: project.action ?? "—",                                     color: project.action === "block" ? "#ef4444" : project.action === "downgrade" ? "#3b82f6" : "var(--muted-fg)" },
-                { icon: Key,          label: "Alert at",  value: project.alert_threshold_pct ? `${project.alert_threshold_pct}%` : "—", color: "#f59e0b" },
+                {
+                  icon: Zap,
+                  label: "Remaining",
+                  value: `$${(usage?.remaining_usd ?? 0).toFixed(4)}`,
+                  color: "#22c55e",
+                },
+                {
+                  icon: TrendingDown,
+                  label: "Action",
+                  value: project.action ?? "—",
+                  color:
+                    project.action === "block"
+                      ? "#ef4444"
+                      : project.action === "downgrade"
+                        ? "#3b82f6"
+                        : "var(--muted-fg)",
+                },
+                {
+                  icon: Key,
+                  label: "Alert at",
+                  value: project.alert_threshold_pct
+                    ? `${project.alert_threshold_pct}%`
+                    : "—",
+                  color: "#f59e0b",
+                },
               ].map(({ icon: Icon, label, value, color }) => (
-                <div key={label} className="flex items-center justify-between px-4 py-3">
+                <div
+                  key={label}
+                  className="flex items-center justify-between px-4 py-3"
+                >
                   <div className="flex items-center gap-2 text-xs text-[--muted-fg]">
-                    <Icon className="w-3.5 h-3.5" style={{ color }} strokeWidth={1.8} />
+                    <Icon
+                      className="w-3.5 h-3.5"
+                      style={{ color }}
+                      strokeWidth={1.8}
+                    />
                     {label}
                   </div>
-                  <span className="font-mono text-xs font-500" style={{ color }}>{value}</span>
+                  <span
+                    className="font-mono text-xs font-500"
+                    style={{ color }}
+                  >
+                    {value}
+                  </span>
                 </div>
               ))}
             </motion.div>
@@ -465,20 +648,32 @@ export default function ProjectDetailPage({
               className="card-base p-5"
             >
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-heading font-700 text-sm">Daily Spend (last 30 days)</h2>
+                <h2 className="font-heading font-700 text-sm">
+                  Daily Spend (last 30 days)
+                </h2>
                 <span className="font-mono text-xs text-[--muted-fg]">
                   Total: ${usedUsd.toFixed(4)}
                 </span>
               </div>
               <ResponsiveContainer width="100%" height={160}>
-                <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 4, right: 4, bottom: 0, left: -20 }}
+                >
                   <defs>
                     <linearGradient id="amberGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#f59e0b" stopOpacity={0.25} />
+                      <stop
+                        offset="5%"
+                        stopColor="#f59e0b"
+                        stopOpacity={0.25}
+                      />
                       <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <CartesianGrid
+                    stroke="rgba(255,255,255,0.04)"
+                    vertical={false}
+                  />
                   <XAxis
                     dataKey="date"
                     tick={{ fontSize: 9, fill: "#4a6080" }}
@@ -487,7 +682,11 @@ export default function ProjectDetailPage({
                     interval={6}
                   />
                   <YAxis
-                    tick={{ fontSize: 9, fill: "#4a6080", fontFamily: "var(--font-jetbrains)" }}
+                    tick={{
+                      fontSize: 9,
+                      fill: "#4a6080",
+                      fontFamily: "var(--font-jetbrains)",
+                    }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v) => `$${v.toFixed(4)}`}
@@ -520,11 +719,15 @@ export default function ProjectDetailPage({
               transition={{ delay: 0.3 }}
               className="card-base p-5"
             >
-              <h2 className="font-heading font-700 text-sm mb-4">Budget Configuration</h2>
+              <h2 className="font-heading font-700 text-sm mb-4">
+                Budget Configuration
+              </h2>
               <form onSubmit={saveBudget} className="flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs text-[--muted-fg] block mb-1.5">Monthly budget ($)</label>
+                    <label className="text-xs text-[--muted-fg] block mb-1.5">
+                      Monthly budget ($)
+                    </label>
                     <input
                       type="number"
                       step="0.01"
@@ -534,32 +737,43 @@ export default function ProjectDetailPage({
                       className={cn(
                         "w-full bg-[--muted] border border-[--border] rounded-md px-3 py-2",
                         "text-sm font-mono text-[--foreground] placeholder:text-[--muted-fg]",
-                        "focus:outline-none focus:border-[--amber] transition-colors"
+                        "focus:outline-none focus:border-[--amber] transition-colors",
                       )}
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-[--muted-fg] block mb-1.5">Alert threshold (%)</label>
+                    <label className="text-xs text-[--muted-fg] block mb-1.5">
+                      Alert threshold (%)
+                    </label>
                     <input
                       type="number"
                       value={threshold}
-                      onChange={(e) => { setThreshold(e.target.value); setThresholdError(null); }}
+                      onChange={(e) => {
+                        setThreshold(e.target.value);
+                        setThresholdError(null);
+                      }}
                       className={cn(
                         "w-full bg-[--muted] border rounded-md px-3 py-2",
                         "text-sm font-mono text-[--foreground]",
                         "focus:outline-none transition-colors",
-                        thresholdError ? "border-red-500" : "border-[--border] focus:border-[--amber]"
+                        thresholdError
+                          ? "border-red-500"
+                          : "border-[--border] focus:border-[--amber]",
                       )}
                     />
                     {thresholdError && (
-                      <p className="text-red-400 text-[10px] mt-1">{thresholdError}</p>
+                      <p className="text-red-400 text-[10px] mt-1">
+                        {thresholdError}
+                      </p>
                     )}
                   </div>
                 </div>
 
                 {/* Action selector */}
                 <div>
-                  <label className="text-xs text-[--muted-fg] block mb-2">On budget exceeded</label>
+                  <label className="text-xs text-[--muted-fg] block mb-2">
+                    On budget exceeded
+                  </label>
                   <div className="grid grid-cols-2 gap-2">
                     {(["block", "downgrade"] as const).map((opt) => (
                       <button
@@ -572,22 +786,25 @@ export default function ProjectDetailPage({
                             ? opt === "block"
                               ? "border-red-500/50 bg-red-500/10"
                               : "border-blue-500/50 bg-blue-500/10"
-                            : "border-[--border] hover:border-white/20 bg-transparent"
+                            : "border-[--border] hover:border-white/20 bg-transparent",
                         )}
                       >
-                        <span className={cn(
-                          "text-xs font-600 capitalize",
-                          action === opt
-                            ? opt === "block" ? "text-red-400" : "text-blue-400"
-                            : "text-[--foreground]"
-                        )}>
+                        <span
+                          className={cn(
+                            "text-xs font-600 capitalize",
+                            action === opt
+                              ? opt === "block"
+                                ? "text-red-400"
+                                : "text-blue-400"
+                              : "text-[--foreground]",
+                          )}
+                        >
                           {opt}
                         </span>
                         <span className="text-[10px] text-[--muted-fg] leading-relaxed">
                           {opt === "block"
                             ? "Return 429 — hard stop all calls"
-                            : "Swap to cheaper model automatically"
-                          }
+                            : "Swap to cheaper model automatically"}
                         </span>
                       </button>
                     ))}
@@ -599,11 +816,14 @@ export default function ProjectDetailPage({
                   <div className="pt-3 border-t border-[--border]">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-xs text-[--muted-fg]">
-                        Fallback model chain <span className="text-[10px]">(ordered priority)</span>
+                        Fallback model chain{" "}
+                        <span className="text-[10px]">(ordered priority)</span>
                       </label>
                       <button
                         type="button"
-                        onClick={() => setDowngradeChain((c) => [...c, "gpt-4o-mini"])}
+                        onClick={() =>
+                          setDowngradeChain((c) => [...c, "gpt-4o-mini"])
+                        }
                         className="flex items-center gap-1 text-[10px] text-[--amber] hover:opacity-80 transition-opacity"
                       >
                         <Plus className="w-3 h-3" /> Add
@@ -612,21 +832,29 @@ export default function ProjectDetailPage({
                     <div className="flex flex-col gap-2">
                       {downgradeChain.map((model, idx) => (
                         <div key={idx} className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono text-[--muted-fg] w-4 shrink-0">{idx + 1}.</span>
+                          <span className="text-[10px] font-mono text-[--muted-fg] w-4 shrink-0">
+                            {idx + 1}.
+                          </span>
                           <ModelSelect
                             value={model}
-                            onChange={(val) => setDowngradeChain((c) => {
-                              const next = [...c];
-                              next[idx] = val;
-                              return next;
-                            })}
+                            onChange={(val) =>
+                              setDowngradeChain((c) => {
+                                const next = [...c];
+                                next[idx] = val;
+                                return next;
+                              })
+                            }
                             modelsByProvider={modelsByProvider}
                             className="flex-1"
                           />
                           {downgradeChain.length > 1 && (
                             <button
                               type="button"
-                              onClick={() => setDowngradeChain((c) => c.filter((_, i) => i !== idx))}
+                              onClick={() =>
+                                setDowngradeChain((c) =>
+                                  c.filter((_, i) => i !== idx),
+                                )
+                              }
                               className="text-[--muted-fg] hover:text-red-400 transition-colors shrink-0"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -641,7 +869,8 @@ export default function ProjectDetailPage({
                 {/* Allowed providers */}
                 <div className="pt-3 border-t border-[--border]">
                   <label className="text-xs text-[--muted-fg] block mb-2">
-                    Allowed providers <span className="text-[10px]">(empty = all)</span>
+                    Allowed providers{" "}
+                    <span className="text-[10px]">(empty = all)</span>
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {ALL_PROVIDERS.map((p) => {
@@ -652,18 +881,27 @@ export default function ProjectDetailPage({
                           type="button"
                           onClick={() =>
                             setAllowedProviders((prev) =>
-                              active ? prev.filter((x) => x !== p) : [...prev, p]
+                              active
+                                ? prev.filter((x) => x !== p)
+                                : [...prev, p],
                             )
                           }
                           className={cn(
                             "flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-500 border transition-all",
                             active
                               ? "border-transparent text-[#070a0f]"
-                              : "border-[--border] text-[--muted-fg] hover:border-white/20"
+                              : "border-[--border] text-[--muted-fg] hover:border-white/20",
                           )}
-                          style={active ? { backgroundColor: PROVIDER_COLORS[p] } : undefined}
+                          style={
+                            active
+                              ? { backgroundColor: PROVIDER_COLORS[p] }
+                              : undefined
+                          }
                         >
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: PROVIDER_COLORS[p] }} />
+                          <span
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: PROVIDER_COLORS[p] }}
+                          />
                           {p}
                         </button>
                       );
@@ -674,7 +912,9 @@ export default function ProjectDetailPage({
                 {/* Budget bar preview */}
                 {budgetUsd && parseFloat(budgetUsd) > 0 && (
                   <div className="pt-2 border-t border-[--border]">
-                    <p className="text-[10px] text-[--muted-fg] mb-2">Preview</p>
+                    <p className="text-[10px] text-[--muted-fg] mb-2">
+                      Preview
+                    </p>
                     <BurnBar pct={pct} height={6} />
                   </div>
                 )}
@@ -692,43 +932,75 @@ export default function ProjectDetailPage({
                   className={cn(
                     "flex items-center justify-center gap-2 w-full py-2.5 rounded-md text-sm font-600 transition-all",
                     "text-[#070a0f] hover:brightness-110 shadow-[0_0_20px_rgba(245,158,11,0.35)]",
-                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
                   )}
                 >
                   {saving ? (
                     <span className="w-4 h-4 rounded-full border-2 border-[#070a0f]/40 border-t-[#070a0f] animate-spin" />
                   ) : (
-                    <><Save className="w-4 h-4" /> Save budget</>
+                    <>
+                      <Save className="w-4 h-4" /> Save budget
+                    </>
                   )}
                 </button>
               </form>
             </motion.div>
 
-            {/* Quick Integration */}
+            {/* Integration snippet */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
               className="card-base p-5"
             >
-              <h2 className="font-heading font-700 text-sm mb-4">How to connect your tool</h2>
-              <QuickIntegration
-                apiKey={project.api_key}
-                proxyBase={process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://llmbudget.maxiaworld.app"}
-              />
+              <h2 className="font-heading font-700 text-sm mb-3">
+                Quick Integration
+              </h2>
+              {(() => {
+                const baseUrl =
+                  process.env.NEXT_PUBLIC_API_BASE_URL ??
+                  "http://localhost:8011";
+                return (
+                  <pre className="font-mono text-[11px] bg-black/30 rounded-md p-4 overflow-x-auto text-[--foreground] leading-relaxed">
+                    <span className="text-[--muted-fg]">
+                      # Python / OpenAI SDK
+                    </span>
+                    {"\n"}
+                    <span className="text-[#22c55e]">client</span>
+                    {" = openai.OpenAI(\n"}
+                    {"    "}
+                    <span className="text-[--amber]">base_url</span>
+                    {`="${baseUrl}/proxy/openai",\n`}
+                    {"    "}
+                    <span className="text-[--amber]">api_key</span>
+                    {`="`}
+                    <span className="text-blue-400">{project.api_key}</span>
+                    {`",\n)\n`}
+                    <span className="text-[--muted-fg]"># Anthropic SDK</span>
+                    {"\n"}
+                    <span className="text-[#22c55e]">client</span>
+                    {" = anthropic.Anthropic(\n"}
+                    {"    "}
+                    <span className="text-[--amber]">base_url</span>
+                    {`="${baseUrl}/proxy/anthropic",\n`}
+                    {"    "}
+                    <span className="text-[--amber]">api_key</span>
+                    {`="`}
+                    <span className="text-blue-400">{project.api_key}</span>
+                    {`",\n)`}
+                  </pre>
+                );
+              })()}
+              <p className="text-[10px] text-[--muted-fg] mt-2">
+                Your LLM API key stays in the backend. Only the BudgetForge key
+                goes in client code.
+              </p>
             </motion.div>
           </div>
         </div>
       </div>
 
-      <ConfirmDialog
-        open={confirmRotate}
-        message="Rotate API key? The current key will stop working immediately."
-        confirmLabel="Rotate"
-        onConfirm={confirmRotateKey}
-        onCancel={() => setConfirmRotate(false)}
-      />
-
+      {/* Toast — P3.3 */}
       <Toast
         show={toast.show}
         message={toast.message}

@@ -3,19 +3,31 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Activity, ChevronLeft, ChevronRight, Download,
-  RefreshCw, SlidersHorizontal, X, ArrowUpDown,
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  RefreshCw,
+  SlidersHorizontal,
+  X,
+  ArrowUpDown,
 } from "lucide-react";
 import { Shell } from "@/components/shell";
-import { api, type UsageRecord, type HistoryPage, type Project } from "@/lib/api";
+import {
+  api,
+  type UsageRecord,
+  type HistoryPage,
+  type Project,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const PROVIDER_COLORS: Record<string, string> = {
-  openai:    "#10a37f",
+  openai: "#10a37f",
   anthropic: "#d4622a",
-  google:    "#4285f4",
-  deepseek:  "#5c67f2",
-  ollama:    "#22c55e",
+  google: "#4285f4",
+  deepseek: "#5c67f2",
+  ollama: "#22c55e",
+  openrouter: "#9333ea",
 };
 
 const PROVIDERS = ["openai", "anthropic", "google", "deepseek", "ollama"];
@@ -37,7 +49,12 @@ function fmt_date(iso: string) {
   const d = new Date(iso);
   return {
     date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    time: d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }),
+    time: d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }),
   };
 }
 
@@ -48,7 +65,10 @@ function ProviderBadge({ provider }: { provider: string }) {
       className="inline-flex items-center gap-1.5 text-[10px] font-600 uppercase tracking-wider px-2 py-0.5 rounded-full"
       style={{ background: `${color}18`, color }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: color, boxShadow: `0 0 4px ${color}` }} />
+      <span
+        className="w-1.5 h-1.5 rounded-full"
+        style={{ background: color, boxShadow: `0 0 4px ${color}` }}
+      />
       {provider}
     </span>
   );
@@ -77,7 +97,16 @@ function TableSkeleton() {
 }
 
 function exportCSV(items: UsageRecord[]) {
-  const header = ["id", "time", "project", "provider", "model", "tokens_in", "tokens_out", "cost_usd"];
+  const header = [
+    "id",
+    "time",
+    "project",
+    "provider",
+    "model",
+    "tokens_in",
+    "tokens_out",
+    "cost_usd",
+  ];
   const rows = items.map((r) => [
     r.id,
     r.created_at,
@@ -99,52 +128,59 @@ function exportCSV(items: UsageRecord[]) {
 }
 
 export default function ActivityPage() {
-  const [data, setData]           = useState<HistoryPage | null>(null);
-  const [projects, setProjects]   = useState<Project[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
+  const [data, setData] = useState<HistoryPage | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const intervalRef               = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // filters
-  const [page, setPage]           = useState(1);
-  const [pageSize, setPageSize]   = useState(50);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [projectId, setProjectId] = useState<number | null>(null);
-  const [provider, setProvider]   = useState<string | null>(null);
-  const [model, setModel]         = useState("");
-  const [dateFrom, setDateFrom]   = useState("");
-  const [dateTo, setDateTo]       = useState("");
+  const [provider, setProvider] = useState<string | null>(null);
+  const [model, setModel] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  const hasActiveFilters = projectId !== null || provider !== null || model || dateFrom || dateTo;
+  const hasActiveFilters =
+    projectId !== null || provider !== null || model || dateFrom || dateTo;
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    setError(null);
-    try {
-      const result = await api.usage.history({
-        page,
-        page_size: pageSize,
-        project_id: projectId,
-        provider,
-        model: model || null,
-        date_from: dateFrom || null,
-        date_to: dateTo || null,
-      });
-      setData(result);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load history");
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [page, pageSize, projectId, provider, model, dateFrom, dateTo]);
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      setError(null);
+      try {
+        const result = await api.usage.history({
+          page,
+          page_size: pageSize,
+          project_id: projectId,
+          provider,
+          model: model || null,
+          date_from: dateFrom || null,
+          date_to: dateTo || null,
+        });
+        setData(result);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load history");
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [page, pageSize, projectId, provider, model, dateFrom, dateTo],
+  );
 
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
-    api.projects.list().then(setProjects).catch(() => {});
+    api.projects
+      .list()
+      .then(setProjects)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -153,7 +189,9 @@ export default function ActivityPage() {
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [autoRefresh, load]);
 
   function clearFilters() {
@@ -175,8 +213,12 @@ export default function ActivityPage() {
           className="flex items-start justify-between mb-6"
         >
           <div>
-            <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">Activity</h1>
-            <p className="text-[--muted-fg] text-sm">Complete history of proxied LLM calls</p>
+            <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">
+              Activity
+            </h1>
+            <p className="text-[--muted-fg] text-sm">
+              Complete history of proxied LLM calls
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {/* Auto-refresh toggle */}
@@ -186,11 +228,13 @@ export default function ActivityPage() {
                 "flex items-center gap-1.5 text-xs font-600 px-3 py-2 rounded-md border cursor-pointer transition-all",
                 autoRefresh
                   ? "border-[--amber] text-[--amber] bg-[--amber-dim] shadow-[0_0_12px_rgba(245,158,11,0.2)]"
-                  : "border-[--border] text-[--foreground] bg-[--muted] hover:border-[--amber] hover:text-[--amber]"
+                  : "border-[--border] text-[--foreground] bg-[--muted] hover:border-[--amber] hover:text-[--amber]",
               )}
               title="Auto-refresh every 5s"
             >
-              <RefreshCw className={cn("w-3.5 h-3.5", autoRefresh && "animate-spin")} />
+              <RefreshCw
+                className={cn("w-3.5 h-3.5", autoRefresh && "animate-spin")}
+              />
               Live
             </button>
             {/* Filters toggle */}
@@ -200,7 +244,7 @@ export default function ActivityPage() {
                 "flex items-center gap-1.5 text-xs font-600 px-3 py-2 rounded-md border cursor-pointer transition-all",
                 showFilters || hasActiveFilters
                   ? "border-[--amber] text-[--amber] bg-[--amber-dim] shadow-[0_0_12px_rgba(245,158,11,0.2)]"
-                  : "border-[--border] text-[--foreground] bg-[--muted] hover:border-[--amber] hover:text-[--amber]"
+                  : "border-[--border] text-[--foreground] bg-[--muted] hover:border-[--amber] hover:text-[--amber]",
               )}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -211,7 +255,10 @@ export default function ActivityPage() {
             </button>
             {/* Export */}
             <a
-              href={api.usage.exportUrl({ format: "csv", ...(projectId != null ? { project_id: projectId } : {}) })}
+              href={api.usage.exportUrl({
+                format: "csv",
+                ...(projectId != null ? { project_id: projectId } : {}),
+              })}
               className="flex items-center gap-1.5 text-xs font-600 px-3 py-2 rounded-md border border-[--border] text-[--foreground] bg-[--muted] hover:border-[--amber] hover:text-[--amber] transition-all cursor-pointer"
               download
             >
@@ -231,11 +278,21 @@ export default function ActivityPage() {
             {[
               { label: "Total calls", value: data.total.toLocaleString() },
               { label: "Total cost", value: fmt_cost(data.total_cost_usd) },
-              { label: "Showing page", value: `${data.page} / ${data.pages || 1}` },
+              {
+                label: "Showing page",
+                value: `${data.page} / ${data.pages || 1}`,
+              },
             ].map(({ label, value }) => (
-              <div key={label} className="card-base px-4 py-3 flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-widest text-[--muted-fg] font-600">{label}</span>
-                <span className="font-mono text-sm font-600 text-[--foreground]">{value}</span>
+              <div
+                key={label}
+                className="card-base px-4 py-3 flex items-center justify-between"
+              >
+                <span className="text-[11px] uppercase tracking-widest text-[--muted-fg] font-600">
+                  {label}
+                </span>
+                <span className="font-mono text-sm font-600 text-[--foreground]">
+                  {value}
+                </span>
               </div>
             ))}
           </motion.div>
@@ -254,45 +311,74 @@ export default function ActivityPage() {
               <div className="card-base p-4 flex flex-wrap gap-4 items-end">
                 {/* Project */}
                 <div className="flex flex-col gap-1.5 min-w-[180px]">
-                  <label className="text-[10px] uppercase tracking-widest text-[--muted-fg] font-600">Project</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[--muted-fg] font-600">
+                    Project
+                  </label>
                   <select
                     value={projectId ?? ""}
-                    onChange={(e) => { setProjectId(e.target.value ? Number(e.target.value) : null); setPage(1); }}
+                    onChange={(e) => {
+                      setProjectId(
+                        e.target.value ? Number(e.target.value) : null,
+                      );
+                      setPage(1);
+                    }}
                     className="bg-[--muted] border border-[--border] rounded-md px-3 py-2 text-xs text-[--foreground] focus:outline-none focus:border-[--amber]/60"
                   >
                     <option value="">All projects</option>
                     {projects.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 {/* Provider chips */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-[--muted-fg] font-600">Provider</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[--muted-fg] font-600">
+                    Provider
+                  </label>
                   <div className="flex gap-1.5">
                     <button
-                      onClick={() => { setProvider(null); setPage(1); }}
+                      onClick={() => {
+                        setProvider(null);
+                        setPage(1);
+                      }}
                       className={cn(
                         "text-[10px] font-600 uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all",
                         provider === null
                           ? "border-[--amber] text-[--amber] bg-[--amber-dim]"
-                          : "border-[--border] text-[--muted-fg] hover:border-[--amber]/40"
+                          : "border-[--border] text-[--muted-fg] hover:border-[--amber]/40",
                       )}
-                    >All</button>
+                    >
+                      All
+                    </button>
                     {PROVIDERS.map((pv) => {
                       const color = PROVIDER_COLORS[pv];
                       const active = provider === pv;
                       return (
                         <button
                           key={pv}
-                          onClick={() => { setProvider(active ? null : pv); setPage(1); }}
+                          onClick={() => {
+                            setProvider(active ? null : pv);
+                            setPage(1);
+                          }}
                           className="text-[10px] font-600 uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all"
-                          style={active
-                            ? { borderColor: color, color, background: `${color}18` }
-                            : { borderColor: "var(--border)", color: "var(--muted-fg)" }
+                          style={
+                            active
+                              ? {
+                                  borderColor: color,
+                                  color,
+                                  background: `${color}18`,
+                                }
+                              : {
+                                  borderColor: "var(--border)",
+                                  color: "var(--muted-fg)",
+                                }
                           }
-                        >{pv}</button>
+                        >
+                          {pv}
+                        </button>
                       );
                     })}
                   </div>
@@ -300,31 +386,44 @@ export default function ActivityPage() {
 
                 {/* Model */}
                 <div className="flex flex-col gap-1.5 min-w-[160px]">
-                  <label className="text-[10px] uppercase tracking-widest text-[--muted-fg] font-600">Model</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[--muted-fg] font-600">
+                    Model
+                  </label>
                   <input
                     type="text"
                     placeholder="e.g. gpt-4o"
                     value={model}
-                    onChange={(e) => { setModel(e.target.value); setPage(1); }}
+                    onChange={(e) => {
+                      setModel(e.target.value);
+                      setPage(1);
+                    }}
                     className="bg-[--muted] border border-[--border] rounded-md px-3 py-2 text-xs text-[--foreground] placeholder:text-[--muted-fg] focus:outline-none focus:border-[--amber]/60"
                   />
                 </div>
 
                 {/* Date range */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] uppercase tracking-widest text-[--muted-fg] font-600">Date range</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[--muted-fg] font-600">
+                    Date range
+                  </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="date"
                       value={dateFrom}
-                      onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                      onChange={(e) => {
+                        setDateFrom(e.target.value);
+                        setPage(1);
+                      }}
                       className="bg-[--muted] border border-[--border] rounded-md px-3 py-2 text-xs text-[--foreground] focus:outline-none focus:border-[--amber]/60"
                     />
                     <span className="text-[--muted-fg] text-xs">→</span>
                     <input
                       type="date"
                       value={dateTo}
-                      onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                      onChange={(e) => {
+                        setDateTo(e.target.value);
+                        setPage(1);
+                      }}
                       className="bg-[--muted] border border-[--border] rounded-md px-3 py-2 text-xs text-[--foreground] focus:outline-none focus:border-[--amber]/60"
                     />
                   </div>
@@ -366,7 +465,7 @@ export default function ActivityPage() {
                 key={label}
                 className={cn(
                   "flex items-center gap-1 text-[10px] uppercase tracking-widest font-600 text-[--muted-fg] whitespace-nowrap",
-                  mono && "justify-end"
+                  mono && "justify-end",
                 )}
               >
                 {label}
@@ -381,7 +480,12 @@ export default function ActivityPage() {
           ) : error ? (
             <div className="py-16 text-center">
               <p className="text-sm text-red-400">{error}</p>
-              <button onClick={() => load()} className="mt-2 text-xs text-[--amber] hover:underline">Retry</button>
+              <button
+                onClick={() => load()}
+                className="mt-2 text-xs text-[--amber] hover:underline"
+              >
+                Retry
+              </button>
             </div>
           ) : !data || data.items.length === 0 ? (
             <div className="py-16 text-center flex flex-col items-center gap-3">
@@ -389,10 +493,17 @@ export default function ActivityPage() {
                 <Activity className="w-5 h-5 text-[--amber]" />
               </div>
               <p className="text-sm text-[--muted-fg]">
-                {hasActiveFilters ? "No calls match the current filters." : "No calls recorded yet."}
+                {hasActiveFilters
+                  ? "No calls match the current filters."
+                  : "No calls recorded yet."}
               </p>
               {hasActiveFilters && (
-                <button onClick={clearFilters} className="text-xs text-[--amber] hover:underline">Clear filters</button>
+                <button
+                  onClick={clearFilters}
+                  className="text-xs text-[--amber] hover:underline"
+                >
+                  Clear filters
+                </button>
               )}
             </div>
           ) : (
@@ -411,13 +522,19 @@ export default function ActivityPage() {
                   >
                     {/* Time */}
                     <div className="flex flex-col justify-center">
-                      <span className="font-mono text-[10px] text-[--foreground]">{time}</span>
-                      <span className="font-mono text-[10px] text-[--muted-fg]">{date}</span>
+                      <span className="font-mono text-[10px] text-[--foreground]">
+                        {time}
+                      </span>
+                      <span className="font-mono text-[10px] text-[--muted-fg]">
+                        {date}
+                      </span>
                     </div>
 
                     {/* Project */}
                     <div className="flex items-center min-w-0 pr-4">
-                      <span className="text-xs text-[--foreground] truncate">{row.project_name}</span>
+                      <span className="text-xs text-[--foreground] truncate">
+                        {row.project_name}
+                      </span>
                     </div>
 
                     {/* Provider */}
@@ -427,17 +544,23 @@ export default function ActivityPage() {
 
                     {/* Model */}
                     <div className="flex items-center pr-4">
-                      <span className="font-mono text-[11px] text-[--muted-fg] truncate">{row.model}</span>
+                      <span className="font-mono text-[11px] text-[--muted-fg] truncate">
+                        {row.model}
+                      </span>
                     </div>
 
                     {/* Tokens in */}
                     <div className="flex items-center justify-end">
-                      <span className="font-mono text-xs text-[--muted-fg]">{fmt_tokens(row.tokens_in)}</span>
+                      <span className="font-mono text-xs text-[--muted-fg]">
+                        {fmt_tokens(row.tokens_in)}
+                      </span>
                     </div>
 
                     {/* Tokens out */}
                     <div className="flex items-center justify-end">
-                      <span className="font-mono text-xs text-[--muted-fg]">{fmt_tokens(row.tokens_out)}</span>
+                      <span className="font-mono text-xs text-[--muted-fg]">
+                        {fmt_tokens(row.tokens_out)}
+                      </span>
                     </div>
 
                     {/* Cost */}
@@ -445,7 +568,9 @@ export default function ActivityPage() {
                       <span
                         className={cn(
                           "font-mono text-xs font-600",
-                          row.cost_usd === 0 ? "text-green-400" : "text-[--amber]"
+                          row.cost_usd === 0
+                            ? "text-green-400"
+                            : "text-[--amber]",
                         )}
                       >
                         {fmt_cost(row.cost_usd)}
@@ -462,15 +587,22 @@ export default function ActivityPage() {
             <div className="flex items-center justify-between px-5 py-3 border-t border-[--border] bg-white/[0.01]">
               <div className="flex items-center gap-3">
                 <span className="text-xs text-[--muted-fg]">
-                  {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, data.total)} of {data.total.toLocaleString()}
+                  {(page - 1) * pageSize + 1}–
+                  {Math.min(page * pageSize, data.total)} of{" "}
+                  {data.total.toLocaleString()}
                 </span>
                 <select
                   value={pageSize}
-                  onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
                   className="bg-[--muted] border border-[--border] rounded px-2 py-1 text-xs text-[--foreground] focus:outline-none"
                 >
                   {PAGE_SIZES.map((s) => (
-                    <option key={s} value={s}>{s} / page</option>
+                    <option key={s} value={s}>
+                      {s} / page
+                    </option>
                   ))}
                 </select>
               </div>
@@ -480,7 +612,9 @@ export default function ActivityPage() {
                   onClick={() => setPage(1)}
                   disabled={page === 1}
                   className="px-2 py-1 text-xs text-[--muted-fg] hover:text-[--foreground] disabled:opacity-30 transition-colors"
-                >«</button>
+                >
+                  «
+                </button>
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
@@ -510,9 +644,11 @@ export default function ActivityPage() {
                           "w-7 h-7 text-xs rounded transition-all",
                           p === page
                             ? "bg-[--amber] text-[#070a0f] font-600"
-                            : "text-[--muted-fg] hover:text-[--foreground] hover:bg-white/5"
+                            : "text-[--muted-fg] hover:text-[--foreground] hover:bg-white/5",
                         )}
-                      >{p}</button>
+                      >
+                        {p}
+                      </button>
                     );
                   })}
                 </div>
@@ -528,7 +664,9 @@ export default function ActivityPage() {
                   onClick={() => setPage(data.pages)}
                   disabled={page === data.pages}
                   className="px-2 py-1 text-xs text-[--muted-fg] hover:text-[--foreground] disabled:opacity-30 transition-colors"
-                >»</button>
+                >
+                  »
+                </button>
               </div>
             </div>
           )}

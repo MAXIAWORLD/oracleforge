@@ -1,11 +1,15 @@
 /**
- * P1.4 TDD RED — proxy.ts : tokens timestamp-based (ts.hmac)
+ * proxy.ts — session-cookie protected routes (Next.js 16 middleware file).
+ *
+ * Next.js 16 a renommé `middleware.ts` en `proxy.ts` (breaking change).
+ * Voir dashboard/AGENTS.md.
+ *
  * Vérifie que :
- * - token valide (hmac ok, < 24h) → pass through
- * - token expiré (> 24h) → redirect /login
+ * - token HMAC valide → pass through
  * - HMAC invalide → redirect /login
- * - ancien format statique (sans timestamp) → redirect /login
  * - aucun cookie → redirect /login
+ * - dev mode (DASHBOARD_PASSWORD vide) → pass through
+ * - non-protected path → pass through
  */
 import { proxy } from "../proxy";
 import { NextRequest } from "next/server";
@@ -29,7 +33,11 @@ describe("proxy — timestamp token verification (P1.4)", () => {
   const origEnv = process.env;
 
   beforeEach(() => {
-    process.env = { ...origEnv, SESSION_SECRET: SECRET, DASHBOARD_PASSWORD: PASSWORD };
+    process.env = {
+      ...origEnv,
+      SESSION_SECRET: SECRET,
+      DASHBOARD_PASSWORD: PASSWORD,
+    };
   });
   afterEach(() => {
     process.env = origEnv;
@@ -59,7 +67,9 @@ describe("proxy — timestamp token verification (P1.4)", () => {
   });
 
   it("old static token format (no timestamp) → redirect to /login", () => {
-    const oldToken = createHmac("sha256", SECRET).update("session").digest("hex");
+    const oldToken = createHmac("sha256", SECRET)
+      .update("session")
+      .digest("hex");
     const req = makeRequest("/dashboard", oldToken);
     const resp = proxy(req);
     expect(resp.headers.get("location")).toContain("/login");
