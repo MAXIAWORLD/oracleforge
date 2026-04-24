@@ -42,28 +42,31 @@ STEP 1 — Update your AI tool or app:
   Python / OpenAI SDK:
     client = openai.OpenAI(
         api_key="{api_key}",
-        base_url="https://llmbudget.maxiaworld.app/proxy/openai/v1",
+        base_url="{app_url}/proxy/openai/v1",
         default_headers={{"X-Provider-Key": "YOUR-OPENAI-KEY"}}
     )
 
   Cursor / n8n / any tool:
     API Key:  {api_key}
-    Base URL: https://llmbudget.maxiaworld.app/proxy/openai
+    Base URL: {app_url}/proxy/openai
 
   ⚠️  You keep your original OpenAI / Anthropic key.
   BudgetForge never stores it — you pass it as X-Provider-Key.
   BudgetForge only sees it to forward your request.
 
 STEP 2 — Set your spending limit:
-  Go to: https://llmbudget.maxiaworld.app/portal
+  Go to: {app_url}/portal
   Enter your email → get a magic link → open your dashboard.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+Full integration docs (LangChain, n8n, Cursor, curl):
+  {app_url}/docs
+
 Need help? Reply to this email — we respond within 24h.
 
 — The BudgetForge team
-https://llmbudget.maxiaworld.app
+{app_url}
 """
 
 
@@ -84,7 +87,10 @@ def send_onboarding_email(to: str, api_key: str, plan: str) -> bool:
     plan_label = _PLAN_LABELS.get(plan, plan)
     plan_details = _PLAN_DETAILS.get(plan, "")
     body = _BODY_TEMPLATE.format(
-        api_key=api_key, plan_label=plan_label, plan_details=plan_details
+        api_key=api_key,
+        plan_label=plan_label,
+        plan_details=plan_details,
+        app_url=settings.app_url,
     )
 
     msg = MIMEMultipart("alternative")
@@ -106,19 +112,19 @@ def send_onboarding_email(to: str, api_key: str, plan: str) -> bool:
         return False
 
 
-_DOWNGRADE_BODY = """\
+_DOWNGRADE_BODY_TEMPLATE = """\
 Your BudgetForge subscription has been cancelled.
 
 Your account has been downgraded to the Free plan (1,000 calls/month · 1 project).
 
 To resubscribe:
-  https://llmbudget.maxiaworld.app/#pricing
+  {app_url}/#pricing
 
 To access your projects via the portal:
-  https://llmbudget.maxiaworld.app/portal
+  {app_url}/portal
 
 — The BudgetForge team
-https://llmbudget.maxiaworld.app
+{app_url}
 """
 
 
@@ -129,11 +135,12 @@ def send_downgrade_email(to: str) -> bool:
         )
         return False
 
+    downgrade_body = _DOWNGRADE_BODY_TEMPLATE.format(app_url=settings.app_url)
     msg = MIMEMultipart("alternative")
     msg["Subject"] = "Your BudgetForge subscription has been cancelled"
     msg["From"] = settings.alert_from_email
     msg["To"] = to
-    msg.attach(MIMEText(_DOWNGRADE_BODY, "plain"))
+    msg.attach(MIMEText(downgrade_body, "plain"))
 
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:

@@ -19,7 +19,7 @@ router = APIRouter(tags=["proxy"])
 
 
 @router.post("/proxy/openai/v1/chat/completions")
-@limiter.limit("30/minute", "1000/hour")
+@limiter.limit("30/minute;1000/hour")
 async def proxy_openai(
     request: Request,
     payload: dict,
@@ -56,8 +56,10 @@ async def proxy_openai(
     )
 
 
+@limiter.limit("30/minute;1000/hour")
 @router.post("/proxy/anthropic/v1/messages")
 async def proxy_anthropic(
+    request: Request,
     payload: dict,
     authorization: Optional[str] = Header(None),
     x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
@@ -84,8 +86,10 @@ async def proxy_anthropic(
     )
 
 
+@limiter.limit("30/minute;1000/hour")
 @router.post("/proxy/google/v1/chat/completions")
 async def proxy_google(
+    request: Request,
     payload: dict,
     authorization: Optional[str] = Header(None),
     x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
@@ -118,8 +122,10 @@ async def proxy_google(
     )
 
 
+@limiter.limit("30/minute;1000/hour")
 @router.post("/proxy/deepseek/v1/chat/completions")
 async def proxy_deepseek(
+    request: Request,
     payload: dict,
     authorization: Optional[str] = Header(None),
     x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
@@ -152,8 +158,10 @@ async def proxy_deepseek(
     )
 
 
+@limiter.limit("30/minute;1000/hour")
 @router.post("/proxy/openrouter/v1/chat/completions")
 async def proxy_openrouter(
+    request: Request,
     payload: dict,
     authorization: Optional[str] = Header(None),
     x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
@@ -186,8 +194,46 @@ async def proxy_openrouter(
     )
 
 
+@limiter.limit("30/minute;1000/hour")
+@router.post("/proxy/mistral/v1/chat/completions")
+async def proxy_mistral(
+    request: Request,
+    payload: dict,
+    authorization: Optional[str] = Header(None),
+    x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
+    x_budgetforge_agent: Optional[str] = Header(None, alias="X-BudgetForge-Agent"),
+    db: Session = Depends(get_db),
+):
+    ctx = await proxy_dispatcher.prepare_request(
+        "mistral",
+        payload,
+        authorization,
+        x_provider_key,
+        x_budgetforge_agent,
+        db,
+        "mistral-large-latest",
+    )
+    if not ctx["forward_fn"]:
+        raise HTTPException(status_code=400, detail="Unsupported provider: mistral")
+    return await proxy_dispatcher.dispatch_openai_format(
+        ctx["payload"],
+        ctx["project"],
+        ctx["provider_name"],
+        ctx["final_model"],
+        ctx["usage_id"],
+        ctx["api_key"],
+        ctx["forward_fn"],
+        ctx["forward_stream_fn"],
+        ctx["timeout_s"],
+        ctx["db"],
+        ctx["max_retries"],
+    )
+
+
+@limiter.limit("60/minute;2000/hour")
 @router.post("/proxy/ollama/api/chat")
 async def proxy_ollama_chat(
+    request: Request,
     payload: dict,
     authorization: Optional[str] = Header(None),
     x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
@@ -208,8 +254,10 @@ async def proxy_ollama_chat(
     )
 
 
+@limiter.limit("60/minute;2000/hour")
 @router.post("/proxy/ollama/v1/chat/completions")
 async def proxy_ollama_openai(
+    request: Request,
     payload: dict,
     authorization: Optional[str] = Header(None),
     x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
@@ -230,8 +278,10 @@ async def proxy_ollama_openai(
     )
 
 
+@limiter.limit("30/minute;1000/hour")
 @router.post("/proxy/together/v1/chat/completions")
 async def proxy_together(
+    request: Request,
     payload: dict,
     authorization: Optional[str] = Header(None),
     x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
@@ -264,8 +314,10 @@ async def proxy_together(
     )
 
 
+@limiter.limit("30/minute;1000/hour")
 @router.post("/proxy/azure-openai/v1/chat/completions")
 async def proxy_azure_openai(
+    request: Request,
     payload: dict,
     authorization: Optional[str] = Header(None),
     x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),
@@ -300,8 +352,10 @@ async def proxy_azure_openai(
     )
 
 
+@limiter.limit("30/minute;1000/hour")
 @router.post("/proxy/aws-bedrock/v1/chat/completions")
 async def proxy_aws_bedrock(
+    request: Request,
     payload: dict,
     authorization: Optional[str] = Header(None),
     x_provider_key: Optional[str] = Header(None, alias="X-Provider-Key"),

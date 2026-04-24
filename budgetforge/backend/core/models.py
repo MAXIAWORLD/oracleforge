@@ -115,10 +115,21 @@ class SignupAttempt(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     ip = Column(String, nullable=False, index=True)
+    email_domain = Column(String, nullable=True, index=True)
     created_at = Column(
         DateTime,
         nullable=False,
         default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+
+
+class StripeEvent(Base):
+    __tablename__ = "stripe_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(String, unique=True, nullable=False, index=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
 
 

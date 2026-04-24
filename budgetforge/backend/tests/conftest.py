@@ -139,9 +139,11 @@ def _mock_api_keys(monkeypatch):
     monkeypatch.setattr(settings, "anthropic_api_key", "sk-ant-test")
     monkeypatch.setattr(settings, "google_api_key", "AIza-test")
     monkeypatch.setattr(settings, "deepseek_api_key", "sk-test-deepseek")
+    monkeypatch.setattr(settings, "mistral_api_key", "sk-mistral-test")
     monkeypatch.setattr(settings, "openrouter_api_key", "sk-or-test")
     monkeypatch.setattr(settings, "together_api_key", "sk-test-together")
     monkeypatch.setattr(settings, "portal_secret", "test-portal-secret")
+    monkeypatch.setattr(settings, "admin_api_key", "")  # dev mode for tests
 
 
 @pytest.fixture(autouse=True)

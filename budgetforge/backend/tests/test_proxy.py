@@ -1,8 +1,8 @@
 """TDD RED — Proxy layer: forward OpenAI/Anthropic/Ollama avec enforcement budget."""
+
 import pytest
-import json
 from httpx import AsyncClient, ASGITransport
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -32,8 +32,11 @@ def test_db():
 async def client(test_db):
     def override_get_db():
         yield test_db
+
     app.dependency_overrides[get_db] = override_get_db
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         yield ac
     app.dependency_overrides.clear()
 
@@ -43,7 +46,7 @@ async def project_with_budget(client):
     proj = (await client.post("/api/projects", json={"name": "proxy-test"})).json()
     await client.put(
         f"/api/projects/{proj['id']}/budget",
-        json={"budget_usd": 100.0, "alert_threshold_pct": 80, "action": "block"}
+        json={"budget_usd": 100.0, "alert_threshold_pct": 80, "action": "block"},
     )
     return proj
 
@@ -52,8 +55,10 @@ FAKE_OPENAI_RESPONSE = {
     "id": "chatcmpl-fake",
     "object": "chat.completion",
     "model": "gpt-4o",
-    "choices": [{"message": {"role": "assistant", "content": "Hello!"}, "finish_reason": "stop"}],
-    "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+    "choices": [
+        {"message": {"role": "assistant", "content": "Hello!"}, "finish_reason": "stop"}
+    ],
+    "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
 }
 
 FAKE_ANTHROPIC_RESPONSE = {
@@ -63,7 +68,7 @@ FAKE_ANTHROPIC_RESPONSE = {
     "content": [{"type": "text", "text": "Hello!"}],
     "model": "claude-sonnet-4-6",
     "stop_reason": "end_turn",
-    "usage": {"input_tokens": 10, "output_tokens": 5}
+    "usage": {"input_tokens": 10, "output_tokens": 5},
 }
 
 
@@ -73,14 +78,17 @@ class TestOpenAIProxy:
         api_key = project_with_budget["api_key"]
         payload = {
             "model": "gpt-4o",
-            "messages": [{"role": "user", "content": "Hello"}]
+            "messages": [{"role": "user", "content": "Hello"}],
         }
-        with patch("services.proxy_forwarder.ProxyForwarder.forward_openai", new_callable=AsyncMock) as mock_fwd:
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_openai",
+            new_callable=AsyncMock,
+        ) as mock_fwd:
             mock_fwd.return_value = FAKE_OPENAI_RESPONSE
             resp = await client.post(
                 "/proxy/openai/v1/chat/completions",
                 json=payload,
-                headers={"Authorization": f"Bearer {api_key}"}
+                headers={"Authorization": f"Bearer {api_key}"},
             )
         assert resp.status_code == 200
         assert resp.json()["choices"][0]["message"]["content"] == "Hello!"
@@ -89,7 +97,7 @@ class TestOpenAIProxy:
     async def test_proxy_openai_missing_api_key_returns_401(self, client):
         resp = await client.post(
             "/proxy/openai/v1/chat/completions",
-            json={"model": "gpt-4o", "messages": []}
+            json={"model": "gpt-4o", "messages": []},
         )
         assert resp.status_code == 401
 
@@ -98,73 +106,99 @@ class TestOpenAIProxy:
         resp = await client.post(
             "/proxy/openai/v1/chat/completions",
             json={"model": "gpt-4o", "messages": []},
-            headers={"Authorization": "Bearer bf-fake-key-xxxxxxx"}
+            headers={"Authorization": "Bearer bf-fake-key-xxxxxxx"},
         )
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_proxy_openai_budget_exceeded_block_returns_429(self, client, test_db):
+    async def test_proxy_openai_budget_exceeded_block_returns_429(
+        self, client, test_db
+    ):
         proj = (await client.post("/api/projects", json={"name": "over-budget"})).json()
         await client.put(
             f"/api/projects/{proj['id']}/budget",
-            json={"budget_usd": 0.0, "alert_threshold_pct": 80, "action": "block"}
+            json={"budget_usd": 0.0, "alert_threshold_pct": 80, "action": "block"},
         )
         api_key = proj["api_key"]
         resp = await client.post(
             "/proxy/openai/v1/chat/completions",
             json={"model": "gpt-4o", "messages": [{"role": "user", "content": "Hi"}]},
-            headers={"Authorization": f"Bearer {api_key}"}
+            headers={"Authorization": f"Bearer {api_key}"},
         )
         assert resp.status_code == 429
         assert "budget" in resp.json()["detail"].lower()
 
     @pytest.mark.asyncio
     async def test_proxy_openai_budget_exceeded_downgrade_swaps_model(self, client):
-        proj = (await client.post("/api/projects", json={"name": "downgrade-proj"})).json()
+        proj = (
+            await client.post("/api/projects", json={"name": "downgrade-proj"})
+        ).json()
         await client.put(
             f"/api/projects/{proj['id']}/budget",
-            json={"budget_usd": 0.0, "alert_threshold_pct": 80, "action": "downgrade"}
+            json={"budget_usd": 0.0, "alert_threshold_pct": 80, "action": "downgrade"},
         )
         api_key = proj["api_key"]
         captured = {}
+
         async def fake_forward(request_body, api_key, **kwargs):
             captured["model"] = request_body["model"]
             return FAKE_OPENAI_RESPONSE
 
-        with patch("services.proxy_forwarder.ProxyForwarder.forward_openai", new=fake_forward):
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_openai", new=fake_forward
+        ):
             await client.post(
                 "/proxy/openai/v1/chat/completions",
-                json={"model": "gpt-4o", "messages": [{"role": "user", "content": "Hi"}]},
-                headers={"Authorization": f"Bearer {api_key}"}
+                json={
+                    "model": "gpt-4o",
+                    "messages": [{"role": "user", "content": "Hi"}],
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
             )
         assert captured.get("model") == "gpt-4o-mini"
 
     @pytest.mark.asyncio
     async def test_proxy_records_usage_after_call(self, client, project_with_budget):
         api_key = project_with_budget["api_key"]
-        with patch("services.proxy_forwarder.ProxyForwarder.forward_openai", new_callable=AsyncMock) as mock_fwd:
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_openai",
+            new_callable=AsyncMock,
+        ) as mock_fwd:
             mock_fwd.return_value = FAKE_OPENAI_RESPONSE
             await client.post(
                 "/proxy/openai/v1/chat/completions",
-                json={"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]},
-                headers={"Authorization": f"Bearer {api_key}"}
+                json={
+                    "model": "gpt-4o",
+                    "messages": [{"role": "user", "content": "Hello"}],
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
             )
         resp = await client.get(f"/api/projects/{project_with_budget['id']}/usage")
         assert resp.json()["used_usd"] > 0.0
 
     @pytest.mark.asyncio
-    async def test_proxy_llm_down_returns_502_no_budget_deducted(self, client, project_with_budget):
+    async def test_proxy_llm_down_returns_502_no_budget_deducted(
+        self, client, project_with_budget
+    ):
         api_key = project_with_budget["api_key"]
-        with patch("services.proxy_forwarder.ProxyForwarder.forward_openai", new_callable=AsyncMock) as mock_fwd:
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_openai",
+            new_callable=AsyncMock,
+        ) as mock_fwd:
             mock_fwd.side_effect = Exception("Connection refused")
             resp = await client.post(
                 "/proxy/openai/v1/chat/completions",
-                json={"model": "gpt-4o", "messages": [{"role": "user", "content": "Hello"}]},
-                headers={"Authorization": f"Bearer {api_key}"}
+                json={
+                    "model": "gpt-4o",
+                    "messages": [{"role": "user", "content": "Hello"}],
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
             )
         assert resp.status_code == 502
         # Budget NE doit PAS être débité
-        usage = (await client.get(f"/api/projects/{project_with_budget['id']}/usage")).json()
+        usage = (
+            await client.get(f"/api/projects/{project_with_budget['id']}/usage")
+        ).json()
         assert usage["used_usd"] == 0.0
 
 
@@ -175,14 +209,17 @@ class TestAnthropicProxy:
         payload = {
             "model": "claude-sonnet-4-6",
             "max_tokens": 100,
-            "messages": [{"role": "user", "content": "Hello"}]
+            "messages": [{"role": "user", "content": "Hello"}],
         }
-        with patch("services.proxy_forwarder.ProxyForwarder.forward_anthropic", new_callable=AsyncMock) as mock_fwd:
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_anthropic",
+            new_callable=AsyncMock,
+        ) as mock_fwd:
             mock_fwd.return_value = FAKE_ANTHROPIC_RESPONSE
             resp = await client.post(
                 "/proxy/anthropic/v1/messages",
                 json=payload,
-                headers={"Authorization": f"Bearer {api_key}"}
+                headers={"Authorization": f"Bearer {api_key}"},
             )
         assert resp.status_code == 200
         assert resp.json()["content"][0]["text"] == "Hello!"
@@ -190,13 +227,19 @@ class TestAnthropicProxy:
     @pytest.mark.asyncio
     async def test_proxy_anthropic_records_usage(self, client, project_with_budget):
         api_key = project_with_budget["api_key"]
-        with patch("services.proxy_forwarder.ProxyForwarder.forward_anthropic", new_callable=AsyncMock) as mock_fwd:
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_anthropic",
+            new_callable=AsyncMock,
+        ) as mock_fwd:
             mock_fwd.return_value = FAKE_ANTHROPIC_RESPONSE
             await client.post(
                 "/proxy/anthropic/v1/messages",
-                json={"model": "claude-sonnet-4-6", "max_tokens": 100,
-                      "messages": [{"role": "user", "content": "Hi"}]},
-                headers={"Authorization": f"Bearer {api_key}"}
+                json={
+                    "model": "claude-sonnet-4-6",
+                    "max_tokens": 100,
+                    "messages": [{"role": "user", "content": "Hi"}],
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
             )
         resp = await client.get(f"/api/projects/{project_with_budget['id']}/usage")
         assert resp.json()["used_usd"] > 0.0
@@ -206,36 +249,53 @@ class TestAnthropicProxy:
         proj = (await client.post("/api/projects", json={"name": "ant-over"})).json()
         await client.put(
             f"/api/projects/{proj['id']}/budget",
-            json={"budget_usd": 0.0, "alert_threshold_pct": 80, "action": "block"}
+            json={"budget_usd": 0.0, "alert_threshold_pct": 80, "action": "block"},
         )
         resp = await client.post(
             "/proxy/anthropic/v1/messages",
-            json={"model": "claude-sonnet-4-6", "max_tokens": 100,
-                  "messages": [{"role": "user", "content": "Hi"}]},
-            headers={"Authorization": f"Bearer {proj['api_key']}"}
+            json={
+                "model": "claude-sonnet-4-6",
+                "max_tokens": 100,
+                "messages": [{"role": "user", "content": "Hi"}],
+            },
+            headers={"Authorization": f"Bearer {proj['api_key']}"},
         )
         assert resp.status_code == 429
 
 
 class TestProviderKey:
     @pytest.mark.asyncio
-    async def test_x_provider_key_is_forwarded_to_llm(self, client, project_with_budget):
+    async def test_x_provider_key_is_forwarded_to_llm(
+        self, client, project_with_budget
+    ):
         """X-Provider-Key envoyé → utilisé pour l'appel OpenAI (pas la clé settings)."""
         api_key = project_with_budget["api_key"]
-        with patch("services.proxy_forwarder.ProxyForwarder.forward_openai", new_callable=AsyncMock) as mock_fwd:
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_openai",
+            new_callable=AsyncMock,
+        ) as mock_fwd:
             mock_fwd.return_value = FAKE_OPENAI_RESPONSE
             await client.post(
                 "/proxy/openai/v1/chat/completions",
-                json={"model": "gpt-4o", "messages": [{"role": "user", "content": "Hi"}]},
-                headers={"Authorization": f"Bearer {api_key}", "X-Provider-Key": "sk-client-custom-key"},
+                json={
+                    "model": "gpt-4o",
+                    "messages": [{"role": "user", "content": "Hi"}],
+                },
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "X-Provider-Key": "sk-client-custom-key",
+                },
             )
         used_key = mock_fwd.call_args[0][1]
         assert used_key == "sk-client-custom-key"
 
     @pytest.mark.asyncio
-    async def test_missing_provider_key_no_settings_returns_400(self, client, project_with_budget, monkeypatch):
+    async def test_missing_provider_key_no_settings_returns_400(
+        self, client, project_with_budget, monkeypatch
+    ):
         """Pas de X-Provider-Key ET settings vide → 400."""
         from core.config import settings
+
         monkeypatch.setattr(settings, "openai_api_key", "")
         api_key = project_with_budget["api_key"]
         resp = await client.post(
@@ -246,14 +306,22 @@ class TestProviderKey:
         assert resp.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_settings_key_used_when_no_x_provider_key(self, client, project_with_budget):
+    async def test_settings_key_used_when_no_x_provider_key(
+        self, client, project_with_budget
+    ):
         """Sans X-Provider-Key, fallback sur la clé settings (mode actuel)."""
         api_key = project_with_budget["api_key"]
-        with patch("services.proxy_forwarder.ProxyForwarder.forward_openai", new_callable=AsyncMock) as mock_fwd:
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_openai",
+            new_callable=AsyncMock,
+        ) as mock_fwd:
             mock_fwd.return_value = FAKE_OPENAI_RESPONSE
             resp = await client.post(
                 "/proxy/openai/v1/chat/completions",
-                json={"model": "gpt-4o", "messages": [{"role": "user", "content": "Hi"}]},
+                json={
+                    "model": "gpt-4o",
+                    "messages": [{"role": "user", "content": "Hi"}],
+                },
                 headers={"Authorization": f"Bearer {api_key}"},
             )
         assert resp.status_code == 200
@@ -261,23 +329,108 @@ class TestProviderKey:
         assert used_key == "sk-test-openai"  # clé injectée par conftest
 
 
+FAKE_MISTRAL_RESPONSE = {
+    "id": "chatcmpl-mistral-fake",
+    "object": "chat.completion",
+    "model": "mistral-large-latest",
+    "choices": [
+        {
+            "message": {"role": "assistant", "content": "Bonjour!"},
+            "finish_reason": "stop",
+        }
+    ],
+    "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+}
+
+
+class TestMistralProxy:
+    @pytest.mark.asyncio
+    async def test_proxy_mistral_forwards_request(self, client, project_with_budget):
+        api_key = project_with_budget["api_key"]
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_mistral",
+            new_callable=AsyncMock,
+        ) as mock_fwd:
+            mock_fwd.return_value = FAKE_MISTRAL_RESPONSE
+            resp = await client.post(
+                "/proxy/mistral/v1/chat/completions",
+                json={
+                    "model": "mistral-large-latest",
+                    "messages": [{"role": "user", "content": "Bonjour"}],
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["choices"][0]["message"]["content"] == "Bonjour!"
+
+    @pytest.mark.asyncio
+    async def test_proxy_mistral_records_usage(self, client, project_with_budget):
+        api_key = project_with_budget["api_key"]
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_mistral",
+            new_callable=AsyncMock,
+        ) as mock_fwd:
+            mock_fwd.return_value = FAKE_MISTRAL_RESPONSE
+            await client.post(
+                "/proxy/mistral/v1/chat/completions",
+                json={
+                    "model": "mistral-large-latest",
+                    "messages": [{"role": "user", "content": "Hi"}],
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+        usage = (
+            await client.get(f"/api/projects/{project_with_budget['id']}/usage")
+        ).json()
+        assert usage["used_usd"] > 0.0
+
+    @pytest.mark.asyncio
+    async def test_proxy_mistral_budget_exceeded_returns_429(self, client):
+        proj = (
+            await client.post("/api/projects", json={"name": "mistral-over"})
+        ).json()
+        await client.put(
+            f"/api/projects/{proj['id']}/budget",
+            json={"budget_usd": 0.0, "alert_threshold_pct": 80, "action": "block"},
+        )
+        resp = await client.post(
+            "/proxy/mistral/v1/chat/completions",
+            json={
+                "model": "mistral-large-latest",
+                "messages": [{"role": "user", "content": "Hi"}],
+            },
+            headers={"Authorization": f"Bearer {proj['api_key']}"},
+        )
+        assert resp.status_code == 429
+
+
 class TestOllamaProxy:
     @pytest.mark.asyncio
-    async def test_proxy_ollama_counts_tokens_zero_cost(self, client, project_with_budget):
+    async def test_proxy_ollama_counts_tokens_zero_cost(
+        self, client, project_with_budget
+    ):
         api_key = project_with_budget["api_key"]
         fake_ollama_response = {
             "model": "llama3",
             "message": {"role": "assistant", "content": "Hi!"},
             "prompt_eval_count": 10,
-            "eval_count": 5
+            "eval_count": 5,
         }
-        with patch("services.proxy_forwarder.ProxyForwarder.forward_ollama", new_callable=AsyncMock) as mock_fwd:
+        with patch(
+            "services.proxy_forwarder.ProxyForwarder.forward_ollama",
+            new_callable=AsyncMock,
+        ) as mock_fwd:
             mock_fwd.return_value = fake_ollama_response
             await client.post(
                 "/proxy/ollama/api/chat",
-                json={"model": "llama3", "messages": [{"role": "user", "content": "Hi"}]},
-                headers={"Authorization": f"Bearer {api_key}"}
+                json={
+                    "model": "llama3",
+                    "messages": [{"role": "user", "content": "Hi"}],
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
             )
-        usage = (await client.get(f"/api/projects/{project_with_budget['id']}/usage")).json()
+        usage = (
+            await client.get(f"/api/projects/{project_with_budget['id']}/usage")
+        ).json()
         # Tokens comptés mais coût = $0
         assert usage["used_usd"] == 0.0
