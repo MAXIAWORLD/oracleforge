@@ -1,79 +1,61 @@
-# HANDOFF — BudgetForge (24 avril 2026 — fin de session encore-TDD)
+# HANDOFF — BudgetForge (24 avril 2026 — fin de session finition)
 
 ## État actuel
 
-**Backend "encore" : 6/7 fixes livrés TDD.** Prod à jour sauf déploiement (commit git fait, SCP pas encore).
+**BudgetForge vendable.** Prod live, tous les blocs sauf SDK PyPI terminés.
 
 ## Ce qui a été fait cette session
 
-### TDD strict — 6 cycles RED→GREEN
+| Tâche | Statut |
+|---|---|
+| Fix A : test_alerts budget ($0.0001→$0.001, gpt-4o pricing) | ✅ |
+| Fix B : token estimator conservative mode (`prebill` utilise ×2, min 512) | ✅ |
+| Test cassé `test_audit2_phase_b` (stripe_webhook_secret manquant dans patch) | ✅ |
+| Déploiement Fix A+B sur VPS (SCP + restart) | ✅ |
+| Backup daily SQLite (`budgetforge-backup.timer`, 03h00 UTC, rétention 7j) | ✅ |
+| QA golden path 28/28 ✓ en prod (`qa_golden_path.py` pointé sur prod) | ✅ |
 
-| Fix | Fichier(s) | Tests | Statut |
-|---|---|---|---|
-| #1 Budget lock cross-process | `distributed_budget_lock.py` | 4 | ✅ GREEN |
-| #2 Dynamic pricing bypass | `cost_calculator.py` | 6 | ✅ GREEN |
-| #3 Azure OpenAI TypeError | `proxy_forwarder.py` | 6 | ✅ GREEN |
-| #4 Reconcile idempotency + rate-limit | `billing.py` | 4 | ✅ GREEN |
-| #5 Cancel/finalize commit résilient | `proxy_dispatcher.py` | 5 | ✅ GREEN |
-| #6 SSRF webhook IP pinning | `url_validator.py` + `alert_service.py` | 4 | ✅ GREEN |
-
-**29 nouveaux tests** dans `tests/test_encore_fix[1-6]_*.py` — tous verts.
-
-### Détail des fixes
-
-- **Fix #1** : `fallback_budget_lock` utilise `fcntl.flock` (Linux, cross-process) au lieu de `asyncio.Lock` (in-process seulement). Windows garde `asyncio.Lock`.
-- **Fix #2** : `CostCalculator.get_price` priorité inversée — prix statiques `_PRICES` d'abord, dynamic pricing seulement pour modèles inconnus ET seulement si prix > 0.
-- **Fix #3** : `forward_azure_openai` et `forward_azure_openai_stream` : `base_url` retiré des params, lit `settings.azure_openai_base_url` en interne, lève `HTTPException(400)` si non configuré.
-- **Fix #4** : `reconcile_stripe_session` : `@limiter.limit("5/hour")` + `Request` param + idempotency via `StripeEvent(event_id=f"reconcile:{session_id}")` + rollback si Stripe error.
-- **Fix #5** : `cancel_usage` et `finalize_usage` : `db.commit()` enrobé `try/except + db.rollback()` — plus de 500 sur SQLite lock.
-- **Fix #6** : `alert_service.send_webhook` utilise `resolve_safe_host()` (nouveau dans `url_validator.py`) — DNS résolu une fois, IP pincée dans le POST, header `Host` preservé.
-
-## Ce qui reste (encore plan non terminé)
-
-### Token estimator (HAUT) — non fait
-Problème : `estimate_output_tokens` = heuristique ×0.75. Client sans `max_tokens` sur un gros prompt → estimate=75 tokens, réel potentiellement 8000. Prebill sous-facture → finalize arrive après overshoot possible.
-**Risque** : medium en pratique (2 workers, SQLite WAL, busy_timeout=30s absorbe une partie).
-**À faire** : TDD — écrire test `check_per_call_cap must not reject small calls but prebill must use safe upper bound`, puis corriger l'estimateur.
-
-### Test pré-existant cassé
-`tests/test_alerts.py::TestAlertTriggered::test_alert_sent_when_threshold_crossed` — FAIL avant cette session. Probablement lié au même problème token estimator (check_per_call_cap rejette le call avant que maybe_send_alert soit atteint).
-
-### Depuis le plan "encore" — non adressés (CRITIQUE, MOYEN)
-- **CRITIQUE** : `admin_api_key=""` par défaut + pas de fail-fast si `.env` manquant en prod (déjà géré dans main.py lifespan mais à vérifier)
-- **MOYEN** : `Usage.cost_usd` Float au lieu de Decimal
-- **MOYEN** : Portal cookie HMAC non révocable
-- **MOYEN** : Compteurs rate-limit per-worker × 2 non documenté
-
-## Fichiers modifiés (non commités)
+## Commits de cette session
 
 ```
-budgetforge/backend/services/distributed_budget_lock.py
-budgetforge/backend/services/cost_calculator.py
-budgetforge/backend/services/proxy_forwarder.py
-budgetforge/backend/routes/billing.py
-budgetforge/backend/services/proxy_dispatcher.py
-budgetforge/backend/core/url_validator.py
-budgetforge/backend/services/alert_service.py
-budgetforge/backend/tests/test_encore_fix1_budget_lock.py  (nouveau)
-budgetforge/backend/tests/test_encore_fix2_dynamic_pricing.py  (nouveau)
-budgetforge/backend/tests/test_encore_fix3_azure_dispatch.py  (nouveau)
-budgetforge/backend/tests/test_encore_fix4_reconcile.py  (nouveau)
-budgetforge/backend/tests/test_encore_fix5_resilient_commit.py  (nouveau)
-budgetforge/backend/tests/test_encore_fix6_ssrf_pinning.py  (nouveau)
+bedf731  fix(qa): point golden path at prod + fix strict-mode locators
+1b977e4  fix(tests): add missing stripe_webhook_secret patch in test_startup_no_warning
+3c98244  fix(budgetforge-backend): critique A+B — test_alerts budget + token estimator conservative
 ```
+
+## Ce qui reste
+
+### Bloc 6 — SDK PyPI (seul bloc ouvert)
+
+Packager et publier sur PyPI :
+- `budgetforge/sdk/budgetforge_sdk.py` → package `budgetforge`
+- `budgetforge/langchain_budgetforge/` → package `langchain-budgetforge`
+
+Étapes :
+1. Créer `budgetforge/sdk/pyproject.toml` (hatchling ou setuptools)
+2. `python -m build` → wheel + sdist
+3. `twine upload dist/*` (compte PyPI requis — token dans `.env` ou env var `TWINE_PASSWORD`)
+4. Même chose pour `langchain_budgetforge/`
+5. Mettre à jour README + docs avec `pip install budgetforge`
+
+### Turnstile (action Alexis)
+
+- Créer site sur https://dash.cloudflare.com → Turnstile
+- Ajouter `TURNSTILE_SITE_KEY` dans dashboard `.env.local` (VPS)
+- Ajouter `TURNSTILE_SECRET_KEY` dans backend `.env` (VPS)
+- Sans ça : signups bloqués en mode fail-closed (pas de régression fonctionnelle, juste pas de nouveaux signups via landing)
+
+## Infrastructure prod
+
+| Item | État |
+|---|---|
+| Backend (port 8011) | ✅ actif |
+| Dashboard (port 3011) | ✅ actif |
+| SSL Let's Encrypt | ✅ expire 2026-07-20 |
+| Backup daily SQLite | ✅ 03h00 UTC |
+| ENV vars prod | ✅ sauf TURNSTILE |
+| QA golden path | ✅ 28/28 |
 
 ## Prochaine action
 
-1. `git commit` des 6 fixes + 6 fichiers de tests
-2. Backup VPS : `ssh ubuntu@maxiaworld.app 'cp /opt/budgetforge/backend/budgetforge.db /opt/budgetforge/backend/budgetforge.db.bak.$(date +%Y%m%d_%H%M%S)'`
-3. SCP des 7 fichiers modifiés vers VPS
-4. `sudo systemctl restart budgetforge-backend`
-5. Curl health + test webhook
-6. Adresser token estimator (Fix manquant) — TDD obligatoire
-
-## Infrastructure prod
-- VPS : ubuntu@maxiaworld.app (146.59.237.43), port 8011
-- Dashboard : port 3011
-- SSL : Let's Encrypt, expire 2026-07-20
-- Backup cron : 03h00 UTC ✅
-- UptimeRobot : /health ✅
+Démarrer Bloc 6 — SDK PyPI. Vérifier si Alexis a un compte PyPI avant de commencer.
