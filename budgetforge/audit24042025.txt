@@ -1,0 +1,247 @@
+  Tableau des risques
+                                                                                                                          Gravité: CRITIQUE
+  Phase: 1                                                                                                                Composant: distributed_budget_lock.py + budget_lock.py
+  Problème: Pas de Redis → fallback asyncio.Lock() par process. Avec 2 workers uvicorn, chaque worker a son propre lock.
+
+    Rien ne sérialise le couple read used → insert prebill entre workers → budget bypass trivial avec 2 requêtes
+    quasi-simultanées sur projets épuisés.
+  ────────────────────────────────────────
+  Gravité: CRITIQUE
+  Phase: 2
+  Composant: portal.py:33
+  Problème: _portal_secret() fallback sur "portal-dev-secret" si settings.portal_secret=="". Aucun enforcement de
+    app_env=production. Si prod oublie PORTAL_SECRET → secret HMAC public, cookies forgeables → compromission  totale de
+
+    tous les portals clients.
+  ────────────────────────────────────────
+  Gravité: CRITIQUE
+  Phase: 2
+  Composant: core/auth.py:11-19,42-43
+  Problème: Dev mode (admin_api_key=="") active silencieusement le bypass total des écritures admin. app_env=production
+    existe mais n'est JAMAIS vérifié par require_admin/require_viewer. Oubli de set ADMIN_API_KEY en prod = toutes les
+    APIs /api/projects/* grandes ouvertes, y compris DELETE, PUT /budget, POST /rotate-key, /api/admin/stats.
+  ────────────────────────────────────────
+  Gravité: CRITIQUE
+  Phase: 1
+  Composant: proxy_dispatcher.py:239-240 + cost_calculator.py:76
+  Problème: Modèle inconnu → UnknownModelError attrapée → cost = 0.0 dans prebill_usage et finalize_usage. Attaquant
+    envoie "model":"evil-model-xyz" → proxy forward vers OpenAI (le provider le rejette) OU si model valide côté
+  provider
+     mais absent de _PRICES → appels infinis comptés à $0, budget jamais atteint. Le except (ValueError, Exception) dans
+
+    cost_calculator.get_price swallow aussi toute panne du pricing dynamique → tombe en static fallback ou lève → mais
+  le
+     caller mange tout.
+  ────────────────────────────────────────
+  Gravité: CRITIQUE
+  Phase: 1/2
+  Composant: cost_calculator.py:76 + dynamic_pricing.py:155
+  Problème: except (ValueError, Exception): capture absolument tout, y compris KeyboardInterrupt via parents, mais
+    surtout masque les bugs silencieusement. Pricing cassé = cost=0 invisible.
+  ────────────────────────────────────────
+  Gravité: HAUT
+  Phase: 4
+  Composant: SQLite + 2 workers
+  Problème: prebill_usage commit à chaque appel. Sous 10 requêtes simultanées → OperationalError: database is locked non
+
+    capturé → 500 générique, usage fantôme possible si le commit échoue entre INSERT et transaction finale. Aucun
+    busy_timeout configuré visible.
+  ────────────────────────────────────────
+  Gravité: HAUT
+  Phase: 2
+  Composant: portal.py:36-49,180-205
+  Problème: Cookie session 90 jours signé HMAC sur email seul. Aucun timestamp, aucun token id, aucune révocation
+    possible. Rotation de clé portal compromet tous les cookies d'un coup (forcée mais pas bouton). Cookie volé =  accès
+
+    90 jours garantis.
+  ────────────────────────────────────────
+  Gravité: HAUT
+  Phase: 2
+  Composant: billing.py:95-145
+  Problème: Aucune trace du event.id Stripe dans la DB. Replay d'un webhook signé trahi (ex: admin qui fuite un log)
+    recrée/reproject. L'idempotence sur subscription_id couvre le happy path seulement. Pas de table
+    stripe_events_processed.
+  ────────────────────────────────────────
+  Gravité: HAUT
+  Phase: 4
+  Composant: billing.py + success page
+  Problème: Si webhook perdu (réseau VPS down, signature secret mal configuré) → client payé chez Stripe, aucun projet
+    créé. /success ne poll pas /api/projects/by-session, ne fait aucune réconciliation. Stripe retries mais abandonne au
+
+    bout de 3 jours.
+  ────────────────────────────────────────
+  Gravité: HAUT
+  Phase: 2
+  Composant: core/limiter.py + routes/proxy.py
+  Problème: Rate limit uniquement sur /proxy/openai (30/min, 1000/h). Autres proxys (anthropic, google, deepseek,
+    mistral, openrouter, together, azure, bedrock, ollama) aucun limit. Un client avec bf-xxx valide peut spam Anthropic
+
+    à vitesse max. Limit par IP → rotation triviale (Tor, VPN cloud, IPv6 /64).
+  ────────────────────────────────────────
+  Gravité: HAUT
+  Phase: 2
+  Composant: signup.py:24-52
+  Problème: 3 signups/jour/IP = 1000 comptes free faisables avec 334 IPs (€5 VPN cloud). Aucun captcha. Chaque free =
+    1000 calls/mois gratos avec X-Provider-Key du pigeon.
+  ────────────────────────────────────────
+  Gravité: HAUT
+  Phase: 1
+  Composant: proxy_dispatcher.py:83-93
+  Problème: check_provider : si allowed_providers contient du JSON invalide → except json.JSONDecodeError: return =
+    fail-open. Corruption DB ou migration ratée → tous providers autorisés silencieusement. Même pattern downgrade_chain
+
+    L116.
+  ────────────────────────────────────────
+  Gravité: HAUT
+  Phase: 4
+  Composant: budget_guard.py:55-75 + proxy_dispatcher.py:109-132
+  Problème: Budget check lit used SQL, puis décide allowed. Entre le check et prebill_usage commit → fenêtre pour race
+    (cf. CRITIQUE #1). De plus max_cost_per_call_usd est optionnel → overshoot illimité : 1 call peut coûter $500  si
+  non
+     configuré, dépassant un budget de $10.
+  ────────────────────────────────────────
+  Gravité: MOYEN
+  Phase: 1
+  Composant: proxy_dispatcher.py:269-275
+  Problème: finalize_usage lance un UPDATE non-transactionnel séparé du prebill. Si le service crashe entre prebill
+    commit et finalize → le row reste à l'estimation (potentiellement fausse, surestimée ou sous-estimée). Aucun flag
+    finalized=bool pour audit.
+  ────────────────────────────────────────
+  Gravité: MOYEN
+  Phase: 2
+  Composant: url_validator.py:42-45
+  Problème: DNS rebinding : is_safe_webhook_url résout au moment de la création du projet. Rien ne re-résout à chaque
+    send_webhook. Attaquant configure un domaine qui résout 1.1.1.1 puis flip vers 127.0.0.1 → SSRF différée. Webhook
+    callback peut hit metadata cloud interne.
+  ────────────────────────────────────────
+  Gravité: MOYEN
+  Phase: 3
+  Composant: dashboard/page.tsx:436-445
+  Problème: Backend down → catch { /* ignore */ } → UI muette, pas de bannière, pas de retry, pas d'explication. User
+    voit dashboard vide et conclut "produit cassé".
+  ────────────────────────────────────────
+  Gravité: MOYEN
+  Phase: 2
+  Composant: portal.py:84-87
+  Problème: smtplib.SMTP + starttls() sans vérification de certificat (default = aucune). MITM possible entre VPS et
+    serveur SMTP → magic links exfiltrables. Devrait utiliser SMTP_SSL ou contexte TLS strict.
+  ────────────────────────────────────────
+  Gravité: MOYEN
+  Phase: 2
+  Composant: plan_quota.py:39
+  Problème: db.query(Project).filter(Project.name == owner_email).count() assume name == email pour free. Mais
+    routes/projects.py:201 laisse créer un projet avec n'importe quel name via admin. Un admin qui nomme un projet
+    "victim@x.com" pollue la limite free de ce email.
+  ────────────────────────────────────────
+  Gravité: MOYEN
+  Phase: 1
+  Composant: proxy_dispatcher.py:265-270
+  Problème: finalize_usage extraie tokens_in/out du body ; sur streams Anthropic si le provider envoie message_delta
+  sans
+    usage mais avec got_usage=True depuis message_start → tokens_out=0, coût sous-estimé de la sortie complète.
+  ────────────────────────────────────────
+  Gravité: MOYEN
+  Phase: 4
+  Composant: Scénario 2 — overshoot
+  Problème: Budget $1.00, last appel estimé $0.01 passe, coûte réellement $10 → usage row à $10.01, next call bloqué.
+    L'overshoot est déjà consommé, le client paye le provider pour un budget déjà dépassé. Pas de circuit-breaker
+    mid-call ni de chunked billing pour streams longs.
+  ────────────────────────────────────────
+  Gravité: MOYEN
+  Phase: 2
+  Composant: routes/projects.py:201-216
+  Problème: Project.name = champ libre côté admin, égal à email côté signup. Aucun échappement visible dans le dashboard
+
+    (lu React donc protégé par défaut), mais tout rendu dangerouslySetInnerHTML ou attribut d'URL construit à partir de
+    p.name serait XSS. Fragilité latente.
+  ────────────────────────────────────────
+  Gravité: BAS
+  Phase: 2
+  Composant: proxy_dispatcher.py:65-79
+  Problème: Timing attack sur bf-xxx via SQL index lookup. API keys = 256 bits d'entropie secrets.token_urlsafe(32) →
+  non
+    exploitable en pratique, mais grace period previous_api_key ajoute un 2e lookup seulement si le premier miss →
+    différence de timing observable.
+  ────────────────────────────────────────
+  Gravité: BAS
+  Phase: —
+  Composant: racine repo
+  Problème: Fichier budgetforge/backend/=1.13 et missionforge/backend/=1.13 dans git status → artefacts de pip install
+    package>=1.13 mal interprété. Cosmétique mais révèle désordre.
+
+  Ce qui est solide
+
+  1. SSRF proxy : les URLs providers sont hardcodées dans proxy_forwarder.py. X-Provider-Key n'est jamais interprétée
+  comme URL. OK.
+  2. Signature Stripe webhook : stripe.Webhook.construct_event est utilisé correctement, 400 sur mismatch.
+  3. SQL injection : 100% via ORM SQLAlchemy avec filter(Column == value). Aucune raw query détectée.
+  4. Isolation via bf-key : un client ne peut PAS lire les projets d'un autre via sa bf-xxx — elle sert au proxy, pas
+  aux APIs admin/portal.
+  5. Portal magic link : token 256 bits, TTL 1h, usage unique (delete on verify), HTTPOnly+SameSite=lax+Secure si https.
+
+  Correctifs prioritaires
+
+  1. distributed_budget_lock.py + budget_lock.py (CRITIQUE)
+  → Avec 2 workers uvicorn sans Redis, la sérialisation inter-process n'existe pas.
+  → Option A : installer Redis (obligatoire en prod multi-worker).
+  → Option B : remplacer le lock asyncio par un verrou SQL : SELECT ... FOR UPDATE sur la row project AVANT le check, ou
+   advisory lock SQLite via BEGIN IMMEDIATE. SQLite WAL + busy_timeout=30000 + transaction IMMEDIATE sérialisent les
+  écritures entre processus.
+  → Option C : passer à 1 worker uvicorn (dégrade le throughput mais élimine la classe entière).
+  → Ajouter CHECK SQL côté DB : trigger qui refuse un INSERT si la somme dépasserait budget, atomique avec le SELECT de
+  sommation — zéro race possible.
+
+  2. core/config.py + portal.py + core/auth.py (CRITIQUE)
+  → Ajouter au startup de app.py : si app_env=="production" ET (admin_api_key=="" OR portal_secret=="" OR
+  stripe_webhook_secret=="") → raise à l'import, refus de boot. Aucun dev mode silencieux en prod possible.
+  → Supprimer le fallback "portal-dev-secret". En dev, exiger que l'env var soit posée explicitement même à "dev".
+
+  3. proxy_dispatcher.py:239-240 + cost_calculator.py:76 (CRITIQUE)
+  → Si UnknownModelError lors de prebill → refuser l'appel avec HTTP 400 "Unknown model, configure pricing first", pas
+  cost=0.0.
+  → Remplacer except (ValueError, Exception) par except UnknownModelError as e: raise (ou logging warning explicite).
+  → Les provider APIs ne valident pas tous le nom de modèle comme invalide (certains proxy-routent) — la compta doit
+  refuser par défaut.
+
+  4. services/cost_calculator.py:76 et dynamic_pricing.py (CRITIQUE)
+  → Remplacer except (ValueError, Exception) par exceptions spécifiques. Laisser les vraies pannes (réseau, timeout
+  httpx) remonter pour qu'on ne serve pas à $0.
+
+  5. Rate limiting asymétrique (HAUT)
+  → Appliquer @limiter.limit("30/minute;1000/hour") sur TOUS les endpoints proxy, pas juste /proxy/openai.
+  → Ajouter une key_func qui combine IP ET bf-api-key : lambda req: req.headers.get("authorization","") or
+  get_remote_address(req). Empêche rotation IP de contourner.
+
+  6. Signup anti-abuse (HAUT)
+  → Ajouter un captcha (hCaptcha/Turnstile) sur /api/signup/free. 3/j/IP est ridicule face à un VPN.
+  → Ou limiter par hash(email+domaine) : pas plus de 3 comptes par domaine sans validation humaine.
+
+  7. Stripe idempotence + réconciliation (HAUT)
+  → Table processed_stripe_events(event_id PRIMARY KEY, created_at). Au début de /webhook/stripe, INSERT OR IGNORE puis
+  vérifier rowcount — skip si déjà vu.
+  → Sur /success?session_id=X, fetch stripe.checkout.Session.retrieve(X) côté backend et créer le projet si absent
+  (idempotent). Ne plus dépendre uniquement du webhook.
+
+  8. Portal cookie révocable (HAUT)
+  → Ajouter iat (issued-at) dans le payload signé : email.iat.sig. Refuser si iat < portal_session_invalidated_at
+  (colonne SiteSetting globale, ou per-user).
+  → Ou stocker chaque session dans DB avec un id révocable, et mettre l'id dans le cookie (signé).
+
+  9. check_provider fail-open sur JSON corrompu (HAUT)
+  → except json.JSONDecodeError: raise HTTPException(500, "Project config corrupted") plutôt que return. Même chose pour
+   downgrade_chain. Fail-closed, pas fail-open sur décision de sécurité.
+
+  10. SQLite locked 500 (HAUT)
+  → create_engine(..., connect_args={"check_same_thread": False, "timeout": 30}) + PRAGMA journal_mode=WAL au startup.
+  Middleware FastAPI qui attrape OperationalError et retry 3× avec jitter avant de 503.
+
+  11. SSRF DNS rebinding (MOYEN→HAUT si client sensible)
+  → Re-résoudre l'hostname au moment de l'envoi du webhook, vérifier que l'IP résolue n'est pas dans _BLOCKED_NETWORKS
+  juste avant le httpx.post. Coût : 1 DNS lookup par alerte.
+
+  12. Stripe webhook perdu (HAUT)
+  → Sur /success?session_id=X, faire un appel côté backend qui appelle stripe.checkout.Session.retrieve(X), vérifie
+  payment_status=="paid", et upsert le projet si absent. Le client paye, la page /success GARANTIT la création, le
+  webhook devient juste un fallback async.
+
+  Ship-blockers absolus : 1, 2, 3, 4. Tant que ces 4 ne sont pas fixés, le produit n'est pas prod-ready.

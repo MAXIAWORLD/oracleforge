@@ -1,0 +1,143 @@
+SESSION BUDGETFORGE — RESTAURATION (session précédente a cassé la prod)
+
+  ## Contexte
+                                                                                                                          Je suis Alexis (fondateur MAXIA). BudgetForge est en prod sur
+  https://llmbudget.maxiaworld.app. La session précédente (Opus 4.7 BIG CONTEXT,                                          2026-04-22 12h-14h) a écrasé la landing prod via un rsync sans backup.
+  AUCUNE source de vérité exacte : pas de snapshot OVH, pas de Windows VSS,
+  pas de copie locale. Il faut reconstruire à partir des composants déjà
+  présents dans le repo. Ne code PAS avant d'avoir lu les mémoires et ce prompt.
+
+  ## 1) Mémoires à lire d'abord (ordre strict)
+
+  Chemin : ~/.claude/projects/C--Users-Mini-pc-Desktop-MAXIA-Lab/memory/
+
+  1. project_budgetforge_progress.md  (prod, conventions, deploy)
+  2. project_budgetforge_audit_plan.md (P1→P6 DONE)
+  3. project_budgetforge_audit2_plan.md (A→E DONE session précédente)
+  4. project_budgetforge_landing_todo.md (7 TODO landing pricing)
+  5. feedback_never_lie.md, feedback_audit_before_shipping.md,
+     feedback_ship_only_when_complete.md
+
+  ## 2) État des lieux à 2026-04-22 14h
+
+  - Prod = commit 49739ff (branch main)
+  - 14 commits ajoutés par la session précédente, tous sur GitHub
+  - Landing /opt/budgetforge/dashboard/app/page.tsx = version minimaliste
+    du repo (hero basique + 6 features + CTA Try Demo). Version riche
+    pré-incident PERDUE — non-git, non-backup.
+  - Dashboard prod (pages admin, portal, projects, settings, clients) :
+    intact, pas touché par l'incident.
+  - Backend : fonctionnel, /health retourne ok. Nouvelles auths sur
+    /api/models et /api/usage/history (peut casser UI si pas adaptée).
+  - HSTS 1h (pas 1 an), security headers actifs.
+  - deploy.sh rsync SANS backup préalable → bug à corriger AVANT tout deploy.
+
+  ## 3) Composants prêts à assembler (déjà dans main)
+
+  dashboard/components/
+    nav-bar.tsx              (Logo + links How/Pricing/Demo + My keys CTA)
+    free-signup-form.tsx     (email input → POST /api/signup/free)
+    quick-setup-landing.tsx  (tabs Cursor/n8n/Python/Any + proxy URLs)
+    pricing-section.tsx      (3 plans Free/Pro/Agency + billing toggle
+                              Monthly/Annual + trust signals StripeLogo
+                              + pills providers)
+    quick-integration.tsx    (composant portal, PAS pour la landing)
+    confirm-dialog.tsx       (modal destructive, PAS pour la landing)
+
+  Tous typés, testés (backend/tests/test_landing_polish.py = 17 tests verts).
+
+  ## 4) Plan de restauration — exécuter dans l'ordre
+
+  ### Étape 1 — Garde-fou deploy avant TOUT
+  Modifier docs/deploy/deploy.sh pour ajouter AVANT le rsync :
+    BAK="/opt/budgetforge.bak-$(date +%Y%m%d-%H%M%S)"
+    sudo cp -a /opt/budgetforge "$BAK"
+    ls -1dt /opt/budgetforge.bak-* | tail -n +6 | xargs -r sudo rm -rf
+  Commit isolé : `chore(deploy): auto-backup before rsync (retention 5)`.
+
+  ### Étape 2 — Composer dashboard/app/page.tsx
+  Structure obligatoire, dans cet ordre :
+
+    1. <NavBar />
+    2. <section id="hero">
+         badge "Hard budget limits for LLM APIs"
+         h1 "Stop unexpected LLM API bills" (amber sur 2e ligne)
+         p "BudgetForge sits between your code and the LLM APIs..."
+         <FreeSignupForm />   (CTA primaire)
+         liens secondaires : Try demo, View on GitHub
+       </section>
+    3. <div id="how"><QuickSetupLanding /></div>
+    4. <section> "Everything you need" + 6 cards features
+       (Hard Limits, Per-Project Budgets, Auto-Downgrade, Alerts,
+        Usage Export, Team Members)
+    5. <PricingSection />
+    6. CTA final amber "Get my free key →" (ancre #hero) + "See dashboard"
+    7. Footer mini (open source, My keys, Contact)
+
+  Textes exacts disponibles dans les anciens page.tsx du git (fe3caaa et
+  897fc66). Couleurs via CSS vars : --amber, --background, --foreground,
+  --card, --border. Pas de `var(--muted)` pour les textes (c'est le fond) —
+  utiliser "#c8d8e8" (gris bleu lisible).
+
+  ### Étape 3 — Validation locale obligatoire
+    cd dashboard && npm run dev
+    Ouvrir http://localhost:3011 — vérifier visuellement :
+    - NavBar affiche logo + liens + bouton "My keys"
+    - Hero avec input email fonctionnel
+    - Tabs Cursor/n8n/Python/Any qui changent les steps
+    - 6 features cards
+    - 3 plans pricing avec toggle Monthly/Annual
+    - Bouton "Try Free" sur plan Free va vers /portal (pas scroll #hero)
+    - Bouton "Get Pro" / "Get Agency" affichent spinner Loader2 au click
+    - Footer avec lien GitHub, My keys, Contact
+
+  ATTENDRE ma validation visuelle (screenshots) AVANT de commit.
+
+  ### Étape 4 — Commit + push
+  Un seul commit isolé : `fix(landing): restore rich composition (navbar +
+  signup hero + quick-setup + pricing + footer)`.
+
+  ### Étape 5 — Deploy avec backup actif
+  Sur le VPS :
+    cd ~/budgetforge-deploy && git pull origin main
+    bash docs/deploy/deploy.sh
+  Vérifier logs : ligne "Backup current deploy to /opt/budgetforge.bak-*"
+  doit apparaître. Sinon STOP immédiatement.
+
+  ### Étape 6 — Smoke test live
+    curl https://llmbudget.maxiaworld.app/health → {"status":"ok"...}
+    curl -I https://llmbudget.maxiaworld.app/ → 200
+    Ouvrir https://llmbudget.maxiaworld.app/ dans navigateur
+    Vérifier que la landing rendue correspond au rendu local Étape 3.
+
+  ## 5) Règles strictes
+
+  - JAMAIS rsync sans backup préalable (deploy.sh doit être à jour)
+  - JAMAIS commit sans `npm run dev` + validation Alexis
+  - Si incertain à >10 % → poser la question, ne pas deviner
+  - Next.js 16 = proxy.ts (PAS middleware.ts). Ne pas refaire cette erreur.
+  - datetime : garder le style `datetime.utcnow()` (voir P6.3 de l'audit)
+  - Ne PAS toucher au backend dans cette session (la landing d'abord)
+
+  ## 6) Risques backend identifiés (à tester APRÈS la landing)
+
+  Les endpoints suivants ont été protégés par auth par l'audit #2. Vérifier
+  que l'UI dashboard envoie bien la clé admin :
+  - GET /api/models → require_viewer
+  - GET /api/usage/history → require_viewer + cap 500 sans project_id
+  - GET /api/usage/export sans project_id + clé viewer → 400
+
+  Si l'UI prod est cassée → adapter l'UI (ajouter la clé), pas revert l'audit.
+
+  ## 7) Première action attendue de toi
+
+  1. Lire les 5 mémoires ci-dessus (§1)
+  2. Lire dashboard/components/{nav-bar,free-signup-form,quick-setup-landing,
+     pricing-section}.tsx pour comprendre les APIs
+  3. Faire Étape 1 (garde-fou deploy.sh) — 1 commit isolé
+  4. Proposer Étape 2 (composition page.tsx) en me montrant le plan avant
+     d'écrire quoi que ce soit
+  5. Sur validation, coder, npm run dev, screenshots, ma validation, commit,
+     deploy.
+
+  Ne fais PAS plus d'une étape à la fois. Confirme entre chaque.

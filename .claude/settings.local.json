@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh ubuntu@maxiaworld.app 'ls /var/lib/letsencrypt/.certbot.lock 2>/dev/null || echo \"done\"')",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(taskkill *)",
+      "PowerShell(Get-Process | Where-Object { $_.Id -in @\\(9544, 14708, 13212, 18884, 20960\\) } | Select-Object Id, Name, MainWindowTitle)",
+      "PowerShell(curl *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(wmic process where \"ProcessId=13212\" get ProcessId, Name, CommandLine 2>&1)",
+      "PowerShell(Get-CimInstance *)",
+      "PowerShell(vssadmin list *)"
+    ]
+  }
+}
