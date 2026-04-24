@@ -22,7 +22,7 @@ I built MAXIA Oracle, a price data feed designed specifically for AI agents and 
 **Integration:**
 ```bash
 pip install maxia-oracle          # Python SDK
-npm install @maxia/oracle         # TypeScript SDK
+npm install @maxia-marketplace/oracle         # TypeScript SDK
 # Or use the MCP server directly in Claude Desktop / Cursor / Zed
 ```
 
@@ -45,7 +45,7 @@ The key thing: every price response includes a **confidence score + inter-source
 
 - 91 symbols (crypto + equities + forex)
 - MCP server live at `oracle.maxiaworld.app/mcp/sse`
-- `pip install maxia-oracle` / `npm install @maxia/oracle`
+- `pip install maxia-oracle` / `npm install @maxia-marketplace/oracle`
 - Free: 100 req/day, no signup
 
 Data feed only — not investment advice, no custody, no KYC.
@@ -73,7 +73,7 @@ Plus: price history, alerts, SSE streaming.
 4/ Works with every agent framework:
 - MCP server (Claude Desktop, Cursor, Zed)
 - `pip install maxia-oracle`
-- `npm install @maxia/oracle`
+- `npm install @maxia-marketplace/oracle`
 - langchain / crewai / autogen / llama-index / eliza plugins
 
 5/ Free tier: 100 req/day. No email. No credit card. Just:

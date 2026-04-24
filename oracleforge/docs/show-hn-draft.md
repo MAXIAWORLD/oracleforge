@@ -21,7 +21,7 @@ I built a price data feed specifically designed for AI agents and MCP clients.
 
 - MCP server at `https://oracle.maxiaworld.app/mcp/sse` — works with Claude Desktop, Cursor, Continue, Zed
 - Python SDK: `pip install maxia-oracle`
-- TypeScript SDK: `npm install @maxia/oracle`
+- TypeScript SDK: `npm install @maxia-marketplace/oracle`
 - Plugins: `langchain-maxia-oracle`, `crewai-tools-maxia-oracle`, `autogen-maxia-oracle`, `llama-index-tools-maxia-oracle`
 - x402 micropayments on Base (pay-per-call for agents without API keys)
 
