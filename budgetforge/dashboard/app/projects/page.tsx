@@ -139,6 +139,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectWithUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ show: boolean; message: string }>({
     show: false,
     message: "",
@@ -172,16 +173,32 @@ export default function ProjectsPage() {
   }, []);
 
   async function handleCreate(name: string) {
-    const created = await api.projects.create(name);
-    setProjects((prev) => [...prev, { ...created, usage: null }]);
-    showToast(`Project "${name}" created`);
-    refresh();
+    try {
+      const created = await api.projects.create(name);
+      setProjects((prev) => [...prev, { ...created, usage: null }]);
+      showToast(`Project "${name}" created`);
+      refresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to create project";
+      showToast(msg);
+      throw e;
+    }
   }
 
   async function handleDelete(id: number) {
+    if (deletingId !== null) return;
     if (!confirm("Delete this project and all its usage history?")) return;
-    await api.projects.delete(id);
-    await refresh();
+    setDeletingId(id);
+    try {
+      await api.projects.delete(id);
+      showToast("Project deleted");
+      await refresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to delete project";
+      showToast(msg);
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -304,7 +321,8 @@ export default function ProjectsPage() {
                       </Link>
                       <button
                         onClick={() => handleDelete(p.id)}
-                        className="p-1.5 rounded-md text-[--muted-fg] hover:text-red-400 hover:bg-red-500/10 transition-all"
+                        disabled={deletingId === p.id}
+                        className="p-1.5 rounded-md text-[--muted-fg] hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                         title="Delete"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

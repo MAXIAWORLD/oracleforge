@@ -15,7 +15,12 @@ import {
 import { useEffect, useState } from "react";
 import { Shell } from "@/components/shell";
 import { Toast } from "@/components/toast";
-import { api, type SiteSettings } from "@/lib/api";
+import {
+  api,
+  type SiteSettings,
+  getStoredAdminKey,
+  setStoredAdminKey,
+} from "@/lib/api";
 
 const PROVIDERS = [
   {
@@ -58,6 +63,18 @@ const PROVIDERS = [
     models: ["deepseek-chat", "deepseek-reasoner"],
     color: "#5c67f2",
     note: "Required for /proxy/deepseek (OpenAI-compat endpoint)",
+  },
+  {
+    name: "Mistral",
+    env: "MISTRAL_API_KEY",
+    models: [
+      "mistral-large-latest",
+      "mistral-small-latest",
+      "mistral-nemo",
+      "codestral-latest",
+    ],
+    color: "#f54e42",
+    note: "Required for /proxy/mistral (OpenAI-compat endpoint)",
   },
   {
     name: "Ollama",
@@ -141,6 +158,12 @@ const PROXY_ENDPOINTS = [
     method: "POST",
     path: "/proxy/deepseek/v1/chat/completions",
     provider: "DeepSeek",
+    note: "OpenAI-compat",
+  },
+  {
+    method: "POST",
+    path: "/proxy/mistral/v1/chat/completions",
+    provider: "Mistral",
     note: "OpenAI-compat",
   },
   {
@@ -409,11 +432,94 @@ function SmtpForm({ onSaved }: { onSaved: () => void }) {
   );
 }
 
+function AdminAccessForm({ onSaved }: { onSaved: () => void }) {
+  const [key, setKey] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setKey(getStoredAdminKey());
+  }, []);
+
+  function save() {
+    setStoredAdminKey(key.trim());
+    setSaved(true);
+    onSaved();
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  function clear() {
+    setStoredAdminKey("");
+    setKey("");
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    background: "var(--background)",
+    border: "1px solid var(--border)",
+    borderRadius: 6,
+    padding: "6px 10px",
+    fontSize: 12,
+    fontFamily: "var(--font-jetbrains, monospace)",
+    color: "var(--foreground)",
+    outline: "none",
+  };
+
+  return (
+    <div className="px-5 py-4 flex flex-col gap-4">
+      <p className="text-xs text-[--muted-fg]">
+        Stored in your browser only — never sent to any server except as an auth
+        header to this API.
+      </p>
+      <div className="flex gap-2">
+        <input
+          style={inputStyle}
+          type="password"
+          placeholder="06a8b2…"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && save()}
+        />
+        <button
+          onClick={save}
+          className="px-3 py-1.5 rounded text-xs font-600 shrink-0"
+          style={{
+            background: saved
+              ? "rgba(34,197,94,0.15)"
+              : "rgba(245,158,11,0.12)",
+            color: saved ? "#22c55e" : "var(--amber)",
+            border: `1px solid ${saved ? "rgba(34,197,94,0.3)" : "rgba(245,158,11,0.3)"}`,
+          }}
+        >
+          {saved ? "Saved" : "Save"}
+        </button>
+        {key && (
+          <button
+            onClick={clear}
+            className="px-3 py-1.5 rounded text-xs font-600 shrink-0"
+            style={{
+              background: "rgba(239,68,68,0.1)",
+              color: "#ef4444",
+              border: "1px solid rgba(239,68,68,0.3)",
+            }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [toast, setToast] = useState<{ show: boolean; message: string }>({
     show: false,
     message: "",
   });
+  const [adminKeyMissing, setAdminKeyMissing] = useState(false);
+
+  useEffect(() => {
+    setAdminKeyMissing(!getStoredAdminKey());
+  }, []);
 
   return (
     <Shell>
@@ -434,7 +540,46 @@ export default function SettingsPage() {
           </p>
         </motion.div>
 
+        {adminKeyMissing && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-5 flex items-start gap-3 px-4 py-3 rounded-md border border-red-500/30 bg-red-500/10"
+          >
+            <Info className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-700 text-red-400 mb-1">Admin key required</p>
+              <p className="text-xs text-[--muted-fg]">
+                No admin key is configured in this browser. Most settings
+                endpoints will return 401. Paste your admin key in the Admin
+                Access section below.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         <div className="flex flex-col gap-5">
+          {/* Admin Access */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card-base overflow-hidden"
+          >
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-[--border]">
+              <Key className="w-4 h-4 text-[--amber]" />
+              <h2 className="font-heading font-700 text-sm">Admin Access</h2>
+            </div>
+            <AdminAccessForm
+              onSaved={() => {
+                setAdminKeyMissing(!getStoredAdminKey());
+                setToast({
+                  show: true,
+                  message: "Admin key saved — dashboard unlocked",
+                });
+              }}
+            />
+          </motion.div>
+
           {/* Info banner */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}

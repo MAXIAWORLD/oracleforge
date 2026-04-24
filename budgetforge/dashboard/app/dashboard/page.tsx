@@ -405,6 +405,7 @@ export default function OverviewPage() {
   const [breakdown, setBreakdown] = useState<UsageBreakdown | null>(null);
   const [dailySpend, setDailySpend] = useState<DailySpend[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [period, setPeriod] = useState<Period>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -415,37 +416,42 @@ export default function OverviewPage() {
     setSiteOrigin(window.location.origin);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [list, bd] = await Promise.all([
-          api.projects.list(),
-          api.usage.breakdown().catch(() => null),
-        ]);
-        const withUsage = await Promise.all(
-          list.map(async (p) => {
-            const usage =
-              p.budget_usd != null
-                ? await api.projects.usage(p.id).catch(() => null)
-                : null;
-            return { ...p, usage };
-          }),
-        );
-        setProjects(withUsage);
-        setBreakdown(bd);
-      } catch {
-        /* backend offline — show empty */
-      }
-      try {
-        const daily = await api.usage.daily();
-        setDailySpend(daily);
-      } catch {
-        /* ignore */
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const [list, bd] = await Promise.all([
+        api.projects.list(),
+        api.usage.breakdown().catch(() => null),
+      ]);
+      const withUsage = await Promise.all(
+        list.map(async (p) => {
+          const usage =
+            p.budget_usd != null
+              ? await api.projects.usage(p.id).catch(() => null)
+              : null;
+          return { ...p, usage };
+        }),
+      );
+      setProjects(withUsage);
+      setBreakdown(bd);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Backend unreachable";
+      setFetchError(msg);
+    }
+    try {
+      const daily = await api.usage.daily();
+      setDailySpend(daily);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
 
   const fetchPeriodSpent = useCallback(
     async (p: Period, from?: string, to?: string) => {
@@ -493,6 +499,30 @@ export default function OverviewPage() {
     (p) => (p.usage?.pct_used ?? 0) >= 100,
   ).length;
   const overallPct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+
+  if (!loading && fetchError) {
+    return (
+      <Shell>
+        <div className="p-6 max-w-6xl">
+          <div className="mb-8">
+            <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">
+              Overview
+            </h1>
+            <p className="text-[--muted-fg] text-sm">Backend unreachable</p>
+          </div>
+          <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-6">
+            <h2 className="font-heading font-800 text-lg mb-2 text-red-400">
+              Can&apos;t reach the backend
+            </h2>
+            <p className="text-sm text-[--muted-fg] mb-4">{fetchError}</p>
+            <button onClick={loadDashboard} className="btn-amber">
+              Retry
+            </button>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
 
   if (!loading && projects.length === 0) {
     return (
@@ -691,7 +721,7 @@ export default function OverviewPage() {
         )}
 
         {/* Global Spend — last 30 days */}
-        <div className="rounded-xl border border-[--border] bg-[--card] p-6 col-span-full mb-6">
+        <div className="rounded-xl border border-[--border] bg-[--card] p-4 sm:p-6 col-span-full mb-6 overflow-hidden">
           <h2 className="text-sm font-semibold text-[--muted] mb-4 uppercase tracking-wider">
             Global Spend — Last 30 Days
           </h2>
@@ -718,8 +748,10 @@ export default function OverviewPage() {
               />
               <YAxis
                 tick={{ fontSize: 10 }}
-                tickFormatter={(v: number) => `$${v.toFixed(3)}`}
-                width={55}
+                tickFormatter={(v: number) =>
+                  v >= 1 ? `$${v.toFixed(1)}` : `$${v.toFixed(2)}`
+                }
+                width={42}
               />
               <Tooltip
                 formatter={(val) => [
