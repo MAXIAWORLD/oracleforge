@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "관리자"
+  },
+  "shell": {
+    "live": "라이브",
+    "offline": "오프라인",
+    "language": "언어",
+    "theme": "테마"
+  },
+  "common": {
+    "loading": "로딩 중...",
+    "refresh": "새로고침",
+    "reload": "다시 로드",
+    "run": "실행",
+    "running": "실행 중...",
+    "runNow": "지금 실행",
+    "send": "전송",
+    "save": "저장",
+    "cancel": "취소",
+    "back": "뒤로",
+    "total": "총",
+    "today": "오늘",
+    "manual": "수동",
+    "scheduled": "예약됨",
+    "none": "없음",
+    "healthy": "정상",
+    "degraded": "저하됨",
+    "success": "성공",
+    "failed": "실패",
+    "status": "상태",
+    "noDescription": "설명 없음",
+    "version": "버전",
+    "cache": "캐시",
+    "enabled": "활성화됨",
+    "disabled": "비활성화됨"
+  },
+  "nav": {
+    "overview": "개요",
+    "products": "제품",
+    "navigation": "탐색"
+  },
+  "hub": {
+    "productHealth": "제품 상태",
+    "suiteOverview": "스위트 개요",
+    "quickActions": "빠른 작업",
+    "checking": "확인 중...",
+    "refreshAll": "모두 새로고침",
+    "healthy": "정상",
+    "down": "중단됨",
+    "total": "총",
+    "openDashboard": "대시보드 열기",
+    "closeTab": "{name} 닫기",
+    "version": "버전",
+    "admin": "관리자",
+    "upStatus": "가동 중",
+    "downStatus": "중단됨",
+    "onlineStatus": "온라인",
+    "offlineStatus": "오프라인",
+    "suiteHealth": "스위트 상태"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "AI 에이전트 프레임워크",
+      "metricLabel": "로드된 미션"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "멀티 프로바이더 LLM 라우터",
+      "metricLabel": "프로바이더"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "다중 소스 가격 오라클",
+      "metricLabel": "상태"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "PII & AI 보안 키트",
+      "metricLabel": "상태"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "완전한 FastAPI 인증",
+      "metricLabel": "상태"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "이메일 아웃리치 자동화",
+      "metricLabel": "상태"
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "مشرف"
+  },
+  "shell": {
+    "live": "مباشر",
+    "offline": "غير متصل",
+    "language": "اللغة",
+    "theme": "السمة"
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "refresh": "تحديث",
+    "reload": "إعادة التحميل",
+    "run": "تشغيل",
+    "running": "قيد التشغيل...",
+    "runNow": "تشغيل الآن",
+    "send": "إرسال",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "back": "رجوع",
+    "total": "الإجمالي",
+    "today": "اليوم",
+    "manual": "يدوي",
+    "scheduled": "مجدول",
+    "none": "لا شيء",
+    "healthy": "سليم",
+    "degraded": "متدهور",
+    "success": "نجاح",
+    "failed": "فشل",
+    "status": "الحالة",
+    "noDescription": "لا يوجد وصف",
+    "version": "الإصدار",
+    "cache": "التخزين المؤقت",
+    "enabled": "مفعّل",
+    "disabled": "معطّل"
+  },
+  "nav": {
+    "overview": "نظرة عامة",
+    "products": "المنتجات",
+    "navigation": "التنقل"
+  },
+  "hub": {
+    "productHealth": "صحة المنتجات",
+    "suiteOverview": "نظرة عامة على الحزمة",
+    "quickActions": "الإجراءات السريعة",
+    "checking": "جاري الفحص...",
+    "refreshAll": "تحديث الكل",
+    "healthy": "سليم",
+    "down": "معطّل",
+    "total": "الإجمالي",
+    "openDashboard": "فتح لوحة التحكم",
+    "closeTab": "إغلاق {name}",
+    "version": "الإصدار",
+    "admin": "مشرف",
+    "upStatus": "نشط",
+    "downStatus": "معطّل",
+    "onlineStatus": "متصل",
+    "offlineStatus": "غير متصل",
+    "suiteHealth": "صحة الحزمة"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "إطار عمل وكلاء الذكاء الاصطناعي",
+      "metricLabel": "المهام المحملة"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "موجّه LLM متعدد المزودين",
+      "metricLabel": "المزودون"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "أوراكل أسعار متعدد المصادر",
+      "metricLabel": "الحالة"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "مجموعة أمان PII والذكاء الاصطناعي",
+      "metricLabel": "الحالة"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "مصادقة FastAPI متكاملة",
+      "metricLabel": "الحالة"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "أتمتة التواصل عبر البريد الإلكتروني",
+      "metricLabel": "الحالة"
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "Admin"
+  },
+  "shell": {
+    "live": "IN DIRETTA",
+    "offline": "OFFLINE",
+    "language": "Lingua",
+    "theme": "Tema"
+  },
+  "common": {
+    "loading": "Caricamento...",
+    "refresh": "Aggiorna",
+    "reload": "Ricarica",
+    "run": "Esegui",
+    "running": "In esecuzione...",
+    "runNow": "Esegui ora",
+    "send": "Invia",
+    "save": "Salva",
+    "cancel": "Annulla",
+    "back": "Indietro",
+    "total": "totale",
+    "today": "oggi",
+    "manual": "manuale",
+    "scheduled": "Programmato",
+    "none": "nessuno",
+    "healthy": "Sano",
+    "degraded": "Degradato",
+    "success": "successo",
+    "failed": "fallito",
+    "status": "Stato",
+    "noDescription": "Nessuna descrizione",
+    "version": "Versione",
+    "cache": "Cache",
+    "enabled": "Abilitato",
+    "disabled": "Disabilitato"
+  },
+  "nav": {
+    "overview": "Panoramica",
+    "products": "Prodotti",
+    "navigation": "Navigazione"
+  },
+  "hub": {
+    "productHealth": "Salute dei prodotti",
+    "suiteOverview": "Panoramica della suite",
+    "quickActions": "Azioni rapide",
+    "checking": "Verifica...",
+    "refreshAll": "Aggiorna tutto",
+    "healthy": "Sano",
+    "down": "Non disponibile",
+    "total": "Totale",
+    "openDashboard": "Apri dashboard",
+    "closeTab": "Chiudi {name}",
+    "version": "Versione",
+    "admin": "Admin",
+    "upStatus": "ATTIVO",
+    "downStatus": "GIU",
+    "onlineStatus": "ONLINE",
+    "offlineStatus": "OFFLINE",
+    "suiteHealth": "Salute della suite"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "Framework per agenti IA",
+      "metricLabel": "Missioni caricate"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "Router LLM multi-provider",
+      "metricLabel": "Provider"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "Oracolo prezzi multi-sorgente",
+      "metricLabel": "Stato"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "Kit sicurezza PII e IA",
+      "metricLabel": "Stato"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "Auth completa FastAPI",
+      "metricLabel": "Stato"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "Automazione email outreach",
+      "metricLabel": "Stato"
+    }
+  }
+}

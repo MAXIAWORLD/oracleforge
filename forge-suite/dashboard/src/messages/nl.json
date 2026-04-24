@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "Beheerder"
+  },
+  "shell": {
+    "live": "LIVE",
+    "offline": "OFFLINE",
+    "language": "Taal",
+    "theme": "Thema"
+  },
+  "common": {
+    "loading": "Laden...",
+    "refresh": "Vernieuwen",
+    "reload": "Herladen",
+    "run": "Uitvoeren",
+    "running": "Bezig...",
+    "runNow": "Nu uitvoeren",
+    "send": "Verzenden",
+    "save": "Opslaan",
+    "cancel": "Annuleren",
+    "back": "Terug",
+    "total": "totaal",
+    "today": "vandaag",
+    "manual": "handmatig",
+    "scheduled": "Gepland",
+    "none": "geen",
+    "healthy": "Gezond",
+    "degraded": "Verslechterd",
+    "success": "succes",
+    "failed": "mislukt",
+    "status": "Status",
+    "noDescription": "Geen beschrijving",
+    "version": "Versie",
+    "cache": "Cache",
+    "enabled": "Ingeschakeld",
+    "disabled": "Uitgeschakeld"
+  },
+  "nav": {
+    "overview": "Overzicht",
+    "products": "Producten",
+    "navigation": "Navigatie"
+  },
+  "hub": {
+    "productHealth": "Productstatus",
+    "suiteOverview": "Suite-overzicht",
+    "quickActions": "Snelle acties",
+    "checking": "Controleren...",
+    "refreshAll": "Alles vernieuwen",
+    "healthy": "Gezond",
+    "down": "Neer",
+    "total": "Totaal",
+    "openDashboard": "Dashboard openen",
+    "closeTab": "{name} sluiten",
+    "version": "Versie",
+    "admin": "Beheerder",
+    "upStatus": "ACTIEF",
+    "downStatus": "NEER",
+    "onlineStatus": "ONLINE",
+    "offlineStatus": "OFFLINE",
+    "suiteHealth": "Suite-gezondheid"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "AI-agentframework",
+      "metricLabel": "Geladen missies"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "LLM-router multi-provider",
+      "metricLabel": "Providers"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "Multi-bron prijsorakel",
+      "metricLabel": "Status"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "PII & AI beveiligingskit",
+      "metricLabel": "Status"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "Volledige FastAPI auth",
+      "metricLabel": "Status"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "E-mail outreach automatisering",
+      "metricLabel": "Status"
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "管理员"
+  },
+  "shell": {
+    "live": "实时",
+    "offline": "离线",
+    "language": "语言",
+    "theme": "主题"
+  },
+  "common": {
+    "loading": "加载中...",
+    "refresh": "刷新",
+    "reload": "重新加载",
+    "run": "运行",
+    "running": "运行中...",
+    "runNow": "立即运行",
+    "send": "发送",
+    "save": "保存",
+    "cancel": "取消",
+    "back": "返回",
+    "total": "总计",
+    "today": "今天",
+    "manual": "手动",
+    "scheduled": "已计划",
+    "none": "无",
+    "healthy": "健康",
+    "degraded": "降级",
+    "success": "成功",
+    "failed": "失败",
+    "status": "状态",
+    "noDescription": "无描述",
+    "version": "版本",
+    "cache": "缓存",
+    "enabled": "已启用",
+    "disabled": "已禁用"
+  },
+  "nav": {
+    "overview": "概览",
+    "products": "产品",
+    "navigation": "导航"
+  },
+  "hub": {
+    "productHealth": "产品健康状态",
+    "suiteOverview": "套件概览",
+    "quickActions": "快速操作",
+    "checking": "检查中...",
+    "refreshAll": "全部刷新",
+    "healthy": "健康",
+    "down": "宕机",
+    "total": "总计",
+    "openDashboard": "打开仪表板",
+    "closeTab": "关闭 {name}",
+    "version": "版本",
+    "admin": "管理员",
+    "upStatus": "在线",
+    "downStatus": "宕机",
+    "onlineStatus": "在线",
+    "offlineStatus": "离线",
+    "suiteHealth": "套件健康状态"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "AI 智能体框架",
+      "metricLabel": "已加载任务"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "多提供商 LLM 路由器",
+      "metricLabel": "提供商"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "多源价格预言机",
+      "metricLabel": "状态"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "PII 和 AI 安全套件",
+      "metricLabel": "状态"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "完整 FastAPI 认证",
+      "metricLabel": "状态"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "邮件外联自动化",
+      "metricLabel": "状态"
+    }
+  }
+}

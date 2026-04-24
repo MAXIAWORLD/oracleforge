@@ -1,0 +1,294 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-neon-cyan: #00e5ff;
+  --color-neon-violet: #b44aff;
+  --color-neon-pink: #ff2d87;
+  --color-neon-green: #0afe7e;
+  --color-neon-amber: #ffb800;
+  --color-neon-blue: #3b82f6;
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+/* ── Light Theme ── */
+:root {
+  --background: #f0f2f8;
+  --foreground: #1a1d2e;
+  --card: #ffffff;
+  --card-foreground: #1a1d2e;
+  --primary: #3b5bff;
+  --primary-foreground: #ffffff;
+  --secondary: #eef0f6;
+  --secondary-foreground: #1a1d2e;
+  --muted: #eef0f6;
+  --muted-foreground: #6b7194;
+  --accent: #eef0f6;
+  --accent-foreground: #1a1d2e;
+  --destructive: #ff3b5c;
+  --border: #dfe2ed;
+  --input: #dfe2ed;
+  --ring: #3b5bff;
+  --radius: 0.75rem;
+}
+
+/* ── Dark Theme ── */
+.dark {
+  --background: #0b0e1a;
+  --foreground: #e2e4f0;
+  --card: rgba(17, 20, 39, 0.5);
+  --card-foreground: #e2e4f0;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1a1d35;
+  --secondary-foreground: #e2e4f0;
+  --muted: #1a1d35;
+  --muted-foreground: #6b7194;
+  --accent: #1a1d35;
+  --accent-foreground: #e2e4f0;
+  --destructive: #ff3b5c;
+  --border: rgba(255, 255, 255, 0.06);
+  --input: #1f2340;
+  --ring: #3b82f6;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* ══════════════════════════════════════
+   LAYERED BACKGROUND
+   ══════════════════════════════════════ */
+.dark body {
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 20% 80%,
+      rgba(180, 74, 255, 0.06) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 80% 20%,
+      rgba(0, 229, 255, 0.05) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 90% 60% at 50% 50%,
+      rgba(59, 130, 246, 0.03) 0%,
+      transparent 70%
+    ),
+    #0b0e1a;
+}
+
+/* ══════════════════════════════════════
+   GLASSMORPHISM CARDS
+   ══════════════════════════════════════ */
+.glass-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  position: relative;
+  transition:
+    transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark .glass-card {
+  backdrop-filter: blur(12px);
+  background: rgba(17, 20, 39, 0.5);
+}
+
+.glass-card:hover {
+  transform: translateY(-3px);
+}
+
+.dark .glass-card:hover {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* ══════════════════════════════════════
+   NEON GLOW CARD — hover border glow
+   ══════════════════════════════════════ */
+.neon-card {
+  --glow: #3b82f6;
+}
+
+.dark .neon-card:hover {
+  box-shadow:
+    0 0 20px color-mix(in srgb, var(--glow) 20%, transparent),
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px color-mix(in srgb, var(--glow) 30%, transparent);
+}
+
+/* ══════════════════════════════════════
+   NEON TEXT GLOW
+   ══════════════════════════════════════ */
+.neon-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.dark .neon-value {
+  text-shadow:
+    0 0 8px color-mix(in srgb, var(--glow, #3b82f6) 40%, transparent),
+    0 0 20px color-mix(in srgb, var(--glow, #3b82f6) 15%, transparent);
+}
+
+/* ══════════════════════════════════════
+   PULSING GLOW (live indicators)
+   ══════════════════════════════════════ */
+@keyframes neon-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 4px var(--pulse-color, #0afe7e),
+      0 0 12px var(--pulse-color, #0afe7e);
+  }
+  50% {
+    box-shadow:
+      0 0 8px var(--pulse-color, #0afe7e),
+      0 0 24px var(--pulse-color, #0afe7e),
+      0 0 40px color-mix(in srgb, var(--pulse-color, #0afe7e) 30%, transparent);
+  }
+}
+
+.neon-pulse {
+  animation: neon-pulse 2.5s ease-in-out infinite;
+}
+
+/* ══════════════════════════════════════
+   PROGRESS BAR GLOW
+   ══════════════════════════════════════ */
+.glow-bar {
+  position: relative;
+}
+
+.dark .glow-bar::after {
+  content: "";
+  position: absolute;
+  inset: -2px 0;
+  border-radius: inherit;
+  background: inherit;
+  filter: blur(6px);
+  opacity: 0.4;
+  z-index: -1;
+}
+
+/* ══════════════════════════════════════
+   SCROLLBAR
+   ══════════════════════════════════════ */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ══════════════════════════════════════
+   ANIMATED GRADIENT BORDER
+   ══════════════════════════════════════ */
+@property --border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.gradient-border {
+  position: relative;
+  overflow: hidden;
+}
+
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--border-angle),
+    transparent 30%,
+    var(--glow, #3b82f6) 50%,
+    transparent 70%
+  );
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.4s;
+  animation: border-spin 4s linear infinite;
+}
+
+.gradient-border:hover::before {
+  opacity: 1;
+}
+
+@keyframes border-spin {
+  to {
+    --border-angle: 360deg;
+  }
+}
+
+/* ══════════════════════════════════════
+   HEALTH GAUGE
+   ══════════════════════════════════════ */
+@keyframes gauge-fill {
+  from {
+    stroke-dashoffset: 251.2;
+  }
+}
+
+.gauge-track {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 8;
+}
+
+.gauge-value {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1);
+}

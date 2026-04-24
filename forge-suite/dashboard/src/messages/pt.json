@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "Admin"
+  },
+  "shell": {
+    "live": "AO VIVO",
+    "offline": "OFFLINE",
+    "language": "Idioma",
+    "theme": "Tema"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "refresh": "Atualizar",
+    "reload": "Recarregar",
+    "run": "Executar",
+    "running": "Executando...",
+    "runNow": "Executar agora",
+    "send": "Enviar",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "back": "Voltar",
+    "total": "total",
+    "today": "hoje",
+    "manual": "manual",
+    "scheduled": "Agendado",
+    "none": "nenhum",
+    "healthy": "Saudavel",
+    "degraded": "Degradado",
+    "success": "sucesso",
+    "failed": "falhou",
+    "status": "Status",
+    "noDescription": "Sem descricao",
+    "version": "Versao",
+    "cache": "Cache",
+    "enabled": "Ativado",
+    "disabled": "Desativado"
+  },
+  "nav": {
+    "overview": "Visao geral",
+    "products": "Produtos",
+    "navigation": "Navegacao"
+  },
+  "hub": {
+    "productHealth": "Saude dos produtos",
+    "suiteOverview": "Visao da suite",
+    "quickActions": "Acoes rapidas",
+    "checking": "Verificando...",
+    "refreshAll": "Atualizar tudo",
+    "healthy": "Saudavel",
+    "down": "Fora do ar",
+    "total": "Total",
+    "openDashboard": "Abrir painel",
+    "closeTab": "Fechar {name}",
+    "version": "Versao",
+    "admin": "Admin",
+    "upStatus": "ATIVO",
+    "downStatus": "INATIVO",
+    "onlineStatus": "ONLINE",
+    "offlineStatus": "OFFLINE",
+    "suiteHealth": "Saude da suite"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "Framework de Agentes IA",
+      "metricLabel": "Missoes carregadas"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "Roteador LLM Multi-Provedor",
+      "metricLabel": "Provedores"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "Oraculo de precos multi-fonte",
+      "metricLabel": "Status"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "Kit de seguranca PII e IA",
+      "metricLabel": "Status"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "Auth completa FastAPI",
+      "metricLabel": "Status"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "Automacao de email outreach",
+      "metricLabel": "Status"
+    }
+  }
+}

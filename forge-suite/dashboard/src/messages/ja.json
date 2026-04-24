@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "管理者"
+  },
+  "shell": {
+    "live": "ライブ",
+    "offline": "オフライン",
+    "language": "言語",
+    "theme": "テーマ"
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "refresh": "更新",
+    "reload": "再読み込み",
+    "run": "実行",
+    "running": "実行中...",
+    "runNow": "今すぐ実行",
+    "send": "送信",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "back": "戻る",
+    "total": "合計",
+    "today": "今日",
+    "manual": "手動",
+    "scheduled": "スケジュール済み",
+    "none": "なし",
+    "healthy": "正常",
+    "degraded": "低下",
+    "success": "成功",
+    "failed": "失敗",
+    "status": "ステータス",
+    "noDescription": "説明なし",
+    "version": "バージョン",
+    "cache": "キャッシュ",
+    "enabled": "有効",
+    "disabled": "無効"
+  },
+  "nav": {
+    "overview": "概要",
+    "products": "製品",
+    "navigation": "ナビゲーション"
+  },
+  "hub": {
+    "productHealth": "製品の健全性",
+    "suiteOverview": "スイート概要",
+    "quickActions": "クイックアクション",
+    "checking": "確認中...",
+    "refreshAll": "すべて更新",
+    "healthy": "正常",
+    "down": "停止中",
+    "total": "合計",
+    "openDashboard": "ダッシュボードを開く",
+    "closeTab": "{name} を閉じる",
+    "version": "バージョン",
+    "admin": "管理者",
+    "upStatus": "稼働中",
+    "downStatus": "停止中",
+    "onlineStatus": "オンライン",
+    "offlineStatus": "オフライン",
+    "suiteHealth": "スイートの健全性"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "AIエージェントフレームワーク",
+      "metricLabel": "読み込まれたミッション"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "マルチプロバイダーLLMルーター",
+      "metricLabel": "プロバイダー"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "マルチソース価格オラクル",
+      "metricLabel": "ステータス"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "PII & AI安全キット",
+      "metricLabel": "ステータス"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "完全なFastAPI認証",
+      "metricLabel": "ステータス"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "メールアウトリーチ自動化",
+      "metricLabel": "ステータス"
+    }
+  }
+}

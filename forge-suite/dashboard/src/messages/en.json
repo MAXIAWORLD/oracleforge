@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "Admin"
+  },
+  "shell": {
+    "live": "LIVE",
+    "offline": "OFFLINE",
+    "language": "Language",
+    "theme": "Theme"
+  },
+  "common": {
+    "loading": "Loading...",
+    "refresh": "Refresh",
+    "reload": "Reload",
+    "run": "Run",
+    "running": "Running...",
+    "runNow": "Run Now",
+    "send": "Send",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "total": "total",
+    "today": "today",
+    "manual": "manual",
+    "scheduled": "Scheduled",
+    "none": "none",
+    "healthy": "Healthy",
+    "degraded": "Degraded",
+    "success": "success",
+    "failed": "failed",
+    "status": "Status",
+    "noDescription": "No description",
+    "version": "Version",
+    "cache": "Cache",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "nav": {
+    "overview": "Overview",
+    "products": "Products",
+    "navigation": "Navigation"
+  },
+  "hub": {
+    "productHealth": "Product Health",
+    "suiteOverview": "Suite Overview",
+    "quickActions": "Quick Actions",
+    "checking": "Checking...",
+    "refreshAll": "Refresh All",
+    "healthy": "Healthy",
+    "down": "Down",
+    "total": "Total",
+    "openDashboard": "Open Dashboard",
+    "closeTab": "Close {name}",
+    "version": "Version",
+    "admin": "Admin",
+    "upStatus": "UP",
+    "downStatus": "DOWN",
+    "onlineStatus": "ONLINE",
+    "offlineStatus": "OFFLINE",
+    "suiteHealth": "Suite Health"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "AI Agent Framework",
+      "metricLabel": "Missions Loaded"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "LLM Router Multi-Provider",
+      "metricLabel": "Providers"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "Multi-Source Price Oracle",
+      "metricLabel": "Status"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "PII & AI Safety Kit",
+      "metricLabel": "Status"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "Auth Complete FastAPI",
+      "metricLabel": "Status"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "Email Outreach Automation",
+      "metricLabel": "Status"
+    }
+  }
+}

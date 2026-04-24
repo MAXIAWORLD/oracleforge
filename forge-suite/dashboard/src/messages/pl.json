@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "Admin"
+  },
+  "shell": {
+    "live": "NA ZYWO",
+    "offline": "OFFLINE",
+    "language": "Jezyk",
+    "theme": "Motyw"
+  },
+  "common": {
+    "loading": "Ladowanie...",
+    "refresh": "Odswiez",
+    "reload": "Przeladuj",
+    "run": "Uruchom",
+    "running": "Uruchamianie...",
+    "runNow": "Uruchom teraz",
+    "send": "Wyslij",
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "back": "Wstecz",
+    "total": "lacznie",
+    "today": "dzisiaj",
+    "manual": "reczny",
+    "scheduled": "Zaplanowany",
+    "none": "brak",
+    "healthy": "Zdrowy",
+    "degraded": "Zdegradowany",
+    "success": "sukces",
+    "failed": "nieudany",
+    "status": "Status",
+    "noDescription": "Brak opisu",
+    "version": "Wersja",
+    "cache": "Pamiec podreczna",
+    "enabled": "Wlaczony",
+    "disabled": "Wylaczony"
+  },
+  "nav": {
+    "overview": "Przeglad",
+    "products": "Produkty",
+    "navigation": "Nawigacja"
+  },
+  "hub": {
+    "productHealth": "Kondycja produktow",
+    "suiteOverview": "Przeglad pakietu",
+    "quickActions": "Szybkie akcje",
+    "checking": "Sprawdzanie...",
+    "refreshAll": "Odswiez wszystko",
+    "healthy": "Zdrowy",
+    "down": "Niedostepny",
+    "total": "Lacznie",
+    "openDashboard": "Otworz pulpit",
+    "closeTab": "Zamknij {name}",
+    "version": "Wersja",
+    "admin": "Admin",
+    "upStatus": "AKTYWNY",
+    "downStatus": "NIEDOSTEPNY",
+    "onlineStatus": "ONLINE",
+    "offlineStatus": "OFFLINE",
+    "suiteHealth": "Kondycja pakietu"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "Framework agentow AI",
+      "metricLabel": "Zaladowane misje"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "Router LLM wielu dostawcow",
+      "metricLabel": "Dostawcy"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "Wielozrodlowy oracle cenowy",
+      "metricLabel": "Status"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "Zestaw bezpieczenstwa PII i AI",
+      "metricLabel": "Status"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "Kompletne uwierzytelnianie FastAPI",
+      "metricLabel": "Status"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "Automatyzacja email outreach",
+      "metricLabel": "Status"
+    }
+  }
+}

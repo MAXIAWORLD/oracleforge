@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "व्यवस्थापक"
+  },
+  "shell": {
+    "live": "लाइव",
+    "offline": "ऑफलाइन",
+    "language": "भाषा",
+    "theme": "थीम"
+  },
+  "common": {
+    "loading": "लोड हो रहा है...",
+    "refresh": "रीफ्रेश करें",
+    "reload": "पुनः लोड करें",
+    "run": "चलाएं",
+    "running": "चल रहा है...",
+    "runNow": "अभी चलाएं",
+    "send": "भेजें",
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "back": "वापस",
+    "total": "कुल",
+    "today": "आज",
+    "manual": "मैन्युअल",
+    "scheduled": "निर्धारित",
+    "none": "कोई नहीं",
+    "healthy": "स्वस्थ",
+    "degraded": "अवनत",
+    "success": "सफलता",
+    "failed": "विफल",
+    "status": "स्थिति",
+    "noDescription": "कोई विवरण नहीं",
+    "version": "संस्करण",
+    "cache": "कैश",
+    "enabled": "सक्षम",
+    "disabled": "अक्षम"
+  },
+  "nav": {
+    "overview": "अवलोकन",
+    "products": "उत्पाद",
+    "navigation": "नेविगेशन"
+  },
+  "hub": {
+    "productHealth": "उत्पाद स्वास्थ्य",
+    "suiteOverview": "सूट अवलोकन",
+    "quickActions": "त्वरित क्रियाएं",
+    "checking": "जांच हो रही है...",
+    "refreshAll": "सब रीफ्रेश करें",
+    "healthy": "स्वस्थ",
+    "down": "बंद",
+    "total": "कुल",
+    "openDashboard": "डैशबोर्ड खोलें",
+    "closeTab": "{name} बंद करें",
+    "version": "संस्करण",
+    "admin": "व्यवस्थापक",
+    "upStatus": "सक्रिय",
+    "downStatus": "बंद",
+    "onlineStatus": "ऑनलाइन",
+    "offlineStatus": "ऑफलाइन",
+    "suiteHealth": "सूट स्वास्थ्य"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "AI एजेंट फ्रेमवर्क",
+      "metricLabel": "लोड किए गए मिशन"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "मल्टी-प्रोवाइडर LLM राउटर",
+      "metricLabel": "प्रोवाइडर"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "बहु-स्रोत मूल्य ओरेकल",
+      "metricLabel": "स्थिति"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "PII और AI सुरक्षा किट",
+      "metricLabel": "स्थिति"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "पूर्ण FastAPI प्रमाणीकरण",
+      "metricLabel": "स्थिति"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "ईमेल आउटरीच ऑटोमेशन",
+      "metricLabel": "स्थिति"
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "Yonetici"
+  },
+  "shell": {
+    "live": "CANLI",
+    "offline": "CEVRIMDISI",
+    "language": "Dil",
+    "theme": "Tema"
+  },
+  "common": {
+    "loading": "Yukleniyor...",
+    "refresh": "Yenile",
+    "reload": "Yeniden yukle",
+    "run": "Calistir",
+    "running": "Calistiriliyor...",
+    "runNow": "Simdi calistir",
+    "send": "Gonder",
+    "save": "Kaydet",
+    "cancel": "Iptal",
+    "back": "Geri",
+    "total": "toplam",
+    "today": "bugun",
+    "manual": "manuel",
+    "scheduled": "Planli",
+    "none": "yok",
+    "healthy": "Saglikli",
+    "degraded": "Bozulmus",
+    "success": "basari",
+    "failed": "basarisiz",
+    "status": "Durum",
+    "noDescription": "Aciklama yok",
+    "version": "Surum",
+    "cache": "Onbellek",
+    "enabled": "Etkin",
+    "disabled": "Devre disi"
+  },
+  "nav": {
+    "overview": "Genel bakis",
+    "products": "Urunler",
+    "navigation": "Navigasyon"
+  },
+  "hub": {
+    "productHealth": "Urun sagligi",
+    "suiteOverview": "Suite genel bakisi",
+    "quickActions": "Hizli islemler",
+    "checking": "Kontrol ediliyor...",
+    "refreshAll": "Tumu yenile",
+    "healthy": "Saglikli",
+    "down": "Cevrimdisi",
+    "total": "Toplam",
+    "openDashboard": "Panoyu ac",
+    "closeTab": "{name} kapat",
+    "version": "Surum",
+    "admin": "Yonetici",
+    "upStatus": "AKTIF",
+    "downStatus": "KAPALI",
+    "onlineStatus": "CEVRIMICI",
+    "offlineStatus": "CEVRIMDISI",
+    "suiteHealth": "Suite sagligi"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "AI Ajan Cercevesi",
+      "metricLabel": "Yuklenen gorevler"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "Cok saglayicili LLM yonlendirici",
+      "metricLabel": "Saglayicilar"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "Cok kaynakli fiyat kahinesi",
+      "metricLabel": "Durum"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "PII ve AI guvenlik kiti",
+      "metricLabel": "Durum"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "Tam FastAPI kimlik dogrulama",
+      "metricLabel": "Durum"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "E-posta outreach otomasyonu",
+      "metricLabel": "Durum"
+    }
+  }
+}

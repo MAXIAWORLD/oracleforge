@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "Admin"
+  },
+  "shell": {
+    "live": "EN VIVO",
+    "offline": "SIN CONEXION",
+    "language": "Idioma",
+    "theme": "Tema"
+  },
+  "common": {
+    "loading": "Cargando...",
+    "refresh": "Actualizar",
+    "reload": "Recargar",
+    "run": "Ejecutar",
+    "running": "Ejecutando...",
+    "runNow": "Ejecutar ahora",
+    "send": "Enviar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "back": "Volver",
+    "total": "total",
+    "today": "hoy",
+    "manual": "manual",
+    "scheduled": "Programado",
+    "none": "ninguno",
+    "healthy": "Saludable",
+    "degraded": "Degradado",
+    "success": "exito",
+    "failed": "fallido",
+    "status": "Estado",
+    "noDescription": "Sin descripcion",
+    "version": "Version",
+    "cache": "Cache",
+    "enabled": "Activado",
+    "disabled": "Desactivado"
+  },
+  "nav": {
+    "overview": "Resumen",
+    "products": "Productos",
+    "navigation": "Navegacion"
+  },
+  "hub": {
+    "productHealth": "Salud de productos",
+    "suiteOverview": "Resumen de la suite",
+    "quickActions": "Acciones rapidas",
+    "checking": "Verificando...",
+    "refreshAll": "Actualizar todo",
+    "healthy": "Saludable",
+    "down": "Caido",
+    "total": "Total",
+    "openDashboard": "Abrir panel",
+    "closeTab": "Cerrar {name}",
+    "version": "Version",
+    "admin": "Admin",
+    "upStatus": "ACTIVO",
+    "downStatus": "CAIDO",
+    "onlineStatus": "EN LINEA",
+    "offlineStatus": "SIN CONEXION",
+    "suiteHealth": "Salud de la suite"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "Framework de Agentes IA",
+      "metricLabel": "Misiones cargadas"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "Router LLM Multi-Proveedor",
+      "metricLabel": "Proveedores"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "Oraculo de precios multi-fuente",
+      "metricLabel": "Estado"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "Kit de seguridad PII e IA",
+      "metricLabel": "Estado"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "Auth completa FastAPI",
+      "metricLabel": "Estado"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "Automatizacion de email outreach",
+      "metricLabel": "Estado"
+    }
+  }
+}

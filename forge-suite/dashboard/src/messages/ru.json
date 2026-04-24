@@ -1,0 +1,97 @@
+{
+  "brand": {
+    "name": "Forge Suite",
+    "tagline": "MAXIA Lab",
+    "user": "Alexis",
+    "role": "Администратор"
+  },
+  "shell": {
+    "live": "В ЭФИРЕ",
+    "offline": "ОФЛАЙН",
+    "language": "Язык",
+    "theme": "Тема"
+  },
+  "common": {
+    "loading": "Загрузка...",
+    "refresh": "Обновить",
+    "reload": "Перезагрузить",
+    "run": "Запустить",
+    "running": "Выполняется...",
+    "runNow": "Запустить сейчас",
+    "send": "Отправить",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "back": "Назад",
+    "total": "всего",
+    "today": "сегодня",
+    "manual": "вручную",
+    "scheduled": "Запланировано",
+    "none": "нет",
+    "healthy": "Исправен",
+    "degraded": "Деградирован",
+    "success": "успех",
+    "failed": "ошибка",
+    "status": "Статус",
+    "noDescription": "Нет описания",
+    "version": "Версия",
+    "cache": "Кэш",
+    "enabled": "Включен",
+    "disabled": "Отключен"
+  },
+  "nav": {
+    "overview": "Обзор",
+    "products": "Продукты",
+    "navigation": "Навигация"
+  },
+  "hub": {
+    "productHealth": "Состояние продуктов",
+    "suiteOverview": "Обзор пакета",
+    "quickActions": "Быстрые действия",
+    "checking": "Проверка...",
+    "refreshAll": "Обновить все",
+    "healthy": "Исправен",
+    "down": "Недоступен",
+    "total": "Всего",
+    "openDashboard": "Открыть панель",
+    "closeTab": "Закрыть {name}",
+    "version": "Версия",
+    "admin": "Администратор",
+    "upStatus": "РАБОТАЕТ",
+    "downStatus": "НЕДОСТУПЕН",
+    "onlineStatus": "ОНЛАЙН",
+    "offlineStatus": "ОФЛАЙН",
+    "suiteHealth": "Состояние пакета"
+  },
+  "products": {
+    "missionforge": {
+      "name": "MissionForge",
+      "description": "Фреймворк AI-агентов",
+      "metricLabel": "Загружено миссий"
+    },
+    "llmforge": {
+      "name": "LLMForge",
+      "description": "Мультипровайдерный LLM-маршрутизатор",
+      "metricLabel": "Провайдеры"
+    },
+    "oracleforge": {
+      "name": "OracleForge",
+      "description": "Многоисточниковый ценовой оракул",
+      "metricLabel": "Статус"
+    },
+    "guardforge": {
+      "name": "GuardForge",
+      "description": "Набор безопасности PII и ИИ",
+      "metricLabel": "Статус"
+    },
+    "authforge": {
+      "name": "AuthForge",
+      "description": "Полная аутентификация FastAPI",
+      "metricLabel": "Статус"
+    },
+    "outreachforge": {
+      "name": "OutreachForge",
+      "description": "Автоматизация email-рассылок",
+      "metricLabel": "Статус"
+    }
+  }
+}
