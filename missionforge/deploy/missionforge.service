@@ -1,0 +1,18 @@
+[Unit]
+Description=MissionForge — YAML AI Agent Framework
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/missionforge/backend
+EnvironmentFile=/opt/missionforge/.env
+ExecStart=/opt/missionforge/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8001 --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=missionforge
+
+[Install]
+WantedBy=multi-user.target
