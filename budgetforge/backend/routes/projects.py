@@ -1,8 +1,8 @@
 import json
 import re
 import secrets
-from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -11,6 +11,7 @@ from typing import Optional
 from core.database import get_db
 from core.models import Project, Usage, BudgetActionEnum
 from core.auth import require_admin, require_viewer
+from core.limiter import limiter
 from core.url_validator import is_safe_webhook_url
 from services.budget_guard import BudgetGuard, get_period_start
 from services.cost_calculator import CostCalculator
@@ -35,7 +36,7 @@ def _validate_webhook(v: str | None) -> str | None:
         return None
     if not is_safe_webhook_url(v):
         raise ValueError(
-            f"webhook_url must be a public http/https URL (no private IPs, no localhost)"
+            "webhook_url must be a public http/https URL (no private IPs, no localhost)"
         )
     return v
 
@@ -66,6 +67,18 @@ class BudgetUpdate(BaseModel):
     downgrade_chain: list[str] = []
     proxy_timeout_ms: Optional[int] = Field(None, ge=1000, le=300000)
     proxy_retries: Optional[int] = Field(None, ge=0, le=5)
+
+    @field_validator("downgrade_chain")
+    @classmethod
+    def validate_downgrade_chain(cls, v: list[str]) -> list[str]:
+        if len(v) > 10:
+            raise ValueError("downgrade_chain ne peut pas dépasser 10 éléments.")
+        for i in range(len(v) - 1):
+            if v[i] == v[i + 1]:
+                raise ValueError(
+                    f"downgrade_chain contient des doublons consécutifs : '{v[i]}' à l'index {i} et {i + 1}."
+                )
+        return v
 
 
 class ProjectResponse(BaseModel):
@@ -106,6 +119,7 @@ class BudgetResponse(BaseModel):
     max_cost_per_call_usd: Optional[float] = None
     proxy_timeout_ms: Optional[int] = None
     proxy_retries: Optional[int] = None
+    warning: Optional[str] = None
 
 
 class UsageSummary(BaseModel):
@@ -124,7 +138,9 @@ def _compute_forecast(period_usages: list, remaining_usd: float) -> Optional[flo
     if used <= 0:
         return None
     earliest = min(u.created_at for u in period_usages)
-    days_elapsed = (datetime.utcnow() - earliest).total_seconds() / 86400
+    days_elapsed = (
+        datetime.now(timezone.utc).replace(tzinfo=None) - earliest
+    ).total_seconds() / 86400
     if days_elapsed < 1 / 1440:
         return None
     burn_rate = used / days_elapsed
@@ -150,14 +166,21 @@ def _compute_breakdown(usages: list) -> UsageBreakdown:
     for u in usages:
         p = u.provider
         if p not in providers:
-            providers[p] = {"calls": 0, "cost_usd": 0.0, "tokens_in": 0, "tokens_out": 0}
+            providers[p] = {
+                "calls": 0,
+                "cost_usd": 0.0,
+                "tokens_in": 0,
+                "tokens_out": 0,
+            }
         providers[p]["calls"] += 1
         providers[p]["cost_usd"] += u.cost_usd
         providers[p]["tokens_in"] += u.tokens_in
         providers[p]["tokens_out"] += u.tokens_out
 
     total = sum(v["calls"] for v in providers.values())
-    local_calls = sum(v["calls"] for k, v in providers.items() if CostCalculator.is_local(k))
+    local_calls = sum(
+        v["calls"] for k, v in providers.items() if CostCalculator.is_local(k)
+    )
     local_pct = round(local_calls / total * 100, 2) if total > 0 else 0.0
     cloud_pct = round(100.0 - local_pct, 2) if total > 0 else 0.0
 
@@ -169,25 +192,43 @@ def _compute_breakdown(usages: list) -> UsageBreakdown:
     )
 
 
-@router.post("", status_code=201, response_model=ProjectResponse, dependencies=[Depends(require_admin)])
+@router.post(
+    "",
+    status_code=201,
+    response_model=ProjectResponse,
+    dependencies=[Depends(require_admin)],
+)
 def create_project(payload: ProjectCreate, db: Session = Depends(get_db)):
-    project = Project(name=payload.name, alert_email=payload.alert_email, webhook_url=payload.webhook_url)
+    project = Project(
+        name=payload.name,
+        alert_email=payload.alert_email,
+        webhook_url=payload.webhook_url,
+    )
     db.add(project)
     try:
         db.commit()
         db.refresh(project)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail=f"Project '{payload.name}' already exists")
+        raise HTTPException(
+            status_code=409, detail=f"Project '{payload.name}' already exists"
+        )
     return project
 
 
-@router.get("", response_model=list[ProjectResponse], dependencies=[Depends(require_viewer)])
-def list_projects(db: Session = Depends(get_db)):
+@router.get(
+    "", response_model=list[ProjectResponse], dependencies=[Depends(require_viewer)]
+)
+@limiter.limit("60/minute")
+def list_projects(request: Request, db: Session = Depends(get_db)):
     return db.query(Project).all()
 
 
-@router.get("/{project_id}", response_model=ProjectResponse, dependencies=[Depends(require_viewer)])
+@router.get(
+    "/{project_id}",
+    response_model=ProjectResponse,
+    dependencies=[Depends(require_viewer)],
+)
 def get_project(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -204,7 +245,11 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
-@router.put("/{project_id}/budget", response_model=BudgetResponse, dependencies=[Depends(require_admin)])
+@router.put(
+    "/{project_id}/budget",
+    response_model=BudgetResponse,
+    dependencies=[Depends(require_admin)],
+)
 def set_budget(project_id: int, payload: BudgetUpdate, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -214,14 +259,23 @@ def set_budget(project_id: int, payload: BudgetUpdate, db: Session = Depends(get
     project.action = payload.action
     project.reset_period = payload.reset_period
     project.max_cost_per_call_usd = payload.max_cost_per_call_usd
-    project.allowed_providers = json.dumps(payload.allowed_providers) if payload.allowed_providers else None
-    project.downgrade_chain = json.dumps(payload.downgrade_chain) if payload.downgrade_chain else None
+    project.allowed_providers = (
+        json.dumps(payload.allowed_providers) if payload.allowed_providers else None
+    )
+    project.downgrade_chain = (
+        json.dumps(payload.downgrade_chain) if payload.downgrade_chain else None
+    )
     project.proxy_timeout_ms = payload.proxy_timeout_ms
     project.proxy_retries = payload.proxy_retries
     project.alert_sent = False
     project.alert_sent_at = None
     db.commit()
     db.refresh(project)
+    warning = None
+    if project.budget_usd == 0 and project.action == BudgetActionEnum.block:
+        warning = (
+            "budget_usd=0 avec action=block bloquera immédiatement toutes les requêtes."
+        )
     return BudgetResponse(
         budget_usd=project.budget_usd,
         alert_threshold_pct=project.alert_threshold_pct,
@@ -230,10 +284,15 @@ def set_budget(project_id: int, payload: BudgetUpdate, db: Session = Depends(get
         max_cost_per_call_usd=project.max_cost_per_call_usd,
         proxy_timeout_ms=project.proxy_timeout_ms,
         proxy_retries=project.proxy_retries,
+        warning=warning,
     )
 
 
-@router.get("/{project_id}/usage", response_model=UsageSummary, dependencies=[Depends(require_viewer)])
+@router.get(
+    "/{project_id}/usage",
+    response_model=UsageSummary,
+    dependencies=[Depends(require_viewer)],
+)
 def get_usage(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -241,25 +300,39 @@ def get_usage(project_id: int, db: Session = Depends(get_db)):
     period_start = get_period_start(project.reset_period or "none")
 
     # H2: SQL query instead of Python-side filtering on lazy-loaded relationship
-    used = db.query(func.sum(Usage.cost_usd)).filter(
-        Usage.project_id == project_id,
-        Usage.created_at >= period_start,
-    ).scalar() or 0.0
+    used = (
+        db.query(func.sum(Usage.cost_usd))
+        .filter(
+            Usage.project_id == project_id,
+            Usage.created_at >= period_start,
+        )
+        .scalar()
+        or 0.0
+    )
 
-    calls_count = db.query(func.count(Usage.id)).filter(
-        Usage.project_id == project_id,
-        Usage.created_at >= period_start,
-    ).scalar() or 0
+    calls_count = (
+        db.query(func.count(Usage.id))
+        .filter(
+            Usage.project_id == project_id,
+            Usage.created_at >= period_start,
+        )
+        .scalar()
+        or 0
+    )
 
     budget = project.budget_usd or 0.0
     remaining = guard.remaining(budget, used)
     pct = round(used / budget * 100, 2) if budget > 0 else 0.0
 
     # Forecast still needs the individual records (for oldest timestamp)
-    period_usages = db.query(Usage).filter(
-        Usage.project_id == project_id,
-        Usage.created_at >= period_start,
-    ).all()
+    period_usages = (
+        db.query(Usage)
+        .filter(
+            Usage.project_id == project_id,
+            Usage.created_at >= period_start,
+        )
+        .all()
+    )
 
     return UsageSummary(
         used_usd=used,
@@ -271,7 +344,11 @@ def get_usage(project_id: int, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/{project_id}/usage/breakdown", response_model=UsageBreakdown, dependencies=[Depends(require_admin)])
+@router.get(
+    "/{project_id}/usage/breakdown",
+    response_model=UsageBreakdown,
+    dependencies=[Depends(require_admin)],
+)
 def get_usage_breakdown(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -285,25 +362,66 @@ class DailySpend(BaseModel):
     spend: float
 
 
-@router.get("/{project_id}/usage/daily", response_model=list[DailySpend], dependencies=[Depends(require_admin)])
-def get_daily_usage(project_id: int, db: Session = Depends(get_db)):
-    """C4: Retourne les 30 derniers jours de dépenses agrégées par jour."""
+@router.get(
+    "/{project_id}/usage/daily",
+    response_model=list[DailySpend],
+    dependencies=[Depends(require_admin)],
+)
+def get_daily_usage(
+    project_id: int, period: str = "30d", db: Session = Depends(get_db)
+):
+    """Retourne les dépenses agrégées par jour selon la période demandée."""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    today = datetime.utcnow().date()
-    start = today - timedelta(days=29)
+    today = datetime.now(timezone.utc).replace(tzinfo=None).date()
 
-    usages = db.query(Usage).filter(
-        Usage.project_id == project_id,
-        Usage.created_at >= datetime(start.year, start.month, start.day),
-    ).all()
+    # Déterminer la période de filtrage
+    if period == "today":
+        start = today
+        days = 1
+    elif period == "7d":
+        start = today - timedelta(days=6)
+        days = 7
+    elif period == "month":
+        # Premier jour du mois
+        start = today.replace(day=1)
+        days = (today - start).days + 1
+    elif period == "all":
+        # Toutes les données
+        start = None
+        days = 0
+    else:
+        # Défaut : 30 jours
+        start = today - timedelta(days=29)
+        days = 30
 
+    # Construire la requête
+    query = db.query(Usage).filter(Usage.project_id == project_id)
+    if start:
+        query = query.filter(
+            Usage.created_at >= datetime(start.year, start.month, start.day)
+        )
+
+    usages = query.all()
+
+    # Construire le dictionnaire des jours
     daily: dict[str, float] = {}
-    for i in range(30):
-        d = (start + timedelta(days=i)).isoformat()
-        daily[d] = 0.0
+
+    if start:
+        # Pour les périodes limitées, initialiser tous les jours
+        for i in range(days):
+            d = (start + timedelta(days=i)).isoformat()
+            daily[d] = 0.0
+    else:
+        # Pour "all", collecter toutes les dates existantes
+        for u in usages:
+            d = u.created_at.date().isoformat()
+            if d not in daily:
+                daily[d] = 0.0
+
+    # Agréger les coûts
     for u in usages:
         d = u.created_at.date().isoformat()
         if d in daily:
@@ -312,13 +430,17 @@ def get_daily_usage(project_id: int, db: Session = Depends(get_db)):
     return [DailySpend(date=d, spend=round(v, 9)) for d, v in sorted(daily.items())]
 
 
-@router.post("/{project_id}/rotate-key", response_model=ProjectResponse, dependencies=[Depends(require_admin)])
+@router.post(
+    "/{project_id}/rotate-key",
+    response_model=ProjectResponse,
+    dependencies=[Depends(require_admin)],
+)
 def rotate_key(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     project.previous_api_key = project.api_key
-    project.key_rotated_at = datetime.utcnow()
+    project.key_rotated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     project.api_key = f"bf-{secrets.token_urlsafe(32)}"
     db.commit()
     db.refresh(project)
@@ -335,7 +457,11 @@ class AgentBreakdown(BaseModel):
     total_calls: int
 
 
-@router.get("/{project_id}/usage/agents", response_model=AgentBreakdown, dependencies=[Depends(require_admin)])
+@router.get(
+    "/{project_id}/usage/agents",
+    response_model=AgentBreakdown,
+    dependencies=[Depends(require_admin)],
+)
 def get_agent_breakdown(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -357,8 +483,12 @@ def get_agent_breakdown(project_id: int, db: Session = Depends(get_db)):
 _VALID_PLANS = frozenset(PLAN_LIMITS.keys())
 
 
+_PAID_PLANS = {"pro", "agency"}
+
+
 class PlanUpdate(BaseModel):
     plan: str
+    force: bool = False
 
     @field_validator("plan")
     @classmethod
@@ -374,7 +504,11 @@ class PlanStatus(BaseModel):
     calls_limit: int
 
 
-@router.get("/{project_id}/plan", response_model=PlanStatus, dependencies=[Depends(require_viewer)])
+@router.get(
+    "/{project_id}/plan",
+    response_model=PlanStatus,
+    dependencies=[Depends(require_viewer)],
+)
 def get_plan(project_id: int, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
@@ -387,11 +521,22 @@ def get_plan(project_id: int, db: Session = Depends(get_db)):
     )
 
 
-@router.put("/{project_id}/plan", response_model=PlanStatus, dependencies=[Depends(require_admin)])
+@router.put(
+    "/{project_id}/plan",
+    response_model=PlanStatus,
+    dependencies=[Depends(require_admin)],
+)
 def set_plan(project_id: int, payload: PlanUpdate, db: Session = Depends(get_db)):
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    if payload.plan in _PAID_PLANS and not payload.force:
+        if not project.stripe_subscription_id:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Plan '{payload.plan}' requires a Stripe subscription. "
+                "Pass force=true for manual override.",
+            )
     project.plan = payload.plan
     db.commit()
     db.refresh(project)
@@ -400,3 +545,11 @@ def set_plan(project_id: int, payload: PlanUpdate, db: Session = Depends(get_db)
         calls_this_month=get_calls_this_month(project_id, db),
         calls_limit=PLAN_LIMITS.get(project.plan, PLAN_LIMITS["free"]),
     )
+
+
+# Endpoint public pour tester le rate limiting
+@router.get("/public/test")
+@limiter.limit("60/minute", "1000/hour")
+async def public_test_endpoint(request):
+    """Endpoint public pour tester le rate limiting."""
+    return {"message": "OK", "timestamp": datetime.now(timezone.utc).isoformat()}

@@ -2,7 +2,7 @@ import hmac
 import hashlib
 import logging
 import smtplib
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -11,6 +11,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from core.config import settings
 from core.database import get_db
+from core.limiter import limiter
+from core.log_utils import mask_email
 from core.models import Project, PortalToken, Usage
 
 logger = logging.getLogger(__name__)
@@ -21,7 +23,9 @@ _SESSION_MAX_AGE = 90 * 24 * 3600  # 90 jours
 
 
 def cleanup_expired_tokens(db: Session) -> None:
-    db.query(PortalToken).filter(PortalToken.expires_at < datetime.utcnow()).delete()
+    db.query(PortalToken).filter(
+        PortalToken.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)
+    ).delete()
     db.commit()
 
 
@@ -51,7 +55,9 @@ class PortalRequestBody(BaseModel):
 
 def send_portal_email(email: str, token: str) -> bool:
     if not settings.smtp_host:
-        logger.warning("SMTP not configured — skipping portal email to %s", email)
+        logger.warning(
+            "SMTP not configured — skipping portal email to %s", mask_email(email)
+        )
         return False
 
     link = f"{settings.app_url}/portal?token={token}"
@@ -80,15 +86,18 @@ https://llmbudget.maxiaworld.app
             if settings.smtp_user:
                 server.login(settings.smtp_user, settings.smtp_password)
             server.sendmail(settings.alert_from_email, email, msg.as_string())
-        logger.info("Portal email sent to %s", email)
+        logger.info("Portal email sent to %s", mask_email(email))
         return True
     except Exception as e:
-        logger.error("Portal email failed for %s: %s", email, e)
+        logger.error("Portal email failed for %s: %s", mask_email(email), e)
         return False
 
 
 @router.post("/api/portal/request")
-def portal_request(body: PortalRequestBody, db: Session = Depends(get_db)):
+@limiter.limit("5/hour")
+def portal_request(
+    request: Request, body: PortalRequestBody, db: Session = Depends(get_db)
+):
     cleanup_expired_tokens(db)
     email = body.email.strip().lower()
     projects = db.query(Project).filter(Project.name == email).all()
@@ -97,7 +106,8 @@ def portal_request(body: PortalRequestBody, db: Session = Depends(get_db)):
 
     token = PortalToken(
         email=email,
-        expires_at=datetime.utcnow() + timedelta(hours=_TOKEN_TTL_HOURS),
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+        + timedelta(hours=_TOKEN_TTL_HOURS),
     )
     db.add(token)
     db.commit()
@@ -116,12 +126,18 @@ def portal_usage(request: Request, project_id: int, db: Session = Depends(get_db
     if not email:
         raise HTTPException(status_code=401, detail="Invalid session")
 
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.name == email,
-    ).first()
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.name == email,
+        )
+        .first()
+    )
     if not project:
-        raise HTTPException(status_code=403, detail="Project not found or access denied")
+        raise HTTPException(
+            status_code=403, detail="Project not found or access denied"
+        )
 
     today = date.today()
     start = today - timedelta(days=29)
@@ -139,8 +155,10 @@ def portal_usage(request: Request, project_id: int, db: Session = Depends(get_db
     by_day = {r.day: float(r.spend) for r in rows}
 
     daily = [
-        {"date": (start + timedelta(days=i)).isoformat(),
-         "spend": round(by_day.get((start + timedelta(days=i)).isoformat(), 0.0), 9)}
+        {
+            "date": (start + timedelta(days=i)).isoformat(),
+            "spend": round(by_day.get((start + timedelta(days=i)).isoformat(), 0.0), 9),
+        }
         for i in range(30)
     ]
     return {"daily": daily}
@@ -164,7 +182,7 @@ def portal_verify(token: str, response: Response, db: Session = Depends(get_db))
     record = db.query(PortalToken).filter(PortalToken.token == token).first()
     if not record:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    if record.expires_at < datetime.utcnow():
+    if record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         db.delete(record)
         db.commit()
         raise HTTPException(status_code=401, detail="Token expired")

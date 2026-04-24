@@ -2,12 +2,13 @@ import asyncio
 import logging
 import re
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from core.database import get_db
+from core.log_utils import mask_email
 from core.models import Project, SignupAttempt
 from services.onboarding_email import send_onboarding_email
 from services.plan_quota import check_project_quota
@@ -20,11 +21,13 @@ _ip_signups: dict[str, list[datetime]] = defaultdict(list)
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def _check_ip_rate_limit(ip: str, db: "Session | None" = None, max_per_day: int = 3) -> bool:
+def _check_ip_rate_limit(
+    ip: str, db: "Session | None" = None, max_per_day: int = 3
+) -> bool:
     if db is not None:
         return _check_ip_rate_limit_db(ip, db, max_per_day)
     # in-memory fallback (unit tests sans DB)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     cutoff = now - timedelta(hours=24)
     recent = [t for t in _ip_signups[ip] if t > cutoff]
     _ip_signups[ip] = recent
@@ -35,7 +38,7 @@ def _check_ip_rate_limit(ip: str, db: "Session | None" = None, max_per_day: int 
 
 
 def _check_ip_rate_limit_db(ip: str, db: Session, max_per_day: int = 3) -> bool:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     cutoff = now - timedelta(hours=24)
     count = (
         db.query(SignupAttempt)
@@ -81,13 +84,17 @@ async def signup_free(
     try:
         db.commit()
         db.refresh(project)
-        logger.info("Free signup: new project for %s", body.email)
+        logger.info("Free signup: new project for %s", mask_email(body.email))
     except IntegrityError:
         db.rollback()
         project = db.query(Project).filter_by(name=body.email).first()
         if not project:
-            raise HTTPException(status_code=500, detail="Signup failed — please try again.")
-        logger.info("Free signup: resending email to %s", body.email)
+            raise HTTPException(
+                status_code=500, detail="Signup failed — please try again."
+            )
+        logger.info("Free signup: resending email to %s", mask_email(body.email))
 
-    await asyncio.to_thread(send_onboarding_email, body.email, project.api_key, project.plan)
+    await asyncio.to_thread(
+        send_onboarding_email, body.email, project.api_key, project.plan
+    )
     return {"ok": True}

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from core.config import settings
 from core.database import get_db
 from core.limiter import limiter
+from core.log_utils import mask_email
 from core.models import Project
 from services.onboarding_email import send_onboarding_email, send_downgrade_email
 
@@ -19,19 +20,23 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 def _price_ids() -> dict[str, str]:
     return {
-        "free":   settings.stripe_free_price_id,
-        "pro":    settings.stripe_pro_price_id,
+        "free": settings.stripe_free_price_id,
+        "pro": settings.stripe_pro_price_id,
         "agency": settings.stripe_agency_price_id,
     }
 
 
 # ── Checkout ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/api/checkout/{plan}")
 @limiter.limit("5/hour")
 async def create_checkout_session(request: Request, plan: str):
     if plan not in _CHECKOUT_PLANS:
-        raise HTTPException(status_code=400, detail=f"No checkout available for plan '{plan}'. Valid: {sorted(_CHECKOUT_PLANS)}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"No checkout available for plan '{plan}'. Valid: {sorted(_CHECKOUT_PLANS)}",
+        )
 
     price_id = _price_ids().get(plan, "")
     if not price_id:
@@ -61,6 +66,7 @@ async def create_checkout_session(request: Request, plan: str):
 
 # ── Stripe webhook ────────────────────────────────────────────────────────────
 
+
 @router.post("/webhook/stripe")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     payload = await request.body()
@@ -87,9 +93,8 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
 
 async def _handle_checkout_completed(session: dict, db: Session) -> None:
-    email = (
-        (session.get("customer_details") or {}).get("email")
-        or session.get("customer_email")
+    email = (session.get("customer_details") or {}).get("email") or session.get(
+        "customer_email"
     )
     if not email or not _EMAIL_RE.match(str(email)):
         logger.warning(
@@ -105,15 +110,19 @@ async def _handle_checkout_completed(session: dict, db: Session) -> None:
 
     # P2.1 — idempotence: upsert if subscription already exists
     if subscription_id:
-        existing = db.query(Project).filter(
-            Project.stripe_subscription_id == subscription_id
-        ).first()
+        existing = (
+            db.query(Project)
+            .filter(Project.stripe_subscription_id == subscription_id)
+            .first()
+        )
         if existing:
             existing.plan = plan
             db.commit()
             logger.info(
                 "Subscription %s already exists — plan updated to %s (project_id=%s)",
-                subscription_id, plan, existing.id,
+                subscription_id,
+                plan,
+                existing.id,
             )
             return
 
@@ -126,7 +135,12 @@ async def _handle_checkout_completed(session: dict, db: Session) -> None:
     db.add(project)
     db.commit()
     db.refresh(project)
-    logger.info("New %s project created for %s (project_id=%s)", plan, email, project.id)
+    logger.info(
+        "New %s project created for %s (project_id=%s)",
+        plan,
+        mask_email(email),
+        project.id,
+    )
 
     await asyncio.to_thread(send_onboarding_email, email, project.api_key, plan)
 
@@ -135,11 +149,17 @@ def _handle_subscription_deleted(subscription: dict, db: Session) -> None:
     subscription_id = subscription.get("id")
     if not subscription_id:
         return
-    project = db.query(Project).filter(
-        Project.stripe_subscription_id == subscription_id
-    ).first()
+    project = (
+        db.query(Project)
+        .filter(Project.stripe_subscription_id == subscription_id)
+        .first()
+    )
     if project:
         project.plan = "free"
         db.commit()
-        logger.info("Project %s downgraded to free (subscription %s cancelled)", project.id, subscription_id)
+        logger.info(
+            "Project %s downgraded to free (subscription %s cancelled)",
+            project.id,
+            subscription_id,
+        )
         send_downgrade_email(project.name)

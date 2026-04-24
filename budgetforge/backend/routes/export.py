@@ -1,10 +1,11 @@
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from core.config import settings
 from core.database import get_db
 from core.models import Usage
 from core.auth import require_viewer
@@ -34,10 +35,21 @@ async def export_usage(
     project_id: Optional[int] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
     db: Session = Depends(get_db),
 ):
     if format not in ("csv", "json"):
         raise HTTPException(status_code=400, detail="format must be 'csv' or 'json'")
+
+    is_global_admin = (
+        not settings.admin_api_key  # dev mode — pas de clé configurée
+        or x_admin_key == settings.admin_api_key  # prod mode — clé globale valide
+    )
+    if project_id is None and not is_global_admin:
+        raise HTTPException(
+            status_code=400,
+            detail="project_id est requis. L'export global est réservé à l'admin.",
+        )
 
     try:
         date_from_dt = datetime.fromisoformat(date_from) if date_from else None
@@ -63,29 +75,45 @@ async def export_usage(
             for u in records
         ]
 
-    fields = ["id", "project_id", "provider", "model", "tokens_in", "tokens_out", "cost_usd", "agent", "created_at"]
+    fields = [
+        "id",
+        "project_id",
+        "provider",
+        "model",
+        "tokens_in",
+        "tokens_out",
+        "cost_usd",
+        "agent",
+        "created_at",
+    ]
 
     def generate_csv():
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=fields)
         writer.writeheader()
         for u in records:
-            writer.writerow({
-                "id": u.id,
-                "project_id": u.project_id,
-                "provider": u.provider,
-                "model": u.model,
-                "tokens_in": u.tokens_in,
-                "tokens_out": u.tokens_out,
-                "cost_usd": u.cost_usd,
-                "agent": u.agent or "",
-                "created_at": u.created_at.isoformat() if u.created_at else "",
-            })
+            writer.writerow(
+                {
+                    "id": u.id,
+                    "project_id": u.project_id,
+                    "provider": u.provider,
+                    "model": u.model,
+                    "tokens_in": u.tokens_in,
+                    "tokens_out": u.tokens_out,
+                    "cost_usd": u.cost_usd,
+                    "agent": u.agent or "",
+                    "created_at": u.created_at.isoformat() if u.created_at else "",
+                }
+            )
         yield output.getvalue()
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = (
+        datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y%m%d_%H%M%S")
+    )
     return StreamingResponse(
         generate_csv(),
         media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="budgetforge_export_{timestamp}.csv"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="budgetforge_export_{timestamp}.csv"'
+        },
     )
