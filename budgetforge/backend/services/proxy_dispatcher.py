@@ -10,7 +10,7 @@ Regroupe tout ce qui tourne APRÈS l'auth + budget check :
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import httpx
@@ -19,15 +19,190 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from core.config import settings
 from core.models import Project, Usage
 from services.alert_service import AlertService
-from services.budget_guard import BudgetGuard, get_period_start
+from services.budget_guard import BudgetGuard, BudgetAction, get_period_start
+from services.budget_lock import budget_lock
 from services.cost_calculator import CostCalculator, UnknownModelError
+from services.plan_quota import check_quota
 from services.proxy_forwarder import ProxyForwarder
 from services.token_estimator import estimate_input_tokens, estimate_output_tokens
 
 logger = logging.getLogger(__name__)
 guard = BudgetGuard()
+
+_GRACE_PERIOD_MINUTES = 5
+
+_FORWARD_MAPPING = {
+    "openai": (ProxyForwarder.forward_openai, ProxyForwarder.forward_openai_stream),
+    "anthropic": (
+        ProxyForwarder.forward_anthropic,
+        ProxyForwarder.forward_anthropic_stream,
+    ),
+    "google": (ProxyForwarder.forward_google, ProxyForwarder.forward_google_stream),
+    "deepseek": (
+        ProxyForwarder.forward_deepseek,
+        ProxyForwarder.forward_deepseek_stream,
+    ),
+    "openrouter": (
+        ProxyForwarder.forward_openrouter,
+        ProxyForwarder.forward_openrouter_stream,
+    ),
+    "together": (
+        ProxyForwarder.forward_together,
+        ProxyForwarder.forward_together_stream,
+    ),
+    "azure-openai": (
+        ProxyForwarder.forward_azure_openai,
+        ProxyForwarder.forward_azure_openai_stream,
+    ),
+    "aws-bedrock": (
+        ProxyForwarder.forward_aws_bedrock,
+        ProxyForwarder.forward_aws_bedrock_stream,
+    ),
+}
+
+
+def get_project_by_api_key(authorization: Optional[str], db: Session) -> Project:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid Authorization header"
+        )
+    api_key = authorization.removeprefix("Bearer ").strip()
+    project = db.query(Project).filter(Project.api_key == api_key).first()
+    if project:
+        return project
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+        minutes=_GRACE_PERIOD_MINUTES
+    )
+    project = (
+        db.query(Project)
+        .filter(Project.previous_api_key == api_key, Project.key_rotated_at >= cutoff)
+        .first()
+    )
+    if project:
+        return project
+    raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+def check_provider(project: Project, provider_name: str) -> None:
+    if not project.allowed_providers:
+        return
+    try:
+        allowed = json.loads(project.allowed_providers)
+    except json.JSONDecodeError:
+        return
+    if provider_name not in allowed:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Provider {provider_name} not allowed for this project",
+        )
+
+
+def resolve_provider_key(
+    custom_key: Optional[str], default_key: Optional[str], provider_name: str
+) -> str:
+    if custom_key:
+        return custom_key
+    if default_key:
+        return default_key
+    raise HTTPException(
+        status_code=400, detail=f"No API key configured for {provider_name}"
+    )
+
+
+def check_budget_model(project: Project, db: Session, model: str) -> str:
+    if project.budget_usd is None:
+        return model
+    used = get_period_used_sql(project.id, project.reset_period, db)
+    downgrade_chain = None
+    if project.downgrade_chain:
+        try:
+            downgrade_chain = json.loads(project.downgrade_chain)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    status = guard.check(
+        budget_usd=project.budget_usd,
+        used_usd=used,
+        action=BudgetAction(project.action),
+        current_model=model,
+        downgrade_chain=downgrade_chain,
+    )
+    if not status.allowed:
+        raise HTTPException(status_code=429, detail="Budget exceeded")
+    if status.downgrade_to:
+        logger.info(
+            "Downgrading from %s to %s due to budget", model, status.downgrade_to
+        )
+        return status.downgrade_to
+    return model
+
+
+async def check_per_call_cap(project: Project, payload: dict, model: str) -> None:
+    if not project.max_cost_per_call_usd:
+        return
+    tokens_in = estimate_input_tokens(payload)
+    tokens_out = estimate_output_tokens(payload)
+    try:
+        estimated_cost = await CostCalculator.compute_cost(model, tokens_in, tokens_out)
+    except UnknownModelError:
+        return
+    if estimated_cost > project.max_cost_per_call_usd:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Estimated call cost ${estimated_cost:.6f} exceeds per-call cap ${project.max_cost_per_call_usd:.6f}",
+        )
+
+
+async def prepare_request(
+    provider_name: str,
+    payload: dict,
+    authorization: Optional[str],
+    x_provider_key: Optional[str],
+    x_budgetforge_agent: Optional[str],
+    db: Session,
+    default_model: str = "gpt-4",
+    provider_config_key: Optional[str] = None,
+) -> dict:
+    """Auth → provider check → quota → budget lock → prebill. Returns context for dispatch."""
+    project = get_project_by_api_key(authorization, db)
+    check_provider(project, provider_name)
+    if provider_config_key is None:
+        provider_config_key = f"{provider_name.replace('-', '_')}_api_key"
+    api_key = resolve_provider_key(
+        x_provider_key, getattr(settings, provider_config_key, None), provider_name
+    )
+    model = payload.get("model", default_model)
+    check_quota(project, db)
+
+    async with budget_lock(project.id):
+        final_model = check_budget_model(project, db, model)
+        await check_per_call_cap(project, payload, final_model)
+        actual_provider = (
+            "ollama" if final_model.startswith("ollama/") else provider_name
+        )
+        usage_id = await prebill_usage(
+            db, project, actual_provider, final_model, payload, x_budgetforge_agent
+        )
+
+    timeout_s = project.proxy_timeout_ms / 1000.0 if project.proxy_timeout_ms else 60.0
+    max_retries = project.proxy_retries or 0
+    forward_fn, forward_stream_fn = _FORWARD_MAPPING.get(provider_name, (None, None))
+
+    return {
+        "payload": payload,
+        "project": project,
+        "provider_name": provider_name,
+        "final_model": final_model,
+        "usage_id": usage_id,
+        "api_key": api_key,
+        "forward_fn": forward_fn,
+        "forward_stream_fn": forward_stream_fn,
+        "timeout_s": timeout_s,
+        "db": db,
+        "max_retries": max_retries,
+    }
 
 
 # ── Period usage (SQL-side) ───────────────────────────────────────────────────
