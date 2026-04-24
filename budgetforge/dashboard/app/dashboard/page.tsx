@@ -11,6 +11,9 @@ import {
   ArrowRight,
   CheckCircle,
   CalendarRange,
+  Rocket,
+  Key,
+  Plug,
 } from "lucide-react";
 import Link from "next/link";
 import { Shell } from "@/components/shell";
@@ -272,6 +275,131 @@ function StatCard({
   );
 }
 
+function EmptyStateDashboard() {
+  const steps = [
+    {
+      icon: Rocket,
+      title: "Create your first project",
+      desc: "A project holds your budget limit, alert threshold, and a unique API key.",
+      action: (
+        <Link
+          href="/projects"
+          className="mt-2 inline-flex items-center gap-1 text-xs font-600 text-[--amber] hover:opacity-80 transition-opacity"
+        >
+          Create project <ArrowRight className="w-3 h-3" />
+        </Link>
+      ),
+    },
+    {
+      icon: Key,
+      title: "Copy your API key",
+      desc: "After creation, you'll get a key like bf-xxxxxxxxxxxx. Keep it secret — it's your budget guard.",
+      action: null,
+    },
+    {
+      icon: Plug,
+      title: "Point your app at the proxy",
+      desc: (
+        <span>
+          Replace{" "}
+          <code className="font-mono text-[10px] bg-white/5 px-1 py-0.5 rounded">
+            api.openai.com
+          </code>{" "}
+          with{" "}
+          <code className="font-mono text-[10px] text-[--amber] bg-[--amber-dim] px-1 py-0.5 rounded">
+            llmbudget.maxiaworld.app/proxy/openai
+          </code>{" "}
+          and pass your BudgetForge key as{" "}
+          <code className="font-mono text-[10px] bg-white/5 px-1 py-0.5 rounded">
+            Authorization
+          </code>
+          . Done.
+        </span>
+      ),
+      action: (
+        <Link
+          href="/docs"
+          className="mt-2 inline-flex items-center gap-1 text-xs font-600 text-[--amber] hover:opacity-80 transition-opacity"
+        >
+          Full integration docs <ArrowRight className="w-3 h-3" />
+        </Link>
+      ),
+    },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      className="flex flex-col items-center justify-center py-20 px-4"
+    >
+      <div className="w-full max-w-2xl">
+        <div className="text-center mb-10">
+          <div
+            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
+            style={{ background: "rgba(245,158,11,0.12)" }}
+          >
+            <DollarSign
+              className="w-7 h-7"
+              style={{ color: "var(--amber)" }}
+              strokeWidth={1.8}
+            />
+          </div>
+          <h2 className="font-heading font-800 text-2xl tracking-tight mb-2">
+            Get started in 3 steps
+          </h2>
+          <p className="text-[--muted-fg] text-sm">
+            BudgetForge sits between your app and any LLM provider — no SDK
+            required.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {steps.map((step, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{
+                delay: 0.15 + i * 0.1,
+                duration: 0.4,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="card-base p-5 flex gap-4"
+            >
+              <div className="shrink-0 flex flex-col items-center gap-2">
+                <div
+                  className="flex items-center justify-center w-9 h-9 rounded-xl"
+                  style={{ background: "rgba(245,158,11,0.1)" }}
+                >
+                  <step.icon
+                    className="w-4 h-4"
+                    style={{ color: "var(--amber)" }}
+                    strokeWidth={1.8}
+                  />
+                </div>
+                <span className="font-mono text-[10px] font-700 text-[--muted-fg]">
+                  {i + 1}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-600 text-sm text-[--foreground] mb-1">
+                  {step.title}
+                </p>
+                <p className="text-xs text-[--muted-fg] leading-relaxed">
+                  {step.desc}
+                </p>
+                {step.action}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function OverviewPage() {
   const [projects, setProjects] = useState<ProjectWithUsage[]>([]);
   const [breakdown, setBreakdown] = useState<UsageBreakdown | null>(null);
@@ -365,6 +493,24 @@ export default function OverviewPage() {
     (p) => (p.usage?.pct_used ?? 0) >= 100,
   ).length;
   const overallPct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
+
+  if (!loading && projects.length === 0) {
+    return (
+      <Shell>
+        <div className="p-6 max-w-6xl">
+          <div className="mb-8">
+            <h1 className="font-heading font-800 text-2xl tracking-tight mb-1">
+              Overview
+            </h1>
+            <p className="text-[--muted-fg] text-sm">
+              No projects yet — follow the steps below to get started.
+            </p>
+          </div>
+          <EmptyStateDashboard />
+        </div>
+      </Shell>
+    );
+  }
 
   return (
     <Shell>
@@ -632,16 +778,6 @@ export default function OverviewPage() {
                   />
                 ))}
               </div>
-            </div>
-          ) : projects.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-[--muted-fg] text-sm mb-1">No projects yet.</p>
-              <Link
-                href="/projects"
-                className="text-[--amber] text-sm hover:underline"
-              >
-                Create your first project →
-              </Link>
             </div>
           ) : (
             <div className="divide-y divide-[--border]">
