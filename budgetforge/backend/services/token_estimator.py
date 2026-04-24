@@ -183,24 +183,29 @@ class TokenEstimator:
         return message_tokens + param_tokens + 10  # Overhead de la requête
 
     @classmethod
-    def estimate_output_tokens(cls, payload: Dict) -> int:
+    def estimate_output_tokens(cls, payload: Dict, conservative: bool = False) -> int:
         """Estime les tokens de sortie.
 
         Args:
             payload: Payload de requête
+            conservative: Si True, utilise une borne haute pour le prebilling
+                (protège le budget contre les grandes réponses inattendues).
+                Si False (défaut), utilise l'estimation optimiste ×0.75.
 
         Returns:
             Estimation des tokens de sortie
         """
-        # Utilise max_tokens si spécifié
         max_tokens = payload.get("max_tokens")
         if max_tokens is not None:
             return max_tokens
 
-        # Estimation basée sur le contexte d'entrée
-        input_tokens = cls.estimate_input_tokens(payload)
+        if conservative:
+            # Borne haute : réserve au moins 512 tokens, jusqu'à 4096.
+            # Protège le budget sans sur-bloquer les petits calls légitimes.
+            input_tokens = cls.estimate_input_tokens(payload)
+            return min(4096, max(int(input_tokens * 2), 512))
 
-        # Par défaut : 75% des tokens d'entrée, avec un maximum raisonnable
+        input_tokens = cls.estimate_input_tokens(payload)
         return min(4096, int(input_tokens * 0.75))
 
 
@@ -210,6 +215,6 @@ def estimate_input_tokens(payload: dict) -> int:
     return TokenEstimator.estimate_input_tokens(payload)
 
 
-def estimate_output_tokens(payload: dict) -> int:
+def estimate_output_tokens(payload: dict, conservative: bool = False) -> int:
     """Fonction de compatibilité avec l'interface existante."""
-    return TokenEstimator.estimate_output_tokens(payload)
+    return TokenEstimator.estimate_output_tokens(payload, conservative=conservative)

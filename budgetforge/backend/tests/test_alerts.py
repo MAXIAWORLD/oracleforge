@@ -52,7 +52,8 @@ class TestAlertTriggered:
     @pytest.mark.asyncio
     async def test_alert_sent_when_threshold_crossed(self, client):
         """send_email appelé quand usage dépasse threshold après un appel proxy."""
-        # Budget $0.001 → 10+5 tokens gpt-4o ≈ $0.0000375 — mais threshold=1% → alert dès le premier appel
+        # gpt-4o coûte ~$0.000265 estimé pour "Hi" → budget doit dépasser ce seuil.
+        # Après call réel (10+5 tokens = $0.000125), 1% de $0.001 = $0.00001 → alert déclenchée.
         proj = (
             await client.post(
                 "/api/projects",
@@ -61,7 +62,7 @@ class TestAlertTriggered:
         ).json()
         await client.put(
             f"/api/projects/{proj['id']}/budget",
-            json={"budget_usd": 0.0001, "alert_threshold_pct": 1, "action": "block"},
+            json={"budget_usd": 0.001, "alert_threshold_pct": 1, "action": "block"},
         )
         with (
             patch(

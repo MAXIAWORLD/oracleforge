@@ -277,7 +277,7 @@ async def prebill_usage(
     Retourne l'ID de l'enregistrement pour finalisation ultérieure.
     """
     tokens_in = estimate_input_tokens(payload)
-    tokens_out = estimate_output_tokens(payload)
+    tokens_out = estimate_output_tokens(payload, conservative=True)
     try:
         cost = await CostCalculator.compute_cost(model, tokens_in, tokens_out)
     except UnknownModelError:
