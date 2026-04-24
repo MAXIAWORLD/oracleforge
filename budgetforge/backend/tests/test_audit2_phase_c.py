@@ -395,7 +395,10 @@ class TestBudgetLockConcurrency:
                 new_callable=AsyncMock,
                 return_value=mock_response,
             ),
-            patch("routes.proxy.CostCalculator.compute_cost", return_value=0.00015),
+            patch(
+                "services.cost_calculator.CostCalculator.compute_cost",
+                return_value=0.00015,
+            ),
         ):
             resp1 = await client.post(
                 "/proxy/openai/v1/chat/completions",

@@ -1,9 +1,9 @@
 """Tests d'intégration avec fixtures réalistes."""
 
+pytest_plugins = ["fixtures.integration"]
+
 from fixtures.realistic_data import create_realistic_project, PROJECTS_REALISTIC
-from fixtures.integration import (
-    run_integration_test,
-)
+from fixtures.integration import run_integration_test
 
 
 class TestRealisticIntegration:

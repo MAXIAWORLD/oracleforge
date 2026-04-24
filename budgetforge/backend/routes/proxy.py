@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from core.limiter import limiter
 from services import proxy_dispatcher
+from services.proxy_forwarder import ProxyForwarder  # noqa: F401 — kept for mock compatibility
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["proxy"])
