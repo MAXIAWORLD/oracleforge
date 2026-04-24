@@ -34,34 +34,26 @@ guard = BudgetGuard()
 
 _GRACE_PERIOD_MINUTES = 5
 
-_FORWARD_MAPPING = {
-    "openai": (ProxyForwarder.forward_openai, ProxyForwarder.forward_openai_stream),
-    "anthropic": (
-        ProxyForwarder.forward_anthropic,
-        ProxyForwarder.forward_anthropic_stream,
-    ),
-    "google": (ProxyForwarder.forward_google, ProxyForwarder.forward_google_stream),
-    "deepseek": (
-        ProxyForwarder.forward_deepseek,
-        ProxyForwarder.forward_deepseek_stream,
-    ),
-    "openrouter": (
-        ProxyForwarder.forward_openrouter,
-        ProxyForwarder.forward_openrouter_stream,
-    ),
-    "together": (
-        ProxyForwarder.forward_together,
-        ProxyForwarder.forward_together_stream,
-    ),
-    "azure-openai": (
-        ProxyForwarder.forward_azure_openai,
-        ProxyForwarder.forward_azure_openai_stream,
-    ),
-    "aws-bedrock": (
-        ProxyForwarder.forward_aws_bedrock,
-        ProxyForwarder.forward_aws_bedrock_stream,
-    ),
+_FORWARD_NAMES: dict[str, tuple[str, str]] = {
+    "openai": ("forward_openai", "forward_openai_stream"),
+    "anthropic": ("forward_anthropic", "forward_anthropic_stream"),
+    "google": ("forward_google", "forward_google_stream"),
+    "deepseek": ("forward_deepseek", "forward_deepseek_stream"),
+    "openrouter": ("forward_openrouter", "forward_openrouter_stream"),
+    "together": ("forward_together", "forward_together_stream"),
+    "azure-openai": ("forward_azure_openai", "forward_azure_openai_stream"),
+    "aws-bedrock": ("forward_aws_bedrock", "forward_aws_bedrock_stream"),
 }
+
+
+def _resolve_forward_fns(provider_name: str):
+    """Resolves forward functions at call time so mocks remain effective."""
+    names = _FORWARD_NAMES.get(provider_name)
+    if not names:
+        return None, None
+    return getattr(ProxyForwarder, names[0], None), getattr(
+        ProxyForwarder, names[1], None
+    )
 
 
 def get_project_by_api_key(authorization: Optional[str], db: Session) -> Project:
@@ -188,7 +180,7 @@ async def prepare_request(
 
     timeout_s = project.proxy_timeout_ms / 1000.0 if project.proxy_timeout_ms else 60.0
     max_retries = project.proxy_retries or 0
-    forward_fn, forward_stream_fn = _FORWARD_MAPPING.get(provider_name, (None, None))
+    forward_fn, forward_stream_fn = _resolve_forward_fns(provider_name)
 
     return {
         "payload": payload,
