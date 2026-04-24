@@ -1,16 +1,17 @@
 import ipaddress
+import socket
 from urllib.parse import urlparse
 
 _BLOCKED_NETWORKS = [
-    ipaddress.ip_network("127.0.0.0/8"),      # loopback
-    ipaddress.ip_network("10.0.0.0/8"),        # RFC 1918
-    ipaddress.ip_network("172.16.0.0/12"),     # RFC 1918
-    ipaddress.ip_network("192.168.0.0/16"),    # RFC 1918
-    ipaddress.ip_network("169.254.0.0/16"),    # link-local (AWS metadata etc.)
+    ipaddress.ip_network("127.0.0.0/8"),  # loopback
+    ipaddress.ip_network("10.0.0.0/8"),  # RFC 1918
+    ipaddress.ip_network("172.16.0.0/12"),  # RFC 1918
+    ipaddress.ip_network("192.168.0.0/16"),  # RFC 1918
+    ipaddress.ip_network("169.254.0.0/16"),  # link-local (AWS metadata etc.)
     ipaddress.ip_network("0.0.0.0/8"),
-    ipaddress.ip_network("::1/128"),           # IPv6 loopback
-    ipaddress.ip_network("fc00::/7"),          # IPv6 ULA
-    ipaddress.ip_network("fe80::/10"),         # IPv6 link-local
+    ipaddress.ip_network("::1/128"),  # IPv6 loopback
+    ipaddress.ip_network("fc00::/7"),  # IPv6 ULA
+    ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
 ]
 
 _BLOCKED_HOSTNAMES = {"localhost", "metadata.google.internal"}
@@ -37,7 +38,20 @@ def is_safe_webhook_url(url: str) -> bool:
                 if addr in network:
                     return False
         except ValueError:
-            pass  # domain name, pas une IP — autorisé par défaut
+            # domain name — résoudre DNS et vérifier chaque IP résolue
+            try:
+                resolved = socket.getaddrinfo(hostname, None)
+            except OSError:
+                return False  # non résolvable → refus fail-safe
+            for item in resolved:
+                ip_str = item[4][0]
+                try:
+                    addr = ipaddress.ip_address(ip_str)
+                    for network in _BLOCKED_NETWORKS:
+                        if addr in network:
+                            return False
+                except ValueError:
+                    pass
         return True
     except Exception:
         return False
