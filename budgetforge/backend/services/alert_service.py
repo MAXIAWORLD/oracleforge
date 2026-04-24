@@ -2,9 +2,11 @@ import smtplib
 import httpx
 import logging
 from email.mime.text import MIMEText
+from urllib.parse import urlparse as _urlparse
 from sqlalchemy.orm import Session
 from core.config import settings
 from core.models import SiteSetting
+from core.url_validator import resolve_safe_host
 
 logger = logging.getLogger(__name__)
 
@@ -82,21 +84,25 @@ class AlertService:
                 "budget_usd": budget_usd,
                 "pct_used": pct,
             }
-        # F4 — revalider l'URL immédiatement avant le POST pour mitiger le DNS rebinding.
-        # La validation au save peut être obsolète (TOCTOU) si un attaquant a modifié
-        # le DNS entre-temps. On re-résout + re-valide à la dernière seconde.
-        from core.url_validator import is_safe_webhook_url
-
-        if not is_safe_webhook_url(url):
-            logger.warning(
-                "Webhook alert refused for %s: URL failed SSRF re-check at send time",
-                project_name,
-            )
+        # DNS rebinding TOCTOU fix: résoudre l'IP une fois, valider, pinner dans la requête.
+        try:
+            pinned_url, host_header = resolve_safe_host(url)
+        except ValueError as exc:
+            logger.warning("Webhook alert refused for %s: %s", project_name, exc)
             return False
 
+        scheme = _urlparse(url).scheme
         try:
-            async with httpx.AsyncClient(timeout=5.0, follow_redirects=False) as client:
-                await client.post(url, json=payload)
+            async with httpx.AsyncClient(
+                timeout=5.0,
+                follow_redirects=False,
+                verify=(scheme == "https"),
+            ) as client:
+                await client.post(
+                    pinned_url,
+                    json=payload,
+                    headers={"Host": host_header},
+                )
             return True
         except Exception as e:
             logger.warning(f"Webhook alert failed for {project_name}: {e}")

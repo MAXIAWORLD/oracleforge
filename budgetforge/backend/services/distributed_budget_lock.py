@@ -1,8 +1,12 @@
 import asyncio
+import sys
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Optional
 import logging
+
+if sys.platform != "win32":
+    import fcntl as _fcntl
 
 logger = logging.getLogger(__name__)
 
@@ -107,12 +111,34 @@ async def _get_memory_lock(project_id: int) -> asyncio.Lock:
         return _memory_locks[project_id]
 
 
+def _acquire_file_lock(path: str) -> object:
+    fh = open(path, "w")
+    _fcntl.flock(fh, _fcntl.LOCK_EX)
+    return fh
+
+
+def _release_file_lock(fh) -> None:
+    try:
+        _fcntl.flock(fh, _fcntl.LOCK_UN)
+    finally:
+        fh.close()
+
+
 @asynccontextmanager
 async def fallback_budget_lock(project_id: int) -> AsyncIterator[None]:
-    """Fallback mémoire pour compatibilité single-process."""
-    lock = await _get_memory_lock(project_id)
-    async with lock:
+    """Fallback cross-process via fcntl.flock sur Linux, asyncio.Lock sur Windows."""
+    if sys.platform == "win32":
+        lock = await _get_memory_lock(project_id)
+        async with lock:
+            yield
+        return
+
+    lock_path = f"/tmp/bf_budget_{project_id}.lock"
+    fh = await asyncio.to_thread(_acquire_file_lock, lock_path)
+    try:
         yield
+    finally:
+        await asyncio.to_thread(_release_file_lock, fh)
 
 
 # Export principal: utilise Redis si disponible, sinon fallback mémoire

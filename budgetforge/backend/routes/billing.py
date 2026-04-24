@@ -164,14 +164,36 @@ async def _handle_checkout_completed(session: dict, db: Session) -> None:
 
 
 @router.get("/api/billing/reconcile/{session_id}")
-async def reconcile_stripe_session(session_id: str, db: Session = Depends(get_db)):
+@limiter.limit("5/hour")
+async def reconcile_stripe_session(
+    request: Request, session_id: str, db: Session = Depends(get_db)
+):
+    # Idempotency: one reconcile per session_id
+    reconcile_key = f"reconcile:{session_id}"
+    existing = (
+        db.query(StripeEvent).filter(StripeEvent.event_id == reconcile_key).first()
+    )
+    if existing:
+        return {"ok": True, "already_processed": True}
+    db.add(StripeEvent(event_id=reconcile_key))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return {"ok": True, "already_processed": True}
+
     stripe.api_key = settings.stripe_secret_key
     try:
         session = stripe.checkout.Session.retrieve(session_id)
     except Exception as e:
+        # Rollback idempotency record so caller can retry
+        db.query(StripeEvent).filter(StripeEvent.event_id == reconcile_key).delete()
+        db.commit()
         raise HTTPException(status_code=500, detail=f"Stripe error: {e}")
 
     if session.get("payment_status") != "paid":
+        db.query(StripeEvent).filter(StripeEvent.event_id == reconcile_key).delete()
+        db.commit()
         raise HTTPException(status_code=402, detail="Payment not completed")
 
     await _handle_checkout_completed(session, db)

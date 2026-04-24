@@ -320,13 +320,21 @@ async def finalize_usage(
             "cost_usd": actual_cost,
         }
     )
-    db.commit()
+    try:
+        db.commit()
+    except Exception as exc:
+        logger.error("finalize_usage commit failed for usage_id=%s: %s", usage_id, exc)
+        db.rollback()
 
 
 def cancel_usage(db: Session, usage_id: int) -> None:
     """H5: supprime l'enregistrement pre-bill si l'appel LLM a échoué."""
     db.query(Usage).filter(Usage.id == usage_id).delete()
-    db.commit()
+    try:
+        db.commit()
+    except Exception as exc:
+        logger.error("cancel_usage commit failed for usage_id=%s: %s", usage_id, exc)
+        db.rollback()
 
 
 # ── Alert ─────────────────────────────────────────────────────────────────────

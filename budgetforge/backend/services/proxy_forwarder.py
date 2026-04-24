@@ -223,9 +223,17 @@ class ProxyForwarder:
 
     @staticmethod
     async def forward_azure_openai(
-        request_body: dict, api_key: str, base_url: str, timeout_s: float = 60.0
+        request_body: dict, api_key: str, timeout_s: float = 60.0
     ) -> dict:
         """Azure OpenAI via leur endpoint OpenAI-compatible."""
+        from fastapi import HTTPException
+
+        base_url = settings.azure_openai_base_url
+        if not base_url:
+            raise HTTPException(
+                status_code=400,
+                detail="AZURE_OPENAI_BASE_URL not configured on this server",
+            )
         async with httpx.AsyncClient(timeout=timeout_s) as client:
             resp = await client.post(
                 f"{base_url}/openai/deployments/{request_body.get('model', 'gpt-4o')}/chat/completions?api-version=2024-02-15-preview",
@@ -237,9 +245,17 @@ class ProxyForwarder:
 
     @staticmethod
     async def forward_azure_openai_stream(
-        request_body: dict, api_key: str, base_url: str, timeout_s: float = 120.0
+        request_body: dict, api_key: str, timeout_s: float = 120.0
     ):
         """Azure OpenAI streaming via leur endpoint OpenAI-compatible."""
+        from fastapi import HTTPException
+
+        base_url = settings.azure_openai_base_url
+        if not base_url:
+            raise HTTPException(
+                status_code=400,
+                detail="AZURE_OPENAI_BASE_URL not configured on this server",
+            )
         async with httpx.AsyncClient(timeout=timeout_s) as client:
             async with client.stream(
                 "POST",

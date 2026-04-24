@@ -57,20 +57,26 @@ LOCAL_PROVIDERS = {"ollama"}
 class CostCalculator:
     @staticmethod
     async def get_price(model: str) -> ModelPrice:
-        """Obtient le prix d'un modèle via le système dynamique."""
+        """Obtient le prix d'un modèle. Priorité : statique > dynamique."""
         normalized = model.lower()
         if normalized.startswith("ollama/"):
             return ModelPrice(0.0, 0.0)
 
+        # Priorité 1 : prix statiques (source de confiance, bypass-proof)
+        static = _PRICES.get(normalized)
+        if static is not None:
+            return static
+
+        # Priorité 2 : prix dynamiques pour modèles inconnus — valider > 0
         try:
-            # Essayer d'abord le système dynamique
-            return await get_dynamic_price(model)
-        except (ValueError, Exception):
-            # Fallback vers les prix statiques
-            price = _PRICES.get(normalized)
-            if price is None:
-                raise UnknownModelError(f"Unknown model: {model!r}")
+            price = await get_dynamic_price(model)
+            if price.input_per_1m_usd <= 0 and price.output_per_1m_usd <= 0:
+                raise ValueError(
+                    f"Dynamic price=0 for non-free model {model!r} — refused"
+                )
             return price
+        except (ValueError, Exception) as exc:
+            raise UnknownModelError(f"Unknown model: {model!r}") from exc
 
     @staticmethod
     async def compute_cost(model: str, tokens_in: int, tokens_out: int) -> float:
