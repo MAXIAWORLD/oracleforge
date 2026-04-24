@@ -112,7 +112,7 @@ class ProjectResponse(BaseModel):
 
 
 class BudgetResponse(BaseModel):
-    budget_usd: float
+    budget_usd: Optional[float]
     alert_threshold_pct: int
     action: str
     reset_period: str = "none"
@@ -272,7 +272,9 @@ def set_budget(project_id: int, payload: BudgetUpdate, db: Session = Depends(get
     db.commit()
     db.refresh(project)
     warning = None
-    if project.budget_usd == 0 and project.action == BudgetActionEnum.block:
+    if project.budget_usd is None:
+        warning = "Aucun budget défini — ce projet est illimité et consommera sans restriction."
+    elif project.budget_usd == 0 and project.action == BudgetActionEnum.block:
         warning = (
             "budget_usd=0 avec action=block bloquera immédiatement toutes les requêtes."
         )

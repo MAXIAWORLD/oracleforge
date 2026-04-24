@@ -16,6 +16,8 @@ type Project = {
   name: string;
   api_key: string;
   plan: string;
+  budget_usd: number | null;
+  unlimited_budget: boolean;
   created_at: string | null;
 };
 
@@ -287,6 +289,19 @@ function PortalContent() {
                   </div>
                 </div>
               </div>
+              {p.unlimited_budget && (
+                <div
+                  className="mt-4 rounded-md px-3 py-2 text-xs font-medium"
+                  style={{
+                    background: "#7c3d0020",
+                    border: "1px solid #f97316",
+                    color: "#f97316",
+                  }}
+                >
+                  ⚠ No budget set — this project has unlimited spend. Set a
+                  budget in your admin dashboard.
+                </div>
+              )}
               <UsageChart projectId={p.id} />
               <p className="text-[10px] mt-3" style={{ color: "#c8d8e8" }}>
                 Add header{" "}

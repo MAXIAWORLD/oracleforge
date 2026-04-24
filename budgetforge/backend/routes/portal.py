@@ -190,6 +190,8 @@ def _project_list(projects: list) -> list:
             "name": p.name,
             "api_key": p.api_key,
             "plan": p.plan,
+            "budget_usd": p.budget_usd,
+            "unlimited_budget": p.budget_usd is None,
             "created_at": p.created_at.isoformat() if p.created_at else None,
         }
         for p in projects

@@ -85,7 +85,11 @@ class SignupFreeRequest(BaseModel):
         v = v.strip().lower()
         if not _EMAIL_RE.match(v):
             raise ValueError("Invalid email address")
-        return v
+        # Strip +tag alias (user+tag@gmail.com → user@gmail.com)
+        local, sep, domain = v.partition("@")
+        if "+" in local:
+            local = local.split("+", 1)[0]
+        return f"{local}{sep}{domain}"
 
 
 async def _verify_turnstile(token: Optional[str], client_ip: str) -> bool:
