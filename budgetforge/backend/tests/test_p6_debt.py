@@ -2,11 +2,12 @@
 
 P6.1 : cleanup_expired_tokens(db) ajouté à routes/portal.py, appelé lazily dans portal_request
 P6.2 : _dispatch_openai_format et _dispatch_anthropic_format extraits de routes/proxy.py
-P6.3 : datetime.utcnow() uniformisé (plus de .now() ni .now(timezone.utc).replace(tzinfo=None))
+P6.3 : datetime.now(timezone.utc).replace(tzinfo=None) uniformisé (plus de .now() ni .now(timezone.utc).replace(tzinfo=None))
 """
+
 import os
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -25,6 +26,7 @@ _Session = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 @pytest.fixture()
 def db():
     from core.database import Base
+
     Base.metadata.create_all(bind=_engine)
     session = _Session()
     try:
@@ -50,8 +52,8 @@ def client(db):
 
 # ── P6.1 — cleanup_expired_tokens ──────────────────────────────────────────────
 
-class TestCleanupExpiredTokens:
 
+class TestCleanupExpiredTokens:
     def test_function_is_importable(self):
         """cleanup_expired_tokens doit exister dans routes.portal."""
         from routes.portal import cleanup_expired_tokens  # noqa: F401
@@ -61,8 +63,16 @@ class TestCleanupExpiredTokens:
         from routes.portal import cleanup_expired_tokens
         from core.models import PortalToken
 
-        exp1 = PortalToken(email="a@b.com", expires_at=datetime.utcnow() - timedelta(hours=2))
-        exp2 = PortalToken(email="b@b.com", expires_at=datetime.utcnow() - timedelta(minutes=1))
+        exp1 = PortalToken(
+            email="a@b.com",
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            - timedelta(hours=2),
+        )
+        exp2 = PortalToken(
+            email="b@b.com",
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            - timedelta(minutes=1),
+        )
         db.add_all([exp1, exp2])
         db.commit()
 
@@ -76,7 +86,11 @@ class TestCleanupExpiredTokens:
         from routes.portal import cleanup_expired_tokens
         from core.models import PortalToken
 
-        valid = PortalToken(email="v@b.com", expires_at=datetime.utcnow() + timedelta(hours=1))
+        valid = PortalToken(
+            email="v@b.com",
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            + timedelta(hours=1),
+        )
         db.add(valid)
         db.commit()
 
@@ -90,8 +104,16 @@ class TestCleanupExpiredTokens:
         from routes.portal import cleanup_expired_tokens
         from core.models import PortalToken
 
-        valid = PortalToken(email="v@b.com", expires_at=datetime.utcnow() + timedelta(hours=1))
-        expired = PortalToken(email="e@b.com", expires_at=datetime.utcnow() - timedelta(hours=1))
+        valid = PortalToken(
+            email="v@b.com",
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            + timedelta(hours=1),
+        )
+        expired = PortalToken(
+            email="e@b.com",
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            - timedelta(hours=1),
+        )
         db.add_all([valid, expired])
         db.commit()
 
@@ -107,7 +129,8 @@ class TestCleanupExpiredTokens:
 
         expired = PortalToken(
             email="stale@example.com",
-            expires_at=datetime.utcnow() - timedelta(hours=2),
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            - timedelta(hours=2),
         )
         db.add(expired)
         db.commit()
@@ -117,62 +140,67 @@ class TestCleanupExpiredTokens:
         assert resp.status_code == 200
 
         db.expire_all()
-        remaining = db.query(PortalToken).filter(
-            PortalToken.email == "stale@example.com"
-        ).first()
-        assert remaining is None, "Le token expiré doit être supprimé par portal_request"
+        remaining = (
+            db.query(PortalToken)
+            .filter(PortalToken.email == "stale@example.com")
+            .first()
+        )
+        assert remaining is None, (
+            "Le token expiré doit être supprimé par portal_request"
+        )
 
 
 # ── P6.2 — Déduplication handlers proxy ────────────────────────────────────────
 
+
 class TestProxyDispatchRefactor:
+    """E6 : les dispatchers sont extraits dans services.proxy_dispatcher."""
 
     def test_dispatch_openai_format_exists(self):
-        """_dispatch_openai_format doit exister dans routes.proxy."""
-        from routes.proxy import _dispatch_openai_format  # noqa: F401
+        from services.proxy_dispatcher import dispatch_openai_format  # noqa: F401
 
     def test_dispatch_anthropic_format_exists(self):
-        """_dispatch_anthropic_format doit exister dans routes.proxy."""
-        from routes.proxy import _dispatch_anthropic_format  # noqa: F401
+        from services.proxy_dispatcher import dispatch_anthropic_format  # noqa: F401
 
     def test_proxy_openai_calls_dispatch(self):
-        """proxy_openai doit appeler _dispatch_openai_format."""
         import inspect
         from routes import proxy
+
         source = inspect.getsource(proxy.proxy_openai)
-        assert "_dispatch_openai_format" in source, (
-            "proxy_openai doit déléguer à _dispatch_openai_format"
+        assert "dispatch_openai_format" in source, (
+            "proxy_openai doit déléguer à proxy_dispatcher.dispatch_openai_format"
         )
 
     def test_proxy_google_calls_dispatch(self):
-        """proxy_google doit appeler _dispatch_openai_format."""
         import inspect
         from routes import proxy
+
         source = inspect.getsource(proxy.proxy_google)
-        assert "_dispatch_openai_format" in source, (
-            "proxy_google doit déléguer à _dispatch_openai_format"
+        assert "dispatch_openai_format" in source, (
+            "proxy_google doit déléguer à proxy_dispatcher.dispatch_openai_format"
         )
 
     def test_proxy_deepseek_calls_dispatch(self):
-        """proxy_deepseek doit appeler _dispatch_openai_format."""
         import inspect
         from routes import proxy
+
         source = inspect.getsource(proxy.proxy_deepseek)
-        assert "_dispatch_openai_format" in source, (
-            "proxy_deepseek doit déléguer à _dispatch_openai_format"
+        assert "dispatch_openai_format" in source, (
+            "proxy_deepseek doit déléguer à proxy_dispatcher.dispatch_openai_format"
         )
 
     def test_proxy_anthropic_calls_dispatch(self):
-        """proxy_anthropic doit appeler _dispatch_anthropic_format."""
         import inspect
         from routes import proxy
+
         source = inspect.getsource(proxy.proxy_anthropic)
-        assert "_dispatch_anthropic_format" in source, (
-            "proxy_anthropic doit déléguer à _dispatch_anthropic_format"
+        assert "dispatch_anthropic_format" in source, (
+            "proxy_anthropic doit déléguer à proxy_dispatcher.dispatch_anthropic_format"
         )
 
 
-# ── P6.3 — Uniformisation datetime.utcnow() ────────────────────────────────────
+# ── P6.3 — Uniformisation datetime.now(timezone.utc).replace(tzinfo=None) ────────────────────────────────────
+
 
 def _read_backend_file(*rel_path: str) -> str:
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -181,39 +209,5 @@ def _read_backend_file(*rel_path: str) -> str:
         return f.read()
 
 
-class TestDatetimeUniformity:
-
-    def test_models_no_now_timezone(self):
-        """core/models.py : pas de datetime.now(timezone.utc).replace(tzinfo=None)."""
-        src = _read_backend_file("core", "models.py")
-        assert "datetime.now(timezone.utc)" not in src, (
-            "core/models.py doit utiliser datetime.utcnow(), pas now(timezone.utc)"
-        )
-
-    def test_plan_quota_no_now_timezone(self):
-        """services/plan_quota.py : pas de datetime.now(timezone.utc)."""
-        src = _read_backend_file("services", "plan_quota.py")
-        assert "datetime.now(timezone.utc)" not in src, (
-            "plan_quota.py doit utiliser datetime.utcnow()"
-        )
-
-    def test_proxy_no_bare_now(self):
-        """routes/proxy.py : pas de datetime.now() sans timezone."""
-        src = _read_backend_file("routes", "proxy.py")
-        assert "datetime.now()" not in src, (
-            "routes/proxy.py doit utiliser datetime.utcnow()"
-        )
-
-    def test_budget_guard_no_bare_now(self):
-        """services/budget_guard.py : pas de datetime.now() sans timezone."""
-        src = _read_backend_file("services", "budget_guard.py")
-        assert "datetime.now()" not in src, (
-            "budget_guard.py doit utiliser datetime.utcnow()"
-        )
-
-    def test_projects_route_no_bare_now(self):
-        """routes/projects.py : pas de datetime.now() sans timezone."""
-        src = _read_backend_file("routes", "projects.py")
-        assert "datetime.now()" not in src, (
-            "routes/projects.py doit utiliser datetime.utcnow()"
-        )
+# TestDatetimeUniformity supprimé : remplacé par tests/test_audit2_phase_d.py
+# (Phase D1 exige datetime.now(timezone.utc) au lieu de datetime.now(timezone.utc).replace(tzinfo=None) — deprecated en Py 3.12).
