@@ -1,4 +1,5 @@
 import asyncio
+import secrets
 import sys
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
@@ -71,15 +72,17 @@ async def distributed_budget_lock(
     # TTL du lock (en secondes) - assez long pour couvrir la phase critique
     lock_ttl = 60
 
+    # B4.2 (C08): token unique pour delete-if-owner (Lua atomique)
+    token = secrets.token_urlsafe(16).encode()
+
     # Essayer d'acquérir le lock avec SET NX EX (atomic)
-    acquired = await redis_client.set(lock_key, b"locked", nx=True, ex=lock_ttl)
+    acquired = await redis_client.set(lock_key, token, nx=True, ex=lock_ttl)
 
     if not acquired:
         # Le lock est déjà pris, attendre avec timeout
         start_time = asyncio.get_event_loop().time()
         while asyncio.get_event_loop().time() - start_time < timeout:
-            # Vérifier si le lock est libéré
-            acquired = await redis_client.set(lock_key, b"locked", nx=True, ex=lock_ttl)
+            acquired = await redis_client.set(lock_key, token, nx=True, ex=lock_ttl)
             if acquired:
                 break
             await asyncio.sleep(0.1)  # Polling toutes les 100ms
@@ -88,12 +91,20 @@ async def distributed_budget_lock(
                 f"Could not acquire lock for project {project_id} within {timeout}s"
             )
 
+    # Script Lua : delete-if-token-matches (atomic, évite de supprimer le lock d'un autre worker)
+    _LUA_RELEASE = """
+if redis.call("get", KEYS[1]) == ARGV[1] then
+    return redis.call("del", KEYS[1])
+else
+    return 0
+end
+"""
+
     try:
         yield
     finally:
-        # Libérer le lock
         try:
-            await redis_client.delete(lock_key)
+            await redis_client.eval(_LUA_RELEASE, 1, lock_key, token)
         except Exception as e:
             logger.warning(f"Failed to release lock for project {project_id}: {e}")
 
@@ -112,7 +123,11 @@ async def _get_memory_lock(project_id: int) -> asyncio.Lock:
 
 
 def _acquire_file_lock(path: str) -> object:
-    fh = open(path, "w")
+    # B4.3 (H02): O_NOFOLLOW empêche l'attaque symlink par un utilisateur local
+    import os
+
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    fh = os.fdopen(fd, "r+")
     _fcntl.flock(fh, _fcntl.LOCK_EX)
     return fh
 

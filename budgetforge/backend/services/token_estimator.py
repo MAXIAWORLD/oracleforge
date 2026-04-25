@@ -3,6 +3,29 @@
 import re
 from typing import Dict, List
 
+# B4.7 (H05): limites réelles par modèle pour clamper max_tokens trop grand
+_MODEL_MAX_OUTPUT_TOKENS: dict[str, int] = {
+    "gpt-4o": 16_384,
+    "gpt-4o-mini": 16_384,
+    "gpt-4-turbo": 4_096,
+    "gpt-4": 4_096,
+    "gpt-3.5-turbo": 4_096,
+    "o1": 100_000,
+    "o3-mini": 100_000,
+    "claude-opus-4-7": 8_192,
+    "claude-sonnet-4-6": 8_192,
+    "claude-haiku-4-5-20251001": 8_192,
+    "claude-haiku-4-5": 8_192,
+    "gemini-1.5-pro": 8_192,
+    "gemini-1.5-flash": 8_192,
+    "gemini-2.0-flash": 8_192,
+    "deepseek-chat": 8_192,
+    "deepseek-reasoner": 8_192,
+    "mistral-large": 4_096,
+    "mistral-small": 4_096,
+}
+_DEFAULT_MAX_OUTPUT_TOKENS = 8_192
+
 
 class TokenEstimator:
     """Estimateur de tokens amélioré avec facteurs de correction par langue et type de contenu."""
@@ -197,7 +220,10 @@ class TokenEstimator:
         """
         max_tokens = payload.get("max_tokens")
         if max_tokens is not None:
-            return max_tokens
+            # B4.7 (H05): clamper max_tokens à la limite réelle du modèle
+            model = payload.get("model", "")
+            cap = _MODEL_MAX_OUTPUT_TOKENS.get(model, _DEFAULT_MAX_OUTPUT_TOKENS)
+            return min(max_tokens, cap)
 
         if conservative:
             # Borne haute : réserve au moins 512 tokens, jusqu'à 4096.

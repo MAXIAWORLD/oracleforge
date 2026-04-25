@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import re
+import secrets
 import stripe
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -126,7 +128,7 @@ async def _handle_checkout_completed(session: dict, db: Session) -> None:
     customer_id = session.get("customer")
     subscription_id = session.get("subscription")
 
-    # P2.1 — idempotence: upsert if subscription already exists
+    # Idempotence: upsert if subscription already exists (P2.1)
     if subscription_id:
         existing = (
             db.query(Project)
@@ -144,8 +146,28 @@ async def _handle_checkout_completed(session: dict, db: Session) -> None:
             )
             return
 
+    # B2.1 (C14/C15): upsert via email — évite IntegrityError si projet free existe déjà
+    existing_by_email = db.query(Project).filter(Project.name == email).first()
+    if existing_by_email:
+        existing_by_email.plan = plan
+        existing_by_email.stripe_customer_id = customer_id
+        existing_by_email.stripe_subscription_id = subscription_id
+        db.commit()
+        logger.info(
+            "Existing project %s upgraded to %s (email=%s)",
+            existing_by_email.id,
+            plan,
+            mask_email(email),
+        )
+        await asyncio.to_thread(
+            send_onboarding_email, email, existing_by_email.api_key, plan
+        )
+        return
+
+    # Nouveau projet (utilisateur qui n'avait pas de compte free)
     project = Project(
         name=email,
+        owner_email=email,
         plan=plan,
         stripe_customer_id=customer_id,
         stripe_subscription_id=subscription_id,
@@ -210,10 +232,16 @@ def _handle_subscription_deleted(subscription: dict, db: Session) -> None:
         .first()
     )
     if project:
+        # B2.2 (C21): rotation clé API + reset budget au downgrade
+        old_key = project.api_key
         project.plan = "free"
+        project.budget_usd = None
+        project.previous_api_key = old_key
+        project.api_key = f"bf-{secrets.token_urlsafe(32)}"
+        project.key_rotated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
         logger.info(
-            "Project %s downgraded to free (subscription %s cancelled)",
+            "Project %s downgraded to free, API key rotated (subscription %s cancelled)",
             project.id,
             subscription_id,
         )

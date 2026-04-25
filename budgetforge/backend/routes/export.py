@@ -12,13 +12,23 @@ from core.auth import require_viewer
 
 router = APIRouter(prefix="/api/usage", tags=["export"])
 
+_CSV_INJECTION_CHARS = frozenset("=+-@\t\r")
+
+
+def _safe_csv_cell(val) -> str:
+    """B7.3 (H14): préfixe par ' les valeurs CSV qui commencent par des chars d'injection Excel."""
+    s = str(val) if val is not None else ""
+    if s and s[0] in _CSV_INJECTION_CHARS:
+        return "'" + s
+    return s
+
 
 def _query_usages(
     db: Session,
     project_id: Optional[int],
     date_from_dt,
     date_to_dt,
-) -> list:
+):
     q = db.query(Usage)
     if project_id is not None:
         q = q.filter(Usage.project_id == project_id)
@@ -26,7 +36,7 @@ def _query_usages(
         q = q.filter(Usage.created_at >= date_from_dt)
     if date_to_dt is not None:
         q = q.filter(Usage.created_at <= date_to_dt)
-    return q.order_by(Usage.created_at.desc()).all()
+    return q.order_by(Usage.created_at.desc())
 
 
 @router.get("/export", dependencies=[Depends(require_viewer)])
@@ -41,10 +51,11 @@ async def export_usage(
     if format not in ("csv", "json"):
         raise HTTPException(status_code=400, detail="format must be 'csv' or 'json'")
 
-    is_global_admin = (
-        not settings.admin_api_key  # dev mode — pas de clé configurée
-        or x_admin_key == settings.admin_api_key  # prod mode — clé globale valide
-    )
+    # B1.3 — Defense in depth (audit C17)
+    if settings.admin_api_key:
+        is_global_admin = x_admin_key == settings.admin_api_key
+    else:
+        is_global_admin = settings.app_env != "production"
     if project_id is None and not is_global_admin:
         raise HTTPException(
             status_code=400,
@@ -57,9 +68,10 @@ async def export_usage(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=f"Invalid date format: {exc}")
 
-    records = _query_usages(db, project_id, date_from_dt, date_to_dt)
+    q = _query_usages(db, project_id, date_from_dt, date_to_dt)
 
     if format == "json":
+        records = q.all()
         return [
             {
                 "id": u.id,
@@ -88,24 +100,37 @@ async def export_usage(
     ]
 
     def generate_csv():
+        # B7.4 (C18): yield_per(1000) pour éviter OOM sur grosses DB
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=fields)
         writer.writeheader()
-        for u in records:
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate()
+
+        for u in q.yield_per(1000):
             writer.writerow(
                 {
-                    "id": u.id,
-                    "project_id": u.project_id,
-                    "provider": u.provider,
-                    "model": u.model,
-                    "tokens_in": u.tokens_in,
-                    "tokens_out": u.tokens_out,
-                    "cost_usd": u.cost_usd,
-                    "agent": u.agent or "",
-                    "created_at": u.created_at.isoformat() if u.created_at else "",
+                    "id": _safe_csv_cell(u.id),
+                    "project_id": _safe_csv_cell(u.project_id),
+                    "provider": _safe_csv_cell(u.provider),
+                    "model": _safe_csv_cell(u.model),
+                    "tokens_in": _safe_csv_cell(u.tokens_in),
+                    "tokens_out": _safe_csv_cell(u.tokens_out),
+                    "cost_usd": _safe_csv_cell(u.cost_usd),
+                    "agent": _safe_csv_cell(u.agent or ""),
+                    "created_at": _safe_csv_cell(
+                        u.created_at.isoformat() if u.created_at else ""
+                    ),
                 }
             )
-        yield output.getvalue()
+            if output.tell() > 65536:  # flush toutes les ~64KB
+                yield output.getvalue()
+                output.seek(0)
+                output.truncate()
+
+        if output.tell() > 0:
+            yield output.getvalue()
 
     timestamp = (
         datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y%m%d_%H%M%S")

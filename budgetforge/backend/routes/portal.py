@@ -30,6 +30,15 @@ def cleanup_expired_tokens(db: Session) -> None:
     db.commit()
 
 
+def cleanup_old_revoked_sessions(db: Session) -> None:
+    """B7.6 (M05): purge les sessions révoquées de plus de 90 jours pour éviter la croissance illimitée."""
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=90)
+    db.query(PortalRevokedSession).filter(
+        PortalRevokedSession.revoked_at < cutoff
+    ).delete()
+    db.commit()
+
+
 def _portal_secret() -> bytes:
     if not settings.portal_secret:
         if settings.app_env == "production":
@@ -129,7 +138,8 @@ def portal_request(
 ):
     cleanup_expired_tokens(db)
     email = body.email.strip().lower()
-    projects = db.query(Project).filter(Project.name == email).all()
+    # B3: cherche par owner_email en priorité (multi-projet), fallback name (compat)
+    projects = _get_projects_for_email(email, db)
     if not projects:
         return {"ok": True}
 
@@ -155,11 +165,12 @@ def portal_usage(request: Request, project_id: int, db: Session = Depends(get_db
     if not email:
         raise HTTPException(status_code=401, detail="Invalid session")
 
+    # B3: vérifier ownership via owner_email ou name (compat)
     project = (
         db.query(Project)
         .filter(
             Project.id == project_id,
-            Project.name == email,
+            (Project.owner_email == email) | (Project.name == email),
         )
         .first()
     )
@@ -224,16 +235,27 @@ def portal_verify(token: str, response: Response, db: Session = Depends(get_db))
     db.commit()
 
     secure = settings.app_url.startswith("https")
+    # B6.3 (H10): samesite=strict + session 14j (réduit de 90j)
+    _SESSION_COOKIE_AGE = 14 * 24 * 3600
     response.set_cookie(
         key="portal_session",
         value=_sign_session(email),
-        max_age=_SESSION_MAX_AGE,
+        max_age=_SESSION_COOKIE_AGE,
         httponly=True,
-        samesite="lax",
+        samesite="strict",
         secure=secure,
     )
-    projects = db.query(Project).filter(Project.name == email).all()
+    projects = _get_projects_for_email(email, db)
     return {"email": email, "projects": _project_list(projects)}
+
+
+def _get_projects_for_email(email: str, db: Session) -> list:
+    """B3: cherche par owner_email en priorité, fallback sur name (compat anciens projets)."""
+    projects = db.query(Project).filter(Project.owner_email == email).all()
+    if not projects:
+        # Fallback compat: anciens projets sans owner_email
+        projects = db.query(Project).filter(Project.name == email).all()
+    return projects
 
 
 @router.get("/api/portal/session")
@@ -244,8 +266,75 @@ def portal_session(request: Request, db: Session = Depends(get_db)):
     email = _verify_session(cookie, db)
     if not email:
         raise HTTPException(status_code=401, detail="Invalid session")
-    projects = db.query(Project).filter(Project.name == email).all()
+    projects = _get_projects_for_email(email, db)
     return {"email": email, "projects": _project_list(projects)}
+
+
+class CreateProjectBody(BaseModel):
+    name: str
+
+
+@router.post("/api/portal/projects", status_code=201)
+def portal_create_project(
+    body: CreateProjectBody,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """B3.3 (C19/C20): Crée un projet supplémentaire pour les utilisateurs Pro/Agency.
+
+    Auth: cookie portal_session (pas admin key).
+    Vérifie le quota du plan avant création.
+    """
+    import re as _re
+    from services.plan_quota import check_project_quota
+    from sqlalchemy.exc import IntegrityError as _IntegrityError
+
+    cookie = request.cookies.get("portal_session")
+    if not cookie:
+        raise HTTPException(status_code=401, detail="No session")
+    email = _verify_session(cookie, db)
+    if not email:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+    # Valider le nom du projet (slug simple)
+    name = body.name.strip()
+    if not name or not _re.match(r"^[a-zA-Z0-9_\-]{2,64}$", name):
+        raise HTTPException(
+            status_code=422,
+            detail="Project name must be 2-64 characters (letters, digits, - or _)",
+        )
+
+    # Récupérer le plan de l'utilisateur depuis ses projets existants
+    existing_projects = _get_projects_for_email(email, db)
+    if not existing_projects:
+        raise HTTPException(
+            status_code=403, detail="No existing project found for this account"
+        )
+
+    plan = existing_projects[0].plan
+
+    # Vérifier le quota
+    check_project_quota(email, plan, db)
+
+    # Créer le projet
+    new_project = Project(name=name, owner_email=email, plan=plan)
+    db.add(new_project)
+    try:
+        db.commit()
+        db.refresh(new_project)
+    except _IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"A project with name '{name}' already exists",
+        )
+
+    return {
+        "id": new_project.id,
+        "name": new_project.name,
+        "api_key": new_project.api_key,
+        "plan": new_project.plan,
+    }
 
 
 @router.post("/api/portal/logout")

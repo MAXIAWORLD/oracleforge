@@ -1,5 +1,7 @@
+import asyncio
 import httpx
 from core.config import settings
+from services.aws_bedrock_client import aws_bedrock_client
 
 
 class ProxyForwarder:
@@ -326,40 +328,37 @@ class ProxyForwarder:
     async def forward_aws_bedrock(
         request_body: dict, api_key: str = "", timeout_s: float = 60.0
     ) -> dict:
-        """AWS Bedrock via leur API native."""
-        from services.aws_bedrock_client import aws_bedrock_client
+        """B5.2/B5.6 (C05, H18): AWS Bedrock via API Converse, wrappé dans asyncio.to_thread."""
+        from fastapi import HTTPException
 
+        # B5.6 (H18): 503 propre si non configuré (pas ValueError)
         if not aws_bedrock_client.is_configured():
-            raise ValueError("AWS Bedrock non configuré")
+            raise HTTPException(status_code=503, detail="AWS Bedrock not configured")
 
-        # Extraire les données de la requête
         model = request_body.get("model", "anthropic.claude-v2")
         messages = request_body.get("messages", [])
         temperature = request_body.get("temperature", 0.7)
         max_tokens = request_body.get("max_tokens", 1000)
 
-        # Convertir en format Bedrock
-        bedrock_body = aws_bedrock_client.convert_to_bedrock_format(
-            messages, temperature, max_tokens
-        )
+        def _sync_call():
+            converse_response = aws_bedrock_client.invoke_model_converse(
+                model, messages, temperature=temperature, max_tokens=max_tokens
+            )
+            return aws_bedrock_client.convert_from_converse_response(
+                converse_response, model
+            )
 
-        # Invoquer le modèle
-        bedrock_response = aws_bedrock_client.invoke_model(model, bedrock_body)
-
-        # Convertir en format OpenAI
-        openai_response = aws_bedrock_client.convert_from_bedrock_format(
-            bedrock_response, model
-        )
-
-        return openai_response
+        # B5.2 (C05): wrappé dans to_thread pour ne pas bloquer l'event loop async
+        return await asyncio.to_thread(_sync_call)
 
     @staticmethod
     async def forward_aws_bedrock_stream(
         request_body: dict, api_key: str = "", timeout_s: float = 120.0
     ):
-        """AWS Bedrock streaming (non supporté pour l'instant)."""
-        # AWS Bedrock ne supporte pas le streaming natif via leur API
-        # On retourne une erreur pour l'instant
-        raise NotImplementedError(
-            "AWS Bedrock ne supporte pas le streaming via cette API"
+        """AWS Bedrock streaming non supporté."""
+        from fastapi import HTTPException
+
+        raise HTTPException(
+            status_code=501,
+            detail="AWS Bedrock streaming is not supported. Use non-streaming mode.",
         )

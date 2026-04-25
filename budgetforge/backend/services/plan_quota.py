@@ -36,7 +36,18 @@ def check_project_quota(owner_email: str, plan: str, db: Session) -> None:
     limit = PLAN_PROJECT_LIMITS.get(plan, 1)
     if limit == -1:
         return
-    count = db.query(Project).filter(Project.name == owner_email).count()
+    # B3.2 (C19): compter par owner_email, pas par name
+    # Fallback: si owner_email n'est pas défini (anciens projets), compter par name
+    count = (
+        db.query(Project)
+        .filter(
+            (Project.owner_email == owner_email)
+            | (
+                (Project.owner_email == None) & (Project.name == owner_email)  # noqa: E711
+            )
+        )
+        .count()
+    )
     if count >= limit:
         raise HTTPException(
             status_code=429,

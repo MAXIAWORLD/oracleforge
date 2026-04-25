@@ -55,6 +55,9 @@ class Project(Base):
     plan = Column(String, nullable=False, default="free")  # free / pro / agency / ltd
     stripe_customer_id = Column(String, nullable=True)
     stripe_subscription_id = Column(String, nullable=True)
+    # B3.1 (C19/C20): owner_email sépare l'identité du slug de projet
+    # Permet multi-projet (Pro = 10, Agency = illimité) sans contrainte UNIQUE sur name
+    owner_email = Column(String, nullable=True, index=True)
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )

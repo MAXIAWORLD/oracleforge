@@ -73,6 +73,21 @@ async def lifespan(app: FastAPI):
                 "TURNSTILE_SECRET_KEY absent en production — signups free seront bloqués "
                 "(fail-closed anti-bot). Configurer sur https://dash.cloudflare.com/?to=/:account/turnstile"
             )
+
+    # B7.6 (M05): purge sessions révoquées > 90j au démarrage
+    try:
+        from routes.portal import cleanup_old_revoked_sessions
+
+        db_gen = get_db()
+        db = next(db_gen)
+        cleanup_old_revoked_sessions(db)
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
+    except Exception as exc:
+        logger.warning("Purge PortalRevokedSession échouée au démarrage: %s", exc)
+
     yield
 
 
@@ -113,14 +128,29 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+
+def get_cors_origins(app_env: str) -> list[str]:
+    """B1.4 — CORS conditionne sur app_env (audit H13).
+
+    En production: uniquement l'origin prod (pas de localhost).
+    En dev/test: localhost autorise pour faciliter le dev.
+    Fail-safe: env inconnu = comportement prod (restrictif).
+    """
+    prod_origin = "https://llmbudget.maxiaworld.app"
+    dev_origins = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3000",
-        "https://llmbudget.maxiaworld.app",
-    ],
+    ]
+    if app_env in ("development", "dev", "test", "testing"):
+        return [*dev_origins, prod_origin]
+    return [prod_origin]
+
+
+_cors_origins = get_cors_origins(settings.app_env)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
         "Content-Type",

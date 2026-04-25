@@ -84,9 +84,13 @@ class AlertService:
                 "budget_usd": budget_usd,
                 "pct_used": pct,
             }
-        # DNS rebinding TOCTOU fix: résoudre l'IP une fois, valider, pinner dans la requête.
+        # B2.3 (C16): SSRF validation via resolve_safe_host, mais envoi sur URL originale.
+        # Pinning IP + verify=True échoue pour HTTPS (cert validé contre IP pas hostname).
+        # On accepte le TOCTOU DNS rebinding côté webhook (payload non sensible).
         try:
-            pinned_url, host_header = resolve_safe_host(url)
+            resolve_safe_host(
+                url
+            )  # validation SSRF uniquement — lève ValueError si bloqué
         except ValueError as exc:
             logger.warning("Webhook alert refused for %s: %s", project_name, exc)
             return False
@@ -98,11 +102,7 @@ class AlertService:
                 follow_redirects=False,
                 verify=(scheme == "https"),
             ) as client:
-                await client.post(
-                    pinned_url,
-                    json=payload,
-                    headers={"Host": host_header},
-                )
+                await client.post(url, json=payload)
             return True
         except Exception as e:
             logger.warning(f"Webhook alert failed for {project_name}: {e}")

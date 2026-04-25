@@ -1,9 +1,11 @@
+import hmac
 import re
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, Depends, Header, HTTPException
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from typing import Literal
+from typing import Literal, Optional
+from core.config import settings
 from core.database import get_db
 from core.models import Member
 from core.auth import require_admin
@@ -33,8 +35,29 @@ class MemberResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-@router.post("", status_code=201, response_model=MemberResponse, dependencies=[Depends(require_admin)])
-def create_member(payload: MemberCreate, db: Session = Depends(get_db)):
+@router.post(
+    "",
+    status_code=201,
+    response_model=MemberResponse,
+    dependencies=[Depends(require_admin)],
+)
+def create_member(
+    payload: MemberCreate,
+    x_admin_key: Optional[str] = Header(default="", alias="X-Admin-Key"),
+    db: Session = Depends(get_db),
+):
+    # B7.1 (H15): seul le global admin peut créer un member admin
+    # Un member admin compromis ne peut créer que des viewers
+    if payload.role == "admin":
+        is_global_admin = bool(
+            settings.admin_api_key
+            and hmac.compare_digest(x_admin_key or "", settings.admin_api_key)
+        )
+        if not is_global_admin:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the global admin can create admin members",
+            )
     member = Member(email=payload.email, role=payload.role)
     db.add(member)
     try:
@@ -42,11 +65,15 @@ def create_member(payload: MemberCreate, db: Session = Depends(get_db)):
         db.refresh(member)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail=f"Member '{payload.email}' already exists")
+        raise HTTPException(
+            status_code=409, detail=f"Member '{payload.email}' already exists"
+        )
     return member
 
 
-@router.get("", response_model=list[MemberResponse], dependencies=[Depends(require_admin)])
+@router.get(
+    "", response_model=list[MemberResponse], dependencies=[Depends(require_admin)]
+)
 def list_members(db: Session = Depends(get_db)):
     return db.query(Member).all()
 

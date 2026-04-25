@@ -43,6 +43,14 @@ export interface BudgetPayload {
   downgrade_chain?: string[];
 }
 
+export interface BudgetResponse {
+  budget_usd: number | null;
+  alert_threshold_pct: number;
+  action: string;
+  reset_period: string;
+  warning?: string | null;
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const adminKey = getStoredAdminKey();
   const res = await fetch(`${API_BASE}${path}`, {
@@ -159,7 +167,7 @@ export const api = {
     delete: (id: number) =>
       req<void>(`/api/projects/${id}`, { method: "DELETE" }),
     setBudget: (id: number, b: BudgetPayload) =>
-      req<Project>(`/api/projects/${id}/budget`, {
+      req<BudgetResponse>(`/api/projects/${id}/budget`, {
         method: "PUT",
         body: JSON.stringify(b),
       }),

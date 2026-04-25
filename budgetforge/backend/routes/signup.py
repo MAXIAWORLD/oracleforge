@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from core.client_ip import get_real_client_ip
 from core.config import settings
 from core.database import get_db
 from core.log_utils import mask_email
@@ -93,16 +94,20 @@ class SignupFreeRequest(BaseModel):
 
 
 async def _verify_turnstile(token: Optional[str], client_ip: str) -> bool:
-    """H1 — vérifie un token Cloudflare Turnstile côté serveur.
-    Si aucune clé Turnstile n'est configurée : pass-through (déploiement progressif).
-    Un warning est loggué en production pour rappeler de configurer la clé."""
+    """B1.6 — Cloudflare Turnstile fail-closed (audit H09).
+
+    Si aucune clé Turnstile n'est configurée :
+      - production : return False (fail-closed, anti-bot vrai)
+      - dev/test : return True (compat dev sans Cloudflare)
+    """
     secret = settings.turnstile_secret_key
     if not secret:
         if settings.app_env == "production":
-            logger.warning(
-                "Turnstile désactivé (TURNSTILE_SECRET_KEY vide). Les signups "
-                "ne sont PAS protégés contre les bots. Configurez la clé sur Cloudflare."
+            logger.error(
+                "Turnstile fail-closed (TURNSTILE_SECRET_KEY vide en production). "
+                "Signups bloques tant que la cle Cloudflare n'est pas configuree."
             )
+            return False
         return True
     if not token:
         return False
@@ -125,7 +130,7 @@ async def signup_free(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_real_client_ip(request)
 
     # H1 — anti-bot avant tout le reste
     if not await _verify_turnstile(body.turnstile_token, client_ip):
@@ -148,7 +153,8 @@ async def signup_free(
 
     check_project_quota(body.email, "free", db)
 
-    project = Project(name=body.email, plan="free")
+    # B3.2: définir owner_email au signup pour le multi-projet
+    project = Project(name=body.email, owner_email=body.email, plan="free")
     db.add(project)
     try:
         db.commit()

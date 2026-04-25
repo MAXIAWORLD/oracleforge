@@ -362,6 +362,11 @@ class TestSQLiteWALMode:
             os.environ.pop("DATABASE_URL", None)
             importlib.reload(cfg_mod)
             importlib.reload(db_mod)
+            # Re-bind settings in all modules that imported it at module level
+            # to avoid polluting subsequent tests with stale references.
+            import core.auth as auth_mod
+
+            importlib.reload(auth_mod)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -189,7 +189,8 @@ class TestProxyNoExceptionDetailLeak:
         """502 LLM → detail générique sans le texte de l'exception. RED."""
         from core.models import Project
 
-        proj = Project(name="leak-test")
+        # B4.1: budget_usd requis (None → 402 fail-closed)
+        proj = Project(name="leak-test", budget_usd=100.0)
         test_db.add(proj)
         test_db.commit()
         test_db.refresh(proj)
@@ -224,7 +225,8 @@ class TestProxyNoExceptionDetailLeak:
         """502 → message générique compréhensible. RED jusqu'à fix."""
         from core.models import Project
 
-        proj = Project(name="generic-msg-test")
+        # B4.1: budget_usd requis (None → 402 fail-closed)
+        proj = Project(name="generic-msg-test", budget_usd=100.0)
         test_db.add(proj)
         test_db.commit()
         test_db.refresh(proj)

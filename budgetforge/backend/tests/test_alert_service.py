@@ -195,9 +195,8 @@ class TestBudgetGuardAlerts:
         # Assert
         assert result is False
 
-    def test_should_alert_true_when_budget_zero(self):
-        """Test que l'alerte est déclenchée quand le budget est 0."""
-        # Arrange
+    def test_should_alert_false_when_budget_zero(self):
+        """B4.6 (H06): should_alert retourne False quand budget=0 (cohérence avec maybe_send_alert)."""
         from services.budget_guard import BudgetGuard
 
         guard = BudgetGuard()
@@ -205,11 +204,10 @@ class TestBudgetGuardAlerts:
         used_usd = 5.0
         threshold_pct = 80
 
-        # Act
         result = guard.should_alert(budget_usd, used_usd, threshold_pct)
 
-        # Assert
-        assert result is True
+        # Après fix B4.6: budget=0 → pas d'alerte (maybe_send_alert fait déjà early-return si not budget)
+        assert result is False
 
 
 class TestAlertIntegration:
