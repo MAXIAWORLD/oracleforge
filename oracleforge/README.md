@@ -1,5 +1,7 @@
 # MAXIA Oracle
 
+[![Glama](https://glama.ai/mcp/servers/badge/MAXIAWORLD/oracleforge)](https://glama.ai/mcp/servers/MAXIAWORLD/oracleforge)
+
 **Multi-source price data feed for AI agents.** Aggregates Pyth, Chainlink, CoinPaprika, RedStone, and Uniswap v3 TWAP into a cross-validated median price with confidence score and inter-source divergence.
 
 **Live at:** https://oracle.maxiaworld.app — **MCP server:** `https://oracle.maxiaworld.app/mcp/sse`
