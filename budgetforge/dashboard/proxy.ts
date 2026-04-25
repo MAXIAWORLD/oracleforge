@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 
-const PROTECTED_PATHS = ["/dashboard", "/projects", "/activity", "/settings"];
+const PROTECTED_PATHS = [
+  "/dashboard",
+  "/projects",
+  "/clients",
+  "/activity",
+  "/settings",
+];
 
 function computeExpectedToken(secret: string): string {
   return createHmac("sha256", secret).update("session").digest("hex");
@@ -46,6 +52,7 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/projects/:path*",
+    "/clients/:path*",
     "/activity/:path*",
     "/settings/:path*",
   ],
