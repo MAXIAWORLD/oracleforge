@@ -2,7 +2,6 @@ import smtplib
 import httpx
 import logging
 from email.mime.text import MIMEText
-from urllib.parse import urlparse as _urlparse
 from sqlalchemy.orm import Session
 from core.config import settings
 from core.models import SiteSetting
@@ -94,7 +93,6 @@ class AlertService:
             logger.warning("Webhook alert refused for %s: %s", project_name, exc)
             return False
 
-        scheme = _urlparse(url).scheme
         try:
             async with (
                 httpx.AsyncClient(
