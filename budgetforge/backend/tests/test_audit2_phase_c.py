@@ -381,7 +381,7 @@ class TestBudgetLockConcurrency:
         """Après qu'une requête épuise le budget, la suivante est bloquée. GREEN (Lock)."""
 
         proj = _make_project(
-            test_db, name="seq-budget", budget_usd=0.0001, action="block"
+            test_db, name="seq-budget", budget_usd=0.0002, action="block"
         )
 
         mock_response = {

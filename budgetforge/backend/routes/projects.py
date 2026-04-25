@@ -278,12 +278,6 @@ def set_budget(project_id: int, payload: BudgetUpdate, db: Session = Depends(get
         warning = (
             "budget_usd=0 avec action=block bloquera immédiatement toutes les requêtes."
         )
-    elif (
-        project.budget_usd
-        and project.budget_usd > 0
-        and project.max_cost_per_call_usd is None
-    ):
-        warning = "Sans max_cost_per_call_usd, une seule requête coûteuse peut overshoot le budget."
     return BudgetResponse(
         budget_usd=project.budget_usd,
         alert_threshold_pct=project.alert_threshold_pct,

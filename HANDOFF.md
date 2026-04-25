@@ -1,72 +1,48 @@
-# HANDOFF — BudgetForge (24 avril 2026 — fin de session finition)
+# HANDOFF — BudgetForge TDD fix (25 avril 2026)
 
 ## État actuel
 
-**BudgetForge vendable.** Prod live, tous les blocs sauf SDK PyPI terminés.
+**BudgetForge live : https://llmbudget.maxiaworld.app**
 
 ## Ce qui a été fait cette session
 
 | Tâche | Statut |
 |---|---|
-| Fix A : test_alerts budget ($0.0001→$0.001, gpt-4o pricing) | ✅ |
-| Fix B : token estimator conservative mode (`prebill` utilise ×2, min 512) | ✅ |
-| Test cassé `test_audit2_phase_b` (stripe_webhook_secret manquant dans patch) | ✅ |
-| Déploiement Fix A+B sur VPS (SCP + restart) | ✅ |
-| Backup daily SQLite (`budgetforge-backup.timer`, 03h00 UTC, rétention 7j) | ✅ |
-| QA golden path 28/28 ✓ en prod (`qa_golden_path.py` pointé sur prod) | ✅ |
+| Audit état tests BudgetForge (suite complète) | ✅ |
+| Diagnostic test stale `test_audit2_phase_c.py::TestBudgetLockConcurrency` | ✅ |
+| Fix test : `budget_usd=0.0001 → 0.0002` (stale depuis H2 fix) | ✅ GREEN |
+| Confirmation `test_fix7_token_estimator.py` : 9/9 PASSED | ✅ |
+| Suite complète en cours | ⏳ |
 
-## Commits de cette session
+## Diagnostic test stale
 
-```
-bedf731  fix(qa): point golden path at prod + fix strict-mode locators
-1b977e4  fix(tests): add missing stripe_webhook_secret patch in test_startup_no_warning
-3c98244  fix(budgetforge-backend): critique A+B — test_alerts budget + token estimator conservative
-```
+**Cause** : `check_budget_model` inclut maintenant `est_cost` dans le check (fix H2).
+Avec `budget=0.0001` et `compute_cost` patché à `0.00015` :
+- `check_budget_model` : `used_usd = 0 + 0.00015 = 0.00015 > 0.0001` → 429 sur le 1er call.
 
-## Bloc 6 — SDK PyPI ✅ DONE
+**Fix** : `budget_usd=0.0002` → 1er call passe (`0.00015 < 0.0002`), 2ème bloqué (`0.00015 + 0.00015 = 0.0003 > 0.0002`).
 
-Packages publiés sur PyPI (version 0.1.1) :
-- **`budgetforge`** → https://pypi.org/project/budgetforge/0.1.1/
-- **`langchain-budgetforge`** → https://pypi.org/project/langchain-budgetforge/0.1.1/
+## État distribution OracleForge (session précédente)
 
-Deliverables :
-- Setup.py + métadonnées (author, classifiers, long_description)
-- TDD integration tests (`test_sdk_integration.py`) — skipped sans `BF_TEST_API_KEY`
-- Both packages ready for `pip install budgetforge`
-
-## Ce qui reste
-
-### Bloc 7 — QA golden path (seul bloc ouvert)
-
-Vérification complète de la chaîne utilisateur (signup → intégration → upgrade) :
-- Free signup → email reçu → clé reçu ✓
-- Curl avec clé → usage visible dans portal ✓
-- Alert : `alert_threshold_pct=1`, appel → email d'alerte reçu ✓
-- Upgrade Pro → Stripe test → email → plan upgradé ✓
-- Portal magic link → projets → usages ✓
-- Admin `/clients` → stats cohérentes ✓
-- Demo `/demo` → données + projets cliquables ✓
-- Mobile responsive ✓
-- Deploy final : rsync avec backup → service redémarre ✓
-
-### Turnstile (action Alexis)
-
-- Créer site sur https://dash.cloudflare.com → Turnstile
-- Ajouter `TURNSTILE_SITE_KEY` dans dashboard `.env.local` (VPS)
-- Ajouter `TURNSTILE_SECRET_KEY` dans backend `.env` (VPS)
-- Sans ça : signups bloqués en mode fail-closed (pas de régression fonctionnelle, juste pas de nouveaux signups via landing)
-
-## Infrastructure prod
-
-| Item | État |
+| Canal | Statut |
 |---|---|
-| Backend (port 8011) | ✅ actif |
-| Dashboard (port 3011) | ✅ actif |
-| SSL Let's Encrypt | ✅ expire 2026-07-20 |
-| Backup daily SQLite | ✅ 03h00 UTC |
-| ENV vars prod | ✅ sauf TURNSTILE |
-| QA golden path | ✅ 28/28 |
+| GitHub `MAXIAWORLD/oracleforge` | ✅ public |
+| Glama | ✅ approuvé |
+| awesome-mcp-servers PR | ⏳ en attente merge |
+| Landing `oracle.maxiaworld.app` | ✅ live |
+| PyPI `maxia-oracle` | ✅ |
+| npm `@maxia-marketplace/oracle` | ✅ |
+
+## État BudgetForge — Reste à faire
+
+| Priorité | Action | Owner |
+|---|---|---|
+| 🔴 BLOQUANT | Turnstile Cloudflare C2 : créer site → clés `.env` VPS | **Alexis** |
+| 🟠 | Phase G dashboard : build + rsync | Claude |
+| 🟡 | Commit fix test stale + commit 6 fixes encore-TDD | Claude |
+| 🟡 | Deploy 6 fixes encore-TDD sur VPS | Claude |
 
 ## Prochaine action
 
-Démarrer Bloc 6 — SDK PyPI. Vérifier si Alexis a un compte PyPI avant de commencer.
+1. Commit fix test stale
+2. Run suite complète → si 0 échec, commit + deploy Phase G dashboard
