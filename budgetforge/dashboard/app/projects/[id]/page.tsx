@@ -423,7 +423,7 @@ export default function ProjectDetailPage({
 
   async function saveBudget(e: React.FormEvent) {
     e.preventDefault();
-    if (!project) return;
+    if (!project || saving) return; // C2: guard double-submit avant re-render
     setSaveError(null);
     setThresholdError(null);
 

@@ -144,6 +144,10 @@ async def portal_request(
 ):
     cleanup_expired_tokens(db)
     email = body.email.strip().lower()
+    # H4: normaliser les alias email (user+tag@domain → user@domain) avant lookup
+    if "@" in email and "+" in email.split("@")[0]:
+        local, domain = email.split("@", 1)
+        email = f"{local.split('+')[0]}@{domain}"
     # B3: cherche par owner_email en priorité (multi-projet), fallback name (compat)
     projects = _get_projects_for_email(email, db)
     if not projects:
@@ -229,6 +233,8 @@ def _project_list(projects: list) -> list:
 
 def _do_verify(token: str, response: Response, db: Session) -> dict:
     """H11: logique verify partagée entre GET (compat) et POST (sécurisé)."""
+    # M3: empêcher la mise en cache du token par proxy/navigateur/nginx
+    response.headers["Cache-Control"] = "no-store"
     record = db.query(PortalToken).filter(PortalToken.token == token).first()
     if not record:
         raise HTTPException(status_code=401, detail="Invalid or expired token")

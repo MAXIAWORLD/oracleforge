@@ -82,6 +82,9 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     except stripe.error.SignatureVerificationError as e:
         logger.warning("Stripe signature verification failed: %s", e)
         raise HTTPException(status_code=400, detail="Invalid Stripe signature")
+    except (ValueError, TypeError) as e:
+        logger.warning("Stripe webhook config error: %s", e)
+        raise HTTPException(status_code=400, detail="Webhook signature check failed")
 
     event_id = event.get("id")
     if event_id:
@@ -113,6 +116,15 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
 
 async def _handle_checkout_completed(session: dict, db: Session) -> None:
+    # M1: vérifier payment_status avant toute mise à jour DB
+    payment_status = session.get("payment_status")
+    if payment_status and payment_status != "paid":
+        logger.info(
+            "checkout.session.completed ignoré — payment_status=%s (attendu 'paid')",
+            payment_status,
+        )
+        return
+
     email = (session.get("customer_details") or {}).get("email") or session.get(
         "customer_email"
     )
@@ -246,3 +258,12 @@ def _handle_subscription_deleted(subscription: dict, db: Session) -> None:
             subscription_id,
         )
         send_downgrade_email(project.name)
+
+
+def validate_stripe_config() -> None:
+    """Vérifie que le secret webhook Stripe est configuré. À appeler au démarrage."""
+    if not settings.stripe_webhook_secret:
+        logger.critical(
+            "STRIPE_WEBHOOK_SECRET non configuré — "
+            "la vérification des webhooks Stripe sera refusée (400)"
+        )

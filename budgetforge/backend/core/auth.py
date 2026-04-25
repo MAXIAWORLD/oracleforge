@@ -29,6 +29,12 @@ async def require_admin(
                 status_code=503,
                 detail="Service misconfigured: ADMIN_API_KEY not set in production",
             )
+        if settings.app_env != "development":
+            # H2: bypass réservé à "development" uniquement — toute autre env (staging, ci…) refuse
+            raise HTTPException(
+                status_code=401,
+                detail="ADMIN_API_KEY not configured",
+            )
         # Dev mode: block viewer members trying to reach write endpoints
         if x_admin_key and x_admin_key.startswith("bf-mbr-"):
             from core.models import Member
@@ -75,6 +81,11 @@ async def require_viewer(
             raise HTTPException(
                 status_code=503,
                 detail="Service misconfigured: ADMIN_API_KEY not set in production",
+            )
+        if settings.app_env != "development":
+            raise HTTPException(
+                status_code=401,
+                detail="ADMIN_API_KEY not configured",
             )
         return  # dev mode
 

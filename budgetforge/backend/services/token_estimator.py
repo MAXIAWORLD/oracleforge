@@ -118,7 +118,7 @@ class TokenEstimator:
             Estimation du nombre de tokens
         """
         if not text:
-            return 0
+            return 1  # H1: plancher à 1 — zéro token = bypass du budget check
 
         # Détection automatique de la langue si non spécifiée
         if language is None:

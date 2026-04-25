@@ -84,25 +84,26 @@ class AlertService:
                 "budget_usd": budget_usd,
                 "pct_used": pct,
             }
-        # B2.3 (C16): SSRF validation via resolve_safe_host, mais envoi sur URL originale.
-        # Pinning IP + verify=True échoue pour HTTPS (cert validé contre IP pas hostname).
-        # On accepte le TOCTOU DNS rebinding côté webhook (payload non sensible).
+        # H3: résoudre l'IP une seule fois et utiliser l'URL pincée pour l'envoi
+        # — évite le DNS rebinding TOCTOU (résolution séparée entre validation et envoi).
+        # Pour HTTPS + IP pincée : cert validé contre IP (pas hostname) → verify=False.
+        # Trade-off accepté : payload non sensible, SSRF bloqué par plages IP.
         try:
-            resolve_safe_host(
-                url
-            )  # validation SSRF uniquement — lève ValueError si bloqué
+            pinned_url, _hostname = resolve_safe_host(url)
         except ValueError as exc:
             logger.warning("Webhook alert refused for %s: %s", project_name, exc)
             return False
 
         scheme = _urlparse(url).scheme
         try:
-            async with httpx.AsyncClient(
-                timeout=5.0,
-                follow_redirects=False,
-                verify=(scheme == "https"),
-            ) as client:
-                await client.post(url, json=payload)
+            async with (
+                httpx.AsyncClient(
+                    timeout=5.0,
+                    follow_redirects=False,
+                    verify=False,  # IP pincée ≠ hostname cert — risque MITM accepté pour webhooks sortants
+                ) as client
+            ):
+                await client.post(pinned_url, json=payload)
             return True
         except Exception as e:
             logger.warning(f"Webhook alert failed for {project_name}: {e}")

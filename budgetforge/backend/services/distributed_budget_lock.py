@@ -172,11 +172,18 @@ async def budget_lock(project_id: int, timeout: float = 30.0) -> AsyncIterator[N
     """Verrou distribué avec fallback mémoire.
 
     Tente d'utiliser Redis d'abord, sinon utilise le verrou mémoire.
+    C1: lock_acquired distingue "échec acquisition" de "exception dans le body"
+    — seul l'échec d'acquisition déclenche le fallback, pas les exceptions du body.
     """
+    lock_acquired = False
     try:
         async with distributed_budget_lock(project_id, timeout):
+            lock_acquired = True
             yield
+            return
     except Exception as e:
+        if lock_acquired:
+            raise  # exception du body → propager, ne pas déclencher le fallback
         logger.warning(f"Redis lock failed, falling back to memory lock: {e}")
-        async with fallback_budget_lock(project_id):
-            yield
+    async with fallback_budget_lock(project_id):
+        yield
