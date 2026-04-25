@@ -32,6 +32,25 @@ def setup_db():
     Base.metadata.drop_all(bind=engine_test)
 
 
+@pytest.fixture(autouse=True)
+def clear_module_caches():
+    """H22: vider les caches module-level entre tests pour l'isolation."""
+    yield
+    try:
+        import services.plan_quota as pq
+
+        pq._quota_cache.clear()
+    except ImportError:
+        pass
+    try:
+        import routes.models as m
+
+        m._cache.clear()
+        m._models_result_cache.clear()
+    except ImportError:
+        pass
+
+
 @pytest.fixture
 def db():
     """Session de base de données pour les tests."""
