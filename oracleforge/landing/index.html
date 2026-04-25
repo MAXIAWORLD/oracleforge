@@ -961,15 +961,15 @@
     <div class="wrap">
       <div class="hero-grid">
         <div>
-          <span class="hero-kicker reveal">v0.1.0 · apache-2.0 · multi-source</span>
+          <span class="hero-kicker reveal">v0.1.9 · apache-2.0 · multi-source</span>
           <h1 id="hero-heading" class="hero-title reveal">
             Multi-source price&nbsp;feed<br>
             <em>for AI agents.</em>
           </h1>
           <p class="hero-lede reveal">
-            A drop-in oracle for autonomous agents. Three upstreams — Pyth Hermes,
-            Chainlink on Base, and a spot venue — aggregated and reconciled into a
-            single call, with a divergence figure you can trust or refuse.
+            A drop-in oracle for autonomous agents. Six independent sources — Pyth Hermes,
+            Chainlink on-chain, CoinPaprika, RedStone, Pyth Solana, and Uniswap v3 TWAP —
+            cross-validated into a single call, with a divergence figure you can trust or refuse.
             <br><br>
             Six client libraries. One MCP server. Zero custody.
           </p>
@@ -986,7 +986,7 @@
         <aside class="panel reveal" aria-label="Live response from /api/price/BTC">
           <div class="panel-head">
             <span class="example-tag" id="hero-tag">live · GET /api/price/BTC</span>
-            <span>v0.1.0</span>
+            <span>v0.1.9</span>
           </div>
           <div class="price">
             <span class="symbol">BTC</span><span id="hero-price-int">$74,757</span><span class="cents" id="hero-price-cents">.58</span>
@@ -1008,7 +1008,7 @@
             <span class="age">—</span>
           </div>
           <div class="panel-foot">
-            <div><div class="k">symbols</div><div class="v">79</div></div>
+            <div><div class="k">symbols</div><div class="v">91</div></div>
             <div><div class="k">sources</div><div class="v" id="hero-src-count">6</div></div>
             <div><div class="k">uptime</div><div class="v">100%</div></div>
           </div>
@@ -1120,10 +1120,10 @@
 
         <div class="pkg">
           <div class="pkg-head">
-            <span class="pkg-name">@maxia/oracle</span>
+            <span class="pkg-name">@maxia-marketplace/oracle</span>
             <span class="pkg-reg">npm</span>
           </div>
-          <pre class="code"><button class="copy" type="button" data-copy="npm install @maxia/oracle" aria-label="Copy command: npm install @maxia/oracle">copy</button>npm install @maxia/oracle</pre>
+          <pre class="code"><button class="copy" type="button" data-copy="npm install @maxia-marketplace/oracle" aria-label="Copy command: npm install @maxia-marketplace/oracle">copy</button>npm install @maxia-marketplace/oracle</pre>
         </div>
 
         <div class="pkg">
@@ -1276,6 +1276,9 @@ curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxia
       <a href="/docs/">/docs</a>
       <a href="/llms.txt">/llms.txt</a>
       <a href="https://github.com/MAXIAWORLD/oracleforge" rel="noreferrer">github</a>
+      <a href="https://glama.ai/mcp/servers/MAXIAWORLD/oracleforge" rel="noreferrer">
+        <img src="https://glama.ai/mcp/servers/badge/MAXIAWORLD/oracleforge" alt="Glama MCP" height="20" style="vertical-align:middle">
+      </a>
     </div>
     <div>Apache-2.0 · v0.1.9</div>
   </div>
