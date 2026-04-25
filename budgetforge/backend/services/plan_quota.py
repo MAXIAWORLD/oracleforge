@@ -1,8 +1,28 @@
+import time as _time_module
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from core.models import Usage, Project
+
+# H22: cache TTL pour éviter une requête SQL COUNT à chaque appel proxy
+_QUOTA_CACHE_TTL = 30  # secondes
+_quota_cache: dict[int, tuple[float, int]] = {}
+
+
+def time() -> float:
+    return _time_module.time()
+
+
+def get_calls_this_month_cached(project_id: int, db: Session) -> int:
+    now = time()
+    entry = _quota_cache.get(project_id)
+    if entry and now - entry[0] < _QUOTA_CACHE_TTL:
+        return entry[1]
+    count = get_calls_this_month(project_id, db)
+    _quota_cache[project_id] = (now, count)
+    return count
+
 
 PLAN_LIMITS: dict[str, int] = {
     "free": 1_000,
@@ -61,7 +81,7 @@ def check_project_quota(owner_email: str, plan: str, db: Session) -> None:
 def check_quota(project, db: Session) -> None:
     plan = getattr(project, "plan", None) or "free"
     limit = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
-    calls = get_calls_this_month(project.id, db)
+    calls = get_calls_this_month_cached(project.id, db)
     if calls >= limit:
         raise HTTPException(
             status_code=429,

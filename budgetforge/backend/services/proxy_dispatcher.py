@@ -63,17 +63,18 @@ def get_project_by_api_key(authorization: Optional[str], db: Session) -> Project
             status_code=401, detail="Missing or invalid Authorization header"
         )
     api_key = authorization.removeprefix("Bearer ").strip()
-    project = db.query(Project).filter(Project.api_key == api_key).first()
-    if project:
-        return project
+    # H20: toujours exécuter les deux requêtes pour un timing constant
+    # (évite l'énumération de clés valides par mesure de latence)
+    project_main = db.query(Project).filter(Project.api_key == api_key).first()
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
         minutes=_GRACE_PERIOD_MINUTES
     )
-    project = (
+    project_grace = (
         db.query(Project)
         .filter(Project.previous_api_key == api_key, Project.key_rotated_at >= cutoff)
         .first()
     )
+    project = project_main or project_grace
     if project:
         return project
     raise HTTPException(status_code=401, detail="Invalid API key")
@@ -448,16 +449,30 @@ async def _openai_format_stream_gen(
                     except (json.JSONDecodeError, KeyError):
                         pass
             yield chunk
+    except asyncio.CancelledError:
+        stream_error = True
     except Exception as e:
         logger.error(f"{provider_name} stream error: {e}")
         stream_error = True
     finally:
-        # B4.5 (C09): got_usage=True → toujours finaliser (même si stream_error)
-        if got_usage:
-            await finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
-        elif stream_error:
-            cancel_usage(db, usage_id)
-        await _call_maybe_send_alert(project, db)
+        # H19: asyncio.shield() protège le cleanup si le client coupe la connexion
+        # (CancelledError propagée dans le générateur ne doit pas laisser le prebill dangling)
+        try:
+            if got_usage:
+                await asyncio.shield(
+                    finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
+                )
+            else:
+                cancel_usage(db, usage_id)
+            await asyncio.shield(_call_maybe_send_alert(project, db))
+        except asyncio.CancelledError:
+            logger.warning(
+                "Stream cleanup shielded but task still cancelled — "
+                "usage_id=%s may be dangling",
+                usage_id,
+            )
+        except Exception as exc:
+            logger.error("Stream cleanup failed for usage_id=%s: %s", usage_id, exc)
 
 
 async def dispatch_openai_format(

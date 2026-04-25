@@ -42,6 +42,16 @@ class HistoryPage(BaseModel):
 _UNFILTERED_HARD_CAP = 500
 
 
+def _date_to_utc_start(d: date) -> datetime:
+    """Retourne minuit UTC pour la date donnée (naive, interprétée UTC)."""
+    return datetime(d.year, d.month, d.day, 0, 0, 0)
+
+
+def _date_to_utc_end(d: date) -> datetime:
+    """Retourne 23:59:59.999999 UTC pour la date donnée (naive, interprétée UTC)."""
+    return datetime(d.year, d.month, d.day, 23, 59, 59, 999999)
+
+
 @router.get(
     "/history", response_model=HistoryPage, dependencies=[Depends(require_viewer)]
 )
@@ -63,27 +73,24 @@ def get_history(
     if model is not None:
         base_filter.append(Usage.model == model)
     if date_from is not None:
-        base_filter.append(
-            Usage.created_at >= datetime.combine(date_from, datetime.min.time())
-        )
+        base_filter.append(Usage.created_at >= _date_to_utc_start(date_from))
     if date_to is not None:
-        base_filter.append(
-            Usage.created_at <= datetime.combine(date_to, datetime.max.time())
-        )
+        base_filter.append(Usage.created_at <= _date_to_utc_end(date_to))
+
+    # M08: count + sum en une seule requête pour réduire la charge DB
+    agg_row = (
+        db.query(func.count(Usage.id), func.sum(Usage.cost_usd))
+        .join(Project, Usage.project_id == Project.id)
+        .filter(*base_filter)
+        .one()
+    )
+    raw_total = agg_row[0] or 0
+    total_cost = float(agg_row[1] or 0.0)
 
     query = (
         db.query(Usage)
         .join(Project, Usage.project_id == Project.id)
         .filter(*base_filter)
-    )
-
-    raw_total = query.count()
-    total_cost = (
-        db.query(func.sum(Usage.cost_usd))
-        .join(Project, Usage.project_id == Project.id)
-        .filter(*base_filter)
-        .scalar()
-        or 0.0
     )
 
     # H9p — sans project_id, borne l'accès à 500 lignes pour protéger le front.
