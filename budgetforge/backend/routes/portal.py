@@ -356,7 +356,7 @@ def portal_create_project(
         db.rollback()
         raise HTTPException(
             status_code=409,
-            detail=f"A project with name '{name}' already exists",
+            detail="A project with this name already exists",
         )
 
     return {

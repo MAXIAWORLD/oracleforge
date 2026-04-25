@@ -4,14 +4,18 @@ import re
 import secrets
 import stripe
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from core.client_ip import get_real_client_ip
 from core.config import settings
 from core.database import get_db
 from core.limiter import limiter
 from core.log_utils import mask_email
 from core.models import Project, StripeEvent
+from routes.signup import _verify_turnstile
 from services.onboarding_email import send_onboarding_email, send_downgrade_email
 
 logger = logging.getLogger(__name__)
@@ -19,6 +23,10 @@ router = APIRouter(tags=["billing"])
 
 _CHECKOUT_PLANS = {"free", "pro", "agency"}
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class CheckoutRequest(BaseModel):
+    turnstile_token: Optional[str] = None
 
 
 def _price_ids() -> dict[str, str]:
@@ -34,12 +42,23 @@ def _price_ids() -> dict[str, str]:
 
 @router.post("/api/checkout/{plan}")
 @limiter.limit("5/hour")
-async def create_checkout_session(request: Request, plan: str):
+async def create_checkout_session(
+    request: Request, plan: str, body: CheckoutRequest = None
+):
     if plan not in _CHECKOUT_PLANS:
         raise HTTPException(
             status_code=400,
             detail=f"No checkout available for plan '{plan}'. Valid: {sorted(_CHECKOUT_PLANS)}",
         )
+
+    if plan == "free":
+        client_ip = get_real_client_ip(request)
+        token = body.turnstile_token if body else None
+        if not await _verify_turnstile(token, client_ip):
+            raise HTTPException(
+                status_code=400,
+                detail="Captcha verification failed. Please retry.",
+            )
 
     price_id = _price_ids().get(plan, "")
     if not price_id:

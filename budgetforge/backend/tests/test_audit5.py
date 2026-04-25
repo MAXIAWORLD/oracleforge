@@ -304,13 +304,12 @@ async def test_h2_admin_empty_key_dev_mode_requires_explicit_dev_env(test_db):
         app.dependency_overrides.clear()
 
 
-# ── H3 — DNS rebinding : URL pincée utilisée pour l'envoi ────────────────────
+# ── H3 — SSRF + TLS : URL originale + verify=True ────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_h3_alert_service_http_webhook_uses_pinned_ip():
-    """H3: pour un webhook HTTP, l'envoi httpx doit utiliser l'URL pincée (IP résolue)
-    et non l'URL originale, pour éviter le DNS rebinding TOCTOU."""
+async def test_h3_alert_service_http_webhook_uses_original_url():
+    """H3: resolve_safe_host valide l'IP (SSRF gate), httpx utilise l'URL originale."""
     from services.alert_service import AlertService
 
     pinned_url = "http://1.2.3.4/webhook"
@@ -334,17 +333,16 @@ async def test_h3_alert_service_http_webhook_uses_pinned_ip():
                 budget_usd=100.0,
             )
 
-    # L'URL passée à httpx.post doit être la version pincée, pas l'originale
     assert mock_client.post.called
     called_url = mock_client.post.call_args[0][0]
-    assert called_url == pinned_url, (
-        f"httpx.post appelé avec '{called_url}' — attendu URL pincée '{pinned_url}'"
+    assert called_url == original_url, (
+        f"httpx.post appelé avec '{called_url}' — attendu URL originale '{original_url}'"
     )
 
 
 @pytest.mark.asyncio
-async def test_h3_alert_service_https_webhook_still_uses_pinned():
-    """H3: même pour HTTPS, l'URL pincée doit être utilisée (SNI via headers si nécessaire)."""
+async def test_h3_alert_service_https_webhook_uses_original_url():
+    """H3: pour HTTPS, URL originale utilisée — TLS cert valide contre hostname."""
     from services.alert_service import AlertService
 
     pinned_url = "https://1.2.3.4/webhook"
@@ -369,7 +367,7 @@ async def test_h3_alert_service_https_webhook_still_uses_pinned():
             )
 
     called_url = mock_client.post.call_args[0][0]
-    assert called_url == pinned_url
+    assert called_url == original_url
 
 
 # ── H4 — email alias : normalisation avant lookup ────────────────────────────

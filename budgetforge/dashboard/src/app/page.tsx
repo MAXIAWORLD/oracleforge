@@ -74,23 +74,6 @@ export default function HomePage() {
 
         {/* Actions rapides */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 rounded-lg p-6 border border-purple-700">
-            <div className="flex items-center gap-3 mb-4">
-              <Zap className="w-8 h-8 text-purple-400" />
-              <h3 className="text-white font-bold text-xl">Playground</h3>
-            </div>
-            <p className="text-slate-300 mb-4">
-              Testez vos prompts en temps réel avec notre playground intégré.
-              Surveillez les coûts et optimisez vos requêtes.
-            </p>
-            <a
-              href="/playground"
-              className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-            >
-              Essayer maintenant
-            </a>
-          </div>
-
           <div className="bg-slate-800/50 rounded-lg p-6 border border-slate-700">
             <h3 className="text-white font-bold text-xl mb-4">
               Documentation API
