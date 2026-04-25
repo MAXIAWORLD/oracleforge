@@ -1,9 +1,23 @@
-# HANDOFF — BudgetForge audit #4 (25 avril 2026)
+# HANDOFF — BudgetForge audit #4 (fin session 25 avril 2026)
 
-## État : B0–B7 DONE ✅ — Prêt pour deploy prod
+## État : B0–B8 + C2 Turnstile DONE ✅ — 12 findings restants
 
-**URL prod** : https://llmbudget.maxiaworld.app
-**Dernier commit** : `b30e629` (B1 source files)
+**URL prod** : https://llmbudget.maxiaworld.app  
+**Dernier commit** : `9ad359a` (B8 — H11 H12 H21 H23 M12)
+
+## ACTION REQUISE AU DÉMARRAGE PROCHAINE SESSION
+
+Le build Next.js était encore en cours à la fin de session. Exécuter :
+
+```bash
+ssh ubuntu@maxiaworld.app
+# Vérifier que le build est fini :
+pgrep -f 'next build' || echo "build done"
+# Redémarrer le dashboard :
+sudo systemctl restart budgetforge-dashboard
+# Smoke test :
+curl -s https://llmbudget.maxiaworld.app/health
+```
 
 ## Commits audit #4
 
@@ -12,121 +26,53 @@
 | `491fc77` | B0 — nginx Stripe webhook |
 | `c6bf05d` | B1.5 real client IP (deploy prod) |
 | `88a8936` | B2–B7 — 44 tests TDD, 22 findings |
-| `b30e629` | B1 — 33 tests TDD + source files (omis) |
+| `b30e629` | B1 — 33 tests TDD + source files |
+| `51511b4` | HANDOFF mis à jour |
+| `9ad359a` | B8 — H11 H12 H21 H23 M12 (19 tests) |
+
+## Tests
+
+- **Total tests verts** : 77 (backend) + suite complète ~200
+- **Zéro régression** confirmée
+
+## 12 findings restants (nouvelle session)
+
+### Effort ≤ 2 — À faire en premier (7 items)
+
+| ID | Sévérité | Fichier | Sujet |
+|---|---|---|---|
+| **H26** | HAUT | `services/dynamic_pricing.py:439-445` | Singleton sans `close()` au shutdown |
+| **M01** | MOYEN | `distributed_budget_lock.py:102-103` | `_memory_locks` dict illimité |
+| **M02** | MOYEN | `services/token_estimator.py:25-37` | `CODE_PATTERNS` regex unanchored |
+| **M03** | MOYEN | `services/alert_service.py:137` | Email mailsplit via `\r\n` dans project_name |
+| **M04** | MOYEN | `routes/portal.py:125-146` | Timing enum email portal_request |
+| **M10** | MOYEN | `routes/models.py:368-403` | 9 requêtes outbound parallèles par cache miss |
+| **M11** | MOYEN | `routes/admin.py:19-22` | `billing_sync` retourne HTTP 200 sur erreur |
+
+### Effort 4 — Complexes (5 items)
+
+| ID | Sévérité | Fichier | Sujet |
+|---|---|---|---|
+| **H19** | HAUT | `proxy_dispatcher.py` | Worker bloqué si client coupe avant finalize |
+| **H20** | HAUT | `get_project_by_api_key` | Timing attack API key lookup |
+| **H22** | HAUT | `services/plan_quota.py:50-62` | `check_quota` SQL par appel (perf) |
+| **M08** | MOYEN | `routes/history.py:74-87` | History total count lent |
+| **M09** | MOYEN | `routes/history.py:65-72` | date_from/to naive UTC |
 
 ## Documents de référence
 
-- `budgetforge/docs/audit-qa-senior-2026-04-25.md` — 60 findings + C23 infra
+- `budgetforge/docs/audit-qa-senior-2026-04-25.md` — 60 findings complets
 - `budgetforge/docs/plan-correction-audit-2026-04-25.md` — plan 7 blocs
-- `budgetforge/docs/investigation-prod-2026-04-25.md` — état prod live confirmé
 
-## Avancement — TOUT DONE
+## Ce qui est DONE (résumé complet)
 
-### ✅ B0 — INFRA Stripe webhook
-- nginx `location = /webhook/stripe` → port 8011
-
-### ✅ B1 — Stop-the-bleeding sécurité (33 tests)
-
-| Sous-bloc | Audit ID | Résultat |
-|---|---|---|
-| B1.1 rate limit 9 endpoints | C01 | 30× 401 + 5× 429 ✅ |
-| B1.2 `/clients` protected | C13 | 307 → /login ✅ |
-| B1.3 export defense in depth | C17 | 401 sans key, dev bloqué prod |
-| B1.4 CORS conditional | H13 | prod = origin unique ✅ |
-| B1.5 real client IP | H08 | get_real_client_ip + uvicorn proxy-headers |
-| B1.6 Turnstile fail-closed | H09 | sans secret → return False |
-
-### ✅ B2 — Stripe + paiement (test_b2_billing.py)
-
-- B2.1 Upgrade upsert lié au projet (C14, C15)
-- B2.2 Subscription deleted = downgrade + révoque clé (C21)
-- B2.3 Webhook HTTPS sans IP pinning (C16)
-- B2.4 Stripe reconcile via env vars (H25)
-
-### ✅ B3 — Schéma DB + multi-projet (test_b3_multiproject.py)
-
-- B3.1 Migration alembic `owner_email` (C19, C20)
-- B3.2 Découplage `name` / `owner_email`
-- B3.3 `POST /api/portal/projects` multi-tenant
-- B3.4 Frontend portal "Add project"
-- B3.5 Pricing page actualisée
-
-### ✅ B4 — Logique budget + race (test_b4_budget.py)
-
-- B4.1 `budget_usd is None` → 402 fail-closed
-- B4.2 Redlock token-based (C08)
-- B4.3 flock O_NOFOLLOW (H02)
-- B4.4 Lock englobe finalize
-- B4.5 Streaming finalize partiel
-- B4.6 `should_alert` cohérence (H06)
-- B4.7 Token estimator clamp (H05)
-
-### ✅ B5 — AWS Bedrock (test_b5_bedrock.py)
-
-- B5.1–B5.6 : Converse API, asyncio.to_thread, usage réel, detection model
-
-### ✅ B6 — Frontend + UX
-
-- B6.3 Cookie portal samesite=strict + 14j (H10)
-- B6.5 API key masking (M06)
-- B6.6 saveBudget warning toast (M07)
-
-**Non implémenté (non-bloquant pour vendable)** :
-- B6.1 localStorage → cookie HttpOnly (H12) — complexe, deferred
-- B6.2 Magic link POST (H11) — deferred
-- B6.4 Portal "resend link" button — deferred
-
-### ✅ B7 — Hardening admin (test_b7_hardening.py)
-
-- B7.1 Members admin escalation (H15)
-- B7.2 SMTP IP validation (H16)
-- B7.3 CSV injection (H14)
-- B7.4 Export streaming yield_per (C18)
-- B7.5 Retry backoff exponentiel (H24)
-- B7.6 PortalRevokedSession purge + lifespan (M05)
-
-## Prochaine action : DEPLOY PROD
-
-### Séquence deploy
-
-```bash
-# 1. Sur le VPS (ubuntu@maxiaworld.app)
-cd /opt/budgetforge
-cp budgetforge.db budgetforge.db.bak-b2b7-$(date +%Y%m%d-%H%M%S)
-
-# 2. Pull + migration
-git pull origin master
-cd backend && alembic upgrade head
-
-# 3. Restart backend
-sudo systemctl restart budgetforge-backend
-
-# 4. Smoke tests
-curl -s https://llmbudget.maxiaworld.app/health
-curl -s -H "X-Admin-Key: $ADMIN_KEY" https://llmbudget.maxiaworld.app/api/projects
-```
-
-### Alembic migration — `owner_email`
-
-Migration : `budgetforge/backend/alembic/versions/b3_owner_email.py`
-Commande : `alembic upgrade head`
-Impact : ajoute colonne `owner_email TEXT` sur table `projects` (nullable)
-
-### Tests smoke post-deploy à vérifier
-
-- `/health` → 200 `{"status":"ok"}`
-- `GET /api/projects` sans key → 401
-- `GET /api/projects` avec admin key → 200
-- `POST /api/usage/export` sans key → 401
-- `POST /proxy/anthropic/...` → rate limit actif (30/min)
-
-## Reste (C2 Turnstile — action Alexis)
-
-- Créer compte Cloudflare Turnstile → obtenir `TURNSTILE_SECRET_KEY`
-- Setter sur VPS : `echo 'TURNSTILE_SECRET_KEY=xxx' >> /opt/budgetforge/.env`
-- Restart backend
-
-## Sauvegardes prod (audit #4)
-
-- Full : `/opt/budgetforge.bak-audit4-pre-fix-20260425-091126`
-- DB live : `budgetforge.db.audit4-pre-fix-20260425-091154`
+- **B0** Stripe webhook nginx
+- **B1** Rate limit, /clients protégé, export, CORS, real IP, Turnstile
+- **B2** Stripe upsert, subscription deleted, webhook HTTPS, reconcile env vars
+- **B3** owner_email migration, multi-projet, POST /api/portal/projects
+- **B4** budget=None→402, Redlock token, flock O_NOFOLLOW, streaming finalize, should_alert, token clamp
+- **B5** AWS Bedrock Converse API, asyncio.to_thread, usage réel
+- **B6** Cookie portal samesite=strict, API key masking, saveBudget warning
+- **B7** Members escalation, SMTP IP, CSV injection, export streaming, retry backoff, session purge
+- **B8** POST /api/portal/verify, cookie HttpOnly auth, atRisk counting, resend button, plan limits tests
+- **C2** Turnstile configuré en prod
