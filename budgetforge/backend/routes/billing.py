@@ -1,21 +1,15 @@
 import asyncio
 import logging
 import re
-import secrets
 import stripe
-from datetime import datetime, timezone
-from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from core.client_ip import get_real_client_ip
 from core.config import settings
 from core.database import get_db
 from core.limiter import limiter
 from core.log_utils import mask_email
 from core.models import Project, StripeEvent
-from routes.signup import _verify_turnstile
 from services.onboarding_email import send_onboarding_email, send_downgrade_email
 
 logger = logging.getLogger(__name__)
@@ -23,10 +17,6 @@ router = APIRouter(tags=["billing"])
 
 _CHECKOUT_PLANS = {"free", "pro", "agency"}
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-
-class CheckoutRequest(BaseModel):
-    turnstile_token: Optional[str] = None
 
 
 def _price_ids() -> dict[str, str]:
@@ -42,23 +32,12 @@ def _price_ids() -> dict[str, str]:
 
 @router.post("/api/checkout/{plan}")
 @limiter.limit("5/hour")
-async def create_checkout_session(
-    request: Request, plan: str, body: CheckoutRequest = None
-):
+async def create_checkout_session(request: Request, plan: str):
     if plan not in _CHECKOUT_PLANS:
         raise HTTPException(
             status_code=400,
             detail=f"No checkout available for plan '{plan}'. Valid: {sorted(_CHECKOUT_PLANS)}",
         )
-
-    if plan == "free":
-        client_ip = get_real_client_ip(request)
-        token = body.turnstile_token if body else None
-        if not await _verify_turnstile(token, client_ip):
-            raise HTTPException(
-                status_code=400,
-                detail="Captcha verification failed. Please retry.",
-            )
 
     price_id = _price_ids().get(plan, "")
     if not price_id:
@@ -101,9 +80,6 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     except stripe.error.SignatureVerificationError as e:
         logger.warning("Stripe signature verification failed: %s", e)
         raise HTTPException(status_code=400, detail="Invalid Stripe signature")
-    except (ValueError, TypeError) as e:
-        logger.warning("Stripe webhook config error: %s", e)
-        raise HTTPException(status_code=400, detail="Webhook signature check failed")
 
     event_id = event.get("id")
     if event_id:
@@ -135,15 +111,6 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
 
 async def _handle_checkout_completed(session: dict, db: Session) -> None:
-    # M1: vérifier payment_status avant toute mise à jour DB
-    payment_status = session.get("payment_status")
-    if payment_status and payment_status != "paid":
-        logger.info(
-            "checkout.session.completed ignoré — payment_status=%s (attendu 'paid')",
-            payment_status,
-        )
-        return
-
     email = (session.get("customer_details") or {}).get("email") or session.get(
         "customer_email"
     )
@@ -159,7 +126,7 @@ async def _handle_checkout_completed(session: dict, db: Session) -> None:
     customer_id = session.get("customer")
     subscription_id = session.get("subscription")
 
-    # Idempotence: upsert if subscription already exists (P2.1)
+    # P2.1 — idempotence: upsert if subscription already exists
     if subscription_id:
         existing = (
             db.query(Project)
@@ -177,31 +144,13 @@ async def _handle_checkout_completed(session: dict, db: Session) -> None:
             )
             return
 
-    # B2.1 (C14/C15): upsert via email — évite IntegrityError si projet free existe déjà
-    existing_by_email = db.query(Project).filter(Project.name == email).first()
-    if existing_by_email:
-        existing_by_email.plan = plan
-        existing_by_email.stripe_customer_id = customer_id
-        existing_by_email.stripe_subscription_id = subscription_id
-        db.commit()
-        logger.info(
-            "Existing project %s upgraded to %s (email=%s)",
-            existing_by_email.id,
-            plan,
-            mask_email(email),
-        )
-        await asyncio.to_thread(
-            send_onboarding_email, email, existing_by_email.api_key, plan
-        )
-        return
-
-    # Nouveau projet (utilisateur qui n'avait pas de compte free)
+    # H2: budget_usd initialisé à 1.00 pour que le proxy soit utilisable immédiatement
     project = Project(
         name=email,
-        owner_email=email,
         plan=plan,
         stripe_customer_id=customer_id,
         stripe_subscription_id=subscription_id,
+        budget_usd=1.00,
     )
     db.add(project)
     db.commit()
@@ -263,26 +212,11 @@ def _handle_subscription_deleted(subscription: dict, db: Session) -> None:
         .first()
     )
     if project:
-        # B2.2 (C21): rotation clé API + reset budget au downgrade
-        old_key = project.api_key
         project.plan = "free"
-        project.budget_usd = None
-        project.previous_api_key = old_key
-        project.api_key = f"bf-{secrets.token_urlsafe(32)}"
-        project.key_rotated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
         logger.info(
-            "Project %s downgraded to free, API key rotated (subscription %s cancelled)",
+            "Project %s downgraded to free (subscription %s cancelled)",
             project.id,
             subscription_id,
         )
         send_downgrade_email(project.name)
-
-
-def validate_stripe_config() -> None:
-    """Vérifie que le secret webhook Stripe est configuré. À appeler au démarrage."""
-    if not settings.stripe_webhook_secret:
-        logger.critical(
-            "STRIPE_WEBHOOK_SECRET non configuré — "
-            "la vérification des webhooks Stripe sera refusée (400)"
-        )

@@ -2,6 +2,7 @@ import smtplib
 import httpx
 import logging
 from email.mime.text import MIMEText
+from urllib.parse import urlparse as _urlparse
 from sqlalchemy.orm import Session
 from core.config import settings
 from core.models import SiteSetting
@@ -83,21 +84,25 @@ class AlertService:
                 "budget_usd": budget_usd,
                 "pct_used": pct,
             }
-        # SSRF gate: resolve_safe_host validates the URL against private IP ranges.
-        # We use the original URL (not the pinned IP) so TLS cert validation works.
+        # DNS rebinding TOCTOU fix: résoudre l'IP une fois, valider, pinner dans la requête.
         try:
-            _pinned_url, _hostname = resolve_safe_host(url)
+            pinned_url, host_header = resolve_safe_host(url)
         except ValueError as exc:
             logger.warning("Webhook alert refused for %s: %s", project_name, exc)
             return False
 
+        scheme = _urlparse(url).scheme
         try:
             async with httpx.AsyncClient(
                 timeout=5.0,
                 follow_redirects=False,
-                verify=True,
+                verify=(scheme == "https"),
             ) as client:
-                await client.post(url, json=payload)
+                await client.post(
+                    pinned_url,
+                    json=payload,
+                    headers={"Host": host_header},
+                )
             return True
         except Exception as e:
             logger.warning(f"Webhook alert failed for {project_name}: {e}")
@@ -129,8 +134,7 @@ class AlertService:
         msg = MIMEText(
             f"Project '{project_name}' has used ${used_usd:.4f} of ${budget_usd:.2f} budget ({pct}%)."
         )
-        safe_name = project_name.replace("\r", " ").replace("\n", " ")
-        msg["Subject"] = f"[BudgetForge] Budget alert: {safe_name} at {pct}%"
+        msg["Subject"] = f"[BudgetForge] Budget alert: {project_name} at {pct}%"
         msg["From"] = cfg["alert_from_email"]
         msg["To"] = to
         try:

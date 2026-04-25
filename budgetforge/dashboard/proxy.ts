@@ -10,8 +10,20 @@ const PROTECTED_PATHS = [
   "/settings",
 ];
 
-function computeExpectedToken(secret: string): string {
-  return createHmac("sha256", secret).update("session").digest("hex");
+const TOKEN_TTL_S = 86400;
+
+function verifyToken(cookie: string, secret: string): boolean {
+  const dot = cookie.indexOf(".");
+  if (dot === -1) return false;
+  const iatStr = cookie.slice(0, dot);
+  const sig = cookie.slice(dot + 1);
+  const iat = parseInt(iatStr, 10);
+  if (isNaN(iat)) return false;
+  if (Math.floor(Date.now() / 1000) - iat > TOKEN_TTL_S) return false;
+  const expected = createHmac("sha256", secret).update(iatStr).digest("hex");
+  const a = Buffer.from(sig, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function isProtected(pathname: string): boolean {
@@ -35,13 +47,9 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   const sessionSecret = process.env.SESSION_SECRET ?? "default-secret";
-  const expectedToken = computeExpectedToken(sessionSecret);
-  const sessionCookie = request.cookies.get("bf_session")?.value;
+  const sessionCookie = request.cookies.get("bf_session")?.value ?? "";
 
-  const a = Buffer.from(sessionCookie ?? "", "utf8");
-  const b = Buffer.from(expectedToken, "utf8");
-  const valid = a.length === b.length && timingSafeEqual(a, b);
-  if (valid) return NextResponse.next();
+  if (verifyToken(sessionCookie, sessionSecret)) return NextResponse.next();
 
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("from", pathname);

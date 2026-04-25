@@ -1,7 +1,9 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-function computeSessionToken(secret: string): string {
-  return createHmac("sha256", secret).update("session").digest("hex");
+function generateSessionToken(secret: string): string {
+  const iat = Math.floor(Date.now() / 1000);
+  const sig = createHmac("sha256", secret).update(String(iat)).digest("hex");
+  return `${iat}.${sig}`;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -17,7 +19,7 @@ export async function POST(req: Request): Promise<Response> {
 
   // Dev mode: no password configured → always succeed
   if (!dashboardPassword) {
-    const token = computeSessionToken(sessionSecret);
+    const token = generateSessionToken(sessionSecret);
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: {
@@ -47,7 +49,7 @@ export async function POST(req: Request): Promise<Response> {
     });
   }
 
-  const token = computeSessionToken(sessionSecret);
+  const token = generateSessionToken(sessionSecret);
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
     headers: {

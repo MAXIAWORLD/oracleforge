@@ -55,15 +55,13 @@ def _check_ip_rate_limit_db(ip: str, db: Session, max_per_day: int = 3) -> bool:
     return True
 
 
-def _check_domain_rate_limit(email: str, db: Session, max_per_day: int = 10) -> bool:
-    domain = email.split("@", 1)[-1] if "@" in email else ""
-    if not domain:
-        return True
+def _check_email_rate_limit(email: str, db: Session, max_per_day: int = 3) -> bool:
+    """M3: rate limit par adresse email exacte (3/jour) — évite le DoS @domaine."""
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     cutoff = now - timedelta(hours=24)
     count = (
         db.query(SignupAttempt)
-        .filter(SignupAttempt.email_domain == domain, SignupAttempt.created_at > cutoff)
+        .filter(SignupAttempt.email == email, SignupAttempt.created_at > cutoff)
         .count()
     )
     return count < max_per_day
@@ -72,7 +70,7 @@ def _check_domain_rate_limit(email: str, db: Session, max_per_day: int = 10) -> 
 def _record_signup_attempt(ip: str, email: str, db: Session) -> None:
     domain = email.split("@", 1)[-1] if "@" in email else None
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    db.add(SignupAttempt(ip=ip, email_domain=domain, created_at=now))
+    db.add(SignupAttempt(ip=ip, email_domain=domain, email=email, created_at=now))
     db.commit()
 
 
@@ -144,17 +142,17 @@ async def signup_free(
             status_code=429,
             detail="Too many signup attempts from this connection. Try again tomorrow.",
         )
-    if not _check_domain_rate_limit(body.email, db=db):
+    if not _check_email_rate_limit(body.email, db=db):
         raise HTTPException(
             status_code=429,
-            detail="Too many signups from this email domain. Try again tomorrow.",
+            detail="Too many signups from this email address. Try again tomorrow.",
         )
     _record_signup_attempt(client_ip, body.email, db)
 
     check_project_quota(body.email, "free", db)
 
-    # B3.2: définir owner_email au signup pour le multi-projet
-    project = Project(name=body.email, owner_email=body.email, plan="free")
+    # H2: budget_usd initialisé à 1.00 pour que le proxy soit utilisable immédiatement
+    project = Project(name=body.email, plan="free", budget_usd=1.00)
     db.add(project)
     try:
         db.commit()

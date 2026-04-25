@@ -368,37 +368,34 @@ class TestB5BudgetOvershootWarning:
 
 class TestB6SignupDomainRateLimit:
     @pytest.mark.asyncio
-    async def test_same_domain_rate_limit_blocks_after_10(self, client, test_db):
-        """11 signups depuis le même domaine email → le 11ème est bloqué (429)."""
-        domain = "test-domain-ratelimit.com"
-
-        # 10 signups acceptés
-        for i in range(10):
-            # Insérer directement dans SignupAttempt pour simuler les tentatives passées
-            pass
-
-        # Insérer 10 tentatives passées pour ce domaine dans la DB
+    async def test_same_email_rate_limit_blocks_after_3(self, client, test_db):
+        """M3 fix: rate limit par email exact (3/jour) — remplace l'ancien comptage domaine (10/jour).
+        3 tentatives du même email dans la DB → le 4ème signup est bloqué (429)."""
         from datetime import datetime, timezone, timedelta
 
+        email = "repeat-user@test-domain-ratelimit.com"
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        for i in range(10):
-            attempt = SignupAttempt(
-                ip=f"1.2.3.{i}",
-                email_domain=domain,
-                created_at=now - timedelta(minutes=i),
+        # Insérer 3 tentatives pour cet email exact
+        for i in range(3):
+            test_db.add(
+                SignupAttempt(
+                    ip=f"1.2.3.{i}",
+                    email_domain="test-domain-ratelimit.com",
+                    email=email,
+                    created_at=now - timedelta(minutes=i + 1),
+                )
             )
-            test_db.add(attempt)
         test_db.commit()
 
-        # Le 11ème signup de ce domaine doit être bloqué
+        # Le 4ème signup avec ce même email doit être bloqué
         with patch("routes.signup.send_onboarding_email"):
             resp = await client.post(
                 "/api/signup/free",
-                json={"email": f"user11@{domain}"},
+                json={"email": email},
             )
 
         assert resp.status_code == 429, (
-            f"Le 11ème signup du même domaine devrait être bloqué, obtenu {resp.status_code}"
+            f"Le 4ème signup du même email devrait être bloqué, obtenu {resp.status_code}"
         )
 
     @pytest.mark.asyncio
