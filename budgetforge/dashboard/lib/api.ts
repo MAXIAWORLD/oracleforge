@@ -11,6 +11,12 @@ export function setStoredAdminKey(key: string): void {
   if (typeof window === "undefined") return;
   if (key) localStorage.setItem(ADMIN_KEY_STORAGE, key);
   else localStorage.removeItem(ADMIN_KEY_STORAGE);
+  // H12: also store in HttpOnly cookie so XSS cannot read it
+  fetch("/api/admin-auth", {
+    method: key ? "POST" : "DELETE",
+    headers: { "Content-Type": "application/json" },
+    ...(key ? { body: JSON.stringify({ key }) } : {}),
+  }).catch(() => {});
 }
 
 export interface Project {

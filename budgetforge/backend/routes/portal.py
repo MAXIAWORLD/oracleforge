@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta, date, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from urllib.parse import quote as url_quote
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -98,7 +99,8 @@ def send_portal_email(email: str, token: str) -> bool:
         )
         return False
 
-    link = f"{settings.app_url}/portal?token={token}"
+    # H23 (audit H23): include email in URL so frontend can pre-fill the resend form
+    link = f"{settings.app_url}/portal?token={token}&email={url_quote(email)}"
     body = f"""\
 Access your BudgetForge projects
 
@@ -219,8 +221,8 @@ def _project_list(projects: list) -> list:
     ]
 
 
-@router.get("/api/portal/verify")
-def portal_verify(token: str, response: Response, db: Session = Depends(get_db)):
+def _do_verify(token: str, response: Response, db: Session) -> dict:
+    """H11: logique verify partagée entre GET (compat) et POST (sécurisé)."""
     record = db.query(PortalToken).filter(PortalToken.token == token).first()
     if not record:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -230,12 +232,10 @@ def portal_verify(token: str, response: Response, db: Session = Depends(get_db))
         raise HTTPException(status_code=401, detail="Token expired")
 
     email = record.email
-    # Invalider le token — usage unique (magic link)
     db.delete(record)
     db.commit()
 
     secure = settings.app_url.startswith("https")
-    # B6.3 (H10): samesite=strict + session 14j (réduit de 90j)
     _SESSION_COOKIE_AGE = 14 * 24 * 3600
     response.set_cookie(
         key="portal_session",
@@ -247,6 +247,24 @@ def portal_verify(token: str, response: Response, db: Session = Depends(get_db))
     )
     projects = _get_projects_for_email(email, db)
     return {"email": email, "projects": _project_list(projects)}
+
+
+class VerifyBody(BaseModel):
+    token: str
+
+
+@router.post("/api/portal/verify")
+def portal_verify_post(
+    body: VerifyBody, response: Response, db: Session = Depends(get_db)
+):
+    """H11: token dans le body (hors query string / logs nginx)."""
+    return _do_verify(body.token, response, db)
+
+
+@router.get("/api/portal/verify")
+def portal_verify(token: str, response: Response, db: Session = Depends(get_db)):
+    """Compat backward — liens existants en production."""
+    return _do_verify(token, response, db)
 
 
 def _get_projects_for_email(email: str, db: Session) -> list:
