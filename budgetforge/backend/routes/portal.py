@@ -1,3 +1,4 @@
+import asyncio
 import hmac
 import hashlib
 import logging
@@ -133,9 +134,12 @@ https://llmbudget.maxiaworld.app
         return False
 
 
+_PORTAL_REQUEST_DELAY = 0.1  # délai constant pour masquer la présence de l'email
+
+
 @router.post("/api/portal/request")
 @limiter.limit("5/hour")
-def portal_request(
+async def portal_request(
     request: Request, body: PortalRequestBody, db: Session = Depends(get_db)
 ):
     cleanup_expired_tokens(db)
@@ -143,6 +147,8 @@ def portal_request(
     # B3: cherche par owner_email en priorité (multi-projet), fallback name (compat)
     projects = _get_projects_for_email(email, db)
     if not projects:
+        # M04: délai constant pour éviter l'énumération d'emails par timing
+        await asyncio.sleep(_PORTAL_REQUEST_DELAY)
         return {"ok": True}
 
     token = PortalToken(

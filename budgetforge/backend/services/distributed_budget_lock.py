@@ -1,6 +1,7 @@
 import asyncio
 import secrets
 import sys
+from collections import OrderedDict
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Optional
@@ -110,16 +111,25 @@ end
 
 
 # Fallback: implémentation mémoire pour compatibilité
-_memory_locks: dict[int, asyncio.Lock] = {}
+_MEMORY_LOCKS_MAX_SIZE = 1024
+_memory_locks: OrderedDict[int, asyncio.Lock] = OrderedDict()
 _memory_registry_lock = asyncio.Lock()
 
 
 async def _get_memory_lock(project_id: int) -> asyncio.Lock:
-    """Fallback mémoire pour quand Redis n'est pas disponible."""
+    """Fallback mémoire pour quand Redis n'est pas disponible.
+    Borné à _MEMORY_LOCKS_MAX_SIZE pour éviter la fuite mémoire."""
     async with _memory_registry_lock:
-        if project_id not in _memory_locks:
-            _memory_locks[project_id] = asyncio.Lock()
-        return _memory_locks[project_id]
+        if project_id in _memory_locks:
+            # LRU: déplacer en fin de file
+            _memory_locks.move_to_end(project_id)
+            return _memory_locks[project_id]
+        lock = asyncio.Lock()
+        _memory_locks[project_id] = lock
+        if len(_memory_locks) > _MEMORY_LOCKS_MAX_SIZE:
+            # Éviction FIFO: supprimer le plus ancien (premier inséré)
+            _memory_locks.popitem(last=False)
+        return lock
 
 
 def _acquire_file_lock(path: str) -> object:

@@ -90,6 +90,14 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # H26: libérer le singleton DynamicPricingManager au shutdown
+    try:
+        from services.dynamic_pricing import shutdown_pricing_manager
+
+        shutdown_pricing_manager()
+    except Exception as exc:
+        logger.warning("shutdown_pricing_manager échoué: %s", exc)
+
 
 app = FastAPI(
     title="LLM BudgetForge",

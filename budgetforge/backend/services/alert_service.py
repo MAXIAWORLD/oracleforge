@@ -134,7 +134,8 @@ class AlertService:
         msg = MIMEText(
             f"Project '{project_name}' has used ${used_usd:.4f} of ${budget_usd:.2f} budget ({pct}%)."
         )
-        msg["Subject"] = f"[BudgetForge] Budget alert: {project_name} at {pct}%"
+        safe_name = project_name.replace("\r", " ").replace("\n", " ")
+        msg["Subject"] = f"[BudgetForge] Budget alert: {safe_name} at {pct}%"
         msg["From"] = cfg["alert_from_email"]
         msg["To"] = to
         try:
