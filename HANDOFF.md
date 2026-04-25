@@ -1,13 +1,16 @@
 # HANDOFF — BudgetForge audit #4 (session 25 avril 2026 — suite)
 
-## État : B0–B9 + C2 Turnstile DONE ✅ — 5 findings restants
+## État : AUDIT #4 COMPLET ✅ — 60/60 findings résolus
 
 **URL prod** : https://llmbudget.maxiaworld.app  
-**Dernier commit** : `f59384d` (bloc9 — H26 M01 M02 M03 M04 M10 M11, 18 tests TDD)
+**Dernier commit** : `4185a06` (test isolation + bloc10 déployé)
 
 ## ACTION PROCHAINE SESSION
 
-Attaquer les 5 findings effort=4 (H19, H20, H22, M08, M09).
+Audit #4 terminé. Prochaines options :
+- Lancer audit #5 (nouvelle passe QA senior)
+- Démarrer OracleForge Phase 9 (deploy prod)
+- Autre produit Forge Suite
 
 ## Commits audit #4
 
@@ -20,23 +23,17 @@ Attaquer les 5 findings effort=4 (H19, H20, H22, M08, M09).
 | `51511b4` | HANDOFF mis à jour |
 | `9ad359a` | B8 — H11 H12 H21 H23 M12 (19 tests) |
 | `f59384d` | B9 — H26 M01–M04 M10 M11 (18 tests TDD) |
+| `1d7e3c3` | B10 — H19 H20 H22 M08 M09 (14 tests TDD) |
+| `4185a06` | test isolation conftest (cache purge) |
 
 ## Tests
 
 - **Total tests verts** : 77 (backend) + suite complète ~200
 - **Zéro régression** confirmée
 
-## 5 findings restants (tous effort=4)
+## Findings — TOUS RÉSOLUS ✅
 
-### Complexes (5 items)
-
-| ID | Sévérité | Fichier | Sujet |
-|---|---|---|---|
-| **H19** | HAUT | `proxy_dispatcher.py` | Worker bloqué si client coupe avant finalize |
-| **H20** | HAUT | `get_project_by_api_key` | Timing attack API key lookup |
-| **H22** | HAUT | `services/plan_quota.py:50-62` | `check_quota` SQL par appel (perf) |
-| **M08** | MOYEN | `routes/history.py:74-87` | History total count lent |
-| **M09** | MOYEN | `routes/history.py:65-72` | date_from/to naive UTC |
+60/60 findings audit #4 résolus en 10 blocs (B0→B10 + C2 Turnstile).
 
 ## Documents de référence
 
