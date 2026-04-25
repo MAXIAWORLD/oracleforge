@@ -1,23 +1,13 @@
-# HANDOFF — BudgetForge audit #4 (fin session 25 avril 2026)
+# HANDOFF — BudgetForge audit #4 (session 25 avril 2026 — suite)
 
-## État : B0–B8 + C2 Turnstile DONE ✅ — 12 findings restants
+## État : B0–B9 + C2 Turnstile DONE ✅ — 5 findings restants
 
 **URL prod** : https://llmbudget.maxiaworld.app  
-**Dernier commit** : `9ad359a` (B8 — H11 H12 H21 H23 M12)
+**Dernier commit** : `f59384d` (bloc9 — H26 M01 M02 M03 M04 M10 M11, 18 tests TDD)
 
-## ACTION REQUISE AU DÉMARRAGE PROCHAINE SESSION
+## ACTION PROCHAINE SESSION
 
-Le build Next.js était encore en cours à la fin de session. Exécuter :
-
-```bash
-ssh ubuntu@maxiaworld.app
-# Vérifier que le build est fini :
-pgrep -f 'next build' || echo "build done"
-# Redémarrer le dashboard :
-sudo systemctl restart budgetforge-dashboard
-# Smoke test :
-curl -s https://llmbudget.maxiaworld.app/health
-```
+Attaquer les 5 findings effort=4 (H19, H20, H22, M08, M09).
 
 ## Commits audit #4
 
@@ -29,27 +19,16 @@ curl -s https://llmbudget.maxiaworld.app/health
 | `b30e629` | B1 — 33 tests TDD + source files |
 | `51511b4` | HANDOFF mis à jour |
 | `9ad359a` | B8 — H11 H12 H21 H23 M12 (19 tests) |
+| `f59384d` | B9 — H26 M01–M04 M10 M11 (18 tests TDD) |
 
 ## Tests
 
 - **Total tests verts** : 77 (backend) + suite complète ~200
 - **Zéro régression** confirmée
 
-## 12 findings restants (nouvelle session)
+## 5 findings restants (tous effort=4)
 
-### Effort ≤ 2 — À faire en premier (7 items)
-
-| ID | Sévérité | Fichier | Sujet |
-|---|---|---|---|
-| **H26** | HAUT | `services/dynamic_pricing.py:439-445` | Singleton sans `close()` au shutdown |
-| **M01** | MOYEN | `distributed_budget_lock.py:102-103` | `_memory_locks` dict illimité |
-| **M02** | MOYEN | `services/token_estimator.py:25-37` | `CODE_PATTERNS` regex unanchored |
-| **M03** | MOYEN | `services/alert_service.py:137` | Email mailsplit via `\r\n` dans project_name |
-| **M04** | MOYEN | `routes/portal.py:125-146` | Timing enum email portal_request |
-| **M10** | MOYEN | `routes/models.py:368-403` | 9 requêtes outbound parallèles par cache miss |
-| **M11** | MOYEN | `routes/admin.py:19-22` | `billing_sync` retourne HTTP 200 sur erreur |
-
-### Effort 4 — Complexes (5 items)
+### Complexes (5 items)
 
 | ID | Sévérité | Fichier | Sujet |
 |---|---|---|---|
