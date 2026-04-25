@@ -46,14 +46,9 @@ def create_member(
     x_admin_key: Optional[str] = Header(default="", alias="X-Admin-Key"),
     db: Session = Depends(get_db),
 ):
-    # B7.1 (H15): seul le global admin peut créer un member admin
-    # Un member admin compromis ne peut créer que des viewers
-    if payload.role == "admin":
-        is_global_admin = bool(
-            settings.admin_api_key
-            and hmac.compare_digest(x_admin_key or "", settings.admin_api_key)
-        )
-        if not is_global_admin:
+    # B7.1 (H15): seul le global admin peut créer un member admin (si clé configurée)
+    if payload.role == "admin" and settings.admin_api_key:
+        if not hmac.compare_digest(x_admin_key or "", settings.admin_api_key):
             raise HTTPException(
                 status_code=403,
                 detail="Only the global admin can create admin members",
