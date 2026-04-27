@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAXIA — Forge Suite</title>
+<meta name="description" content="MAXIA builds focused tools for AI builders. Hard budget limits for LLM APIs, multi-source price oracles for AI agents.">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://maxiaworld.app/">
+<meta property="og:title" content="MAXIA — Forge Suite">
+<meta property="og:description" content="Focused tools for AI builders. Apache-2.0.">
+<meta property="og:url" content="https://maxiaworld.app/">
+<meta property="og:type" content="website">
+<style>
+  :root {
+    --bg: #0c1220;
+    --bg-2: #11192a;
+    --text: #e9eef7;
+    --text-faint: #94a3b8;
+    --amber: #f6b452;
+    --border: #1d2940;
+    --accent: #7BD389;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  a { color: inherit; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; width: 100%; }
+  header.nav {
+    padding: 28px 0 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand {
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+  main { flex: 1; padding: 80px 0 60px; }
+  h1 {
+    font-size: clamp(32px, 5vw, 48px);
+    line-height: 1.08;
+    margin: 0 0 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  h1 em { color: var(--amber); font-style: normal; }
+  .lede {
+    font-size: 18px;
+    color: var(--text-faint);
+    max-width: 580px;
+    margin: 0 0 56px;
+  }
+  .grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 720px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+  }
+  .card {
+    display: block;
+    padding: 28px 26px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-2);
+    transition: border-color 180ms ease, transform 180ms ease;
+  }
+  .card:hover {
+    border-color: var(--amber);
+    transform: translateY(-2px);
+    text-decoration: none;
+  }
+  .card-tag {
+    display: inline-block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    margin-bottom: 14px;
+  }
+  .card h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .card p {
+    margin: 0 0 16px;
+    color: var(--text-faint);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .card-link {
+    color: var(--amber);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .card-link::after { content: " →"; }
+  .meta {
+    margin-top: 56px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-faint);
+    font-size: 14px;
+  }
+  .meta a { color: var(--amber); }
+  footer {
+    padding: 28px 0;
+    border-top: 1px solid var(--border);
+    color: var(--text-faint);
+    font-size: 13px;
+  }
+  footer .foot-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  footer a { color: var(--amber); }
+</style>
+<script async defer src="https://analytics.maxiaworld.app/script.js" data-website-id="31774da4-f92a-4822-8fd0-bb66c948809b"></script>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <span class="brand">MAXIA · FORGE SUITE</span>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <h1>Focused tools<br>for <em>AI builders</em>.</h1>
+    <p class="lede">
+      Two production tools, more shipping. Apache-2.0. No regulated business, no custody, no investment advice.
+    </p>
+
+    <div class="grid">
+      <a class="card" href="https://llmbudget.maxiaworld.app/">
+        <span class="card-tag">Live · Beta</span>
+        <h2>BudgetForge</h2>
+        <p>Hard limits on your LLM spend. Set a budget per project, get alerts before you blow it, auto-downgrade to cheaper models. Drop-in proxy for OpenAI, Anthropic, Google, DeepSeek, and more.</p>
+        <span class="card-link">Open llmbudget.maxiaworld.app</span>
+      </a>
+
+      <a class="card" href="https://oracle.maxiaworld.app/">
+        <span class="card-tag">Live · v0.1.9</span>
+        <h2>OracleForge</h2>
+        <p>Multi-source price oracle for AI agents. Six independent sources cross-checked, one API call, divergence flagged. REST + MCP + 7 SDKs (Python, TypeScript, LangChain, CrewAI, AutoGen, Eliza).</p>
+        <span class="card-link">Open oracle.maxiaworld.app</span>
+      </a>
+    </div>
+
+    <p class="meta">
+      More forges shipping. <a href="mailto:support@maxiaworld.app">Tell us what you would build with us.</a>
+    </p>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap foot-inner">
+    <span>&copy; 2026 MAXIA</span>
+    <span>
+      <a href="mailto:support@maxiaworld.app">support@maxiaworld.app</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/MAXIAWORLD" rel="noreferrer">github</a>
+    </span>
+  </div>
+</footer>
+
+</body>
+</html>
