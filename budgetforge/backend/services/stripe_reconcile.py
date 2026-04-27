@@ -6,35 +6,20 @@ from core.models import Project
 
 logger = logging.getLogger(__name__)
 
-
-def _plan_from_price_id(price_id: str) -> str:
-    """B2.4 (H25): dériver le plan depuis le price_id configuré en env vars.
-
-    Utilise les env vars STRIPE_PRO_PRICE_ID et STRIPE_AGENCY_PRICE_ID
-    plutôt qu'un string match fragile sur le nickname.
-    """
-    if price_id and price_id == settings.stripe_agency_price_id:
-        return "agency"
-    if price_id and price_id == settings.stripe_pro_price_id:
-        return "pro"
-    return "free"
+_PLAN_PRICE_MAP = {
+    "pro": ["pro", "price_pro"],
+    "agency": ["agency", "price_agency"],
+}
 
 
 def _plan_from_subscription(sub) -> str:
-    """Derive plan name from Stripe subscription items.
-
-    Priorité: price_id (env vars) > nickname (fallback compat).
-    """
+    """Derive plan name from Stripe subscription items."""
     for item in sub.items.data:
-        price_id = item.price.id or ""
-        plan = _plan_from_price_id(price_id)
-        if plan != "free":
-            return plan
-        # Fallback sur nickname pour compat avec Stripe configuré avant env vars
         nickname = (item.price.nickname or "").lower()
-        if "agency" in nickname:
+        price_id = item.price.id or ""
+        if "agency" in nickname or "agency" in price_id:
             return "agency"
-        if "pro" in nickname:
+        if "pro" in nickname or "pro" in price_id:
             return "pro"
     return "free"
 

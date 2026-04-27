@@ -1,4 +1,3 @@
-import asyncio
 import hmac
 import hashlib
 import logging
@@ -7,7 +6,6 @@ import time
 from datetime import datetime, timedelta, date, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from urllib.parse import quote as url_quote
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -28,15 +26,6 @@ _SESSION_MAX_AGE = 90 * 24 * 3600  # 90 jours
 def cleanup_expired_tokens(db: Session) -> None:
     db.query(PortalToken).filter(
         PortalToken.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)
-    ).delete()
-    db.commit()
-
-
-def cleanup_old_revoked_sessions(db: Session) -> None:
-    """B7.6 (M05): purge les sessions révoquées de plus de 90 jours pour éviter la croissance illimitée."""
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=90)
-    db.query(PortalRevokedSession).filter(
-        PortalRevokedSession.revoked_at < cutoff
     ).delete()
     db.commit()
 
@@ -100,8 +89,7 @@ def send_portal_email(email: str, token: str) -> bool:
         )
         return False
 
-    # H23 (audit H23): include email in URL so frontend can pre-fill the resend form
-    link = f"{settings.app_url}/portal?token={token}&email={url_quote(email)}"
+    link = f"{settings.app_url}/portal?token={token}"
     body = f"""\
 Access your BudgetForge projects
 
@@ -134,25 +122,15 @@ https://llmbudget.maxiaworld.app
         return False
 
 
-_PORTAL_REQUEST_DELAY = 0.1  # délai constant pour masquer la présence de l'email
-
-
 @router.post("/api/portal/request")
 @limiter.limit("5/hour")
-async def portal_request(
+def portal_request(
     request: Request, body: PortalRequestBody, db: Session = Depends(get_db)
 ):
     cleanup_expired_tokens(db)
     email = body.email.strip().lower()
-    # H4: normaliser les alias email (user+tag@domain → user@domain) avant lookup
-    if "@" in email and "+" in email.split("@")[0]:
-        local, domain = email.split("@", 1)
-        email = f"{local.split('+')[0]}@{domain}"
-    # B3: cherche par owner_email en priorité (multi-projet), fallback name (compat)
-    projects = _get_projects_for_email(email, db)
+    projects = db.query(Project).filter(Project.name == email).all()
     if not projects:
-        # M04: délai constant pour éviter l'énumération d'emails par timing
-        await asyncio.sleep(_PORTAL_REQUEST_DELAY)
         return {"ok": True}
 
     token = PortalToken(
@@ -177,12 +155,11 @@ def portal_usage(request: Request, project_id: int, db: Session = Depends(get_db
     if not email:
         raise HTTPException(status_code=401, detail="Invalid session")
 
-    # B3: vérifier ownership via owner_email ou name (compat)
     project = (
         db.query(Project)
         .filter(
             Project.id == project_id,
-            (Project.owner_email == email) | (Project.name == email),
+            Project.name == email,
         )
         .first()
     )
@@ -231,10 +208,8 @@ def _project_list(projects: list) -> list:
     ]
 
 
-def _do_verify(token: str, response: Response, db: Session) -> dict:
-    """H11: logique verify partagée entre GET (compat) et POST (sécurisé)."""
-    # M3: empêcher la mise en cache du token par proxy/navigateur/nginx
-    response.headers["Cache-Control"] = "no-store"
+@router.get("/api/portal/verify")
+def portal_verify(token: str, response: Response, db: Session = Depends(get_db)):
     record = db.query(PortalToken).filter(PortalToken.token == token).first()
     if not record:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -244,48 +219,21 @@ def _do_verify(token: str, response: Response, db: Session) -> dict:
         raise HTTPException(status_code=401, detail="Token expired")
 
     email = record.email
+    # Invalider le token — usage unique (magic link)
     db.delete(record)
     db.commit()
 
     secure = settings.app_url.startswith("https")
-    _SESSION_COOKIE_AGE = 14 * 24 * 3600
     response.set_cookie(
         key="portal_session",
         value=_sign_session(email),
-        max_age=_SESSION_COOKIE_AGE,
+        max_age=_SESSION_MAX_AGE,
         httponly=True,
-        samesite="strict",
+        samesite="lax",
         secure=secure,
     )
-    projects = _get_projects_for_email(email, db)
+    projects = db.query(Project).filter(Project.name == email).all()
     return {"email": email, "projects": _project_list(projects)}
-
-
-class VerifyBody(BaseModel):
-    token: str
-
-
-@router.post("/api/portal/verify")
-def portal_verify_post(
-    body: VerifyBody, response: Response, db: Session = Depends(get_db)
-):
-    """H11: token dans le body (hors query string / logs nginx)."""
-    return _do_verify(body.token, response, db)
-
-
-@router.get("/api/portal/verify")
-def portal_verify(token: str, response: Response, db: Session = Depends(get_db)):
-    """Compat backward — liens existants en production."""
-    return _do_verify(token, response, db)
-
-
-def _get_projects_for_email(email: str, db: Session) -> list:
-    """B3: cherche par owner_email en priorité, fallback sur name (compat anciens projets)."""
-    projects = db.query(Project).filter(Project.owner_email == email).all()
-    if not projects:
-        # Fallback compat: anciens projets sans owner_email
-        projects = db.query(Project).filter(Project.name == email).all()
-    return projects
 
 
 @router.get("/api/portal/session")
@@ -296,75 +244,8 @@ def portal_session(request: Request, db: Session = Depends(get_db)):
     email = _verify_session(cookie, db)
     if not email:
         raise HTTPException(status_code=401, detail="Invalid session")
-    projects = _get_projects_for_email(email, db)
+    projects = db.query(Project).filter(Project.name == email).all()
     return {"email": email, "projects": _project_list(projects)}
-
-
-class CreateProjectBody(BaseModel):
-    name: str
-
-
-@router.post("/api/portal/projects", status_code=201)
-def portal_create_project(
-    body: CreateProjectBody,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """B3.3 (C19/C20): Crée un projet supplémentaire pour les utilisateurs Pro/Agency.
-
-    Auth: cookie portal_session (pas admin key).
-    Vérifie le quota du plan avant création.
-    """
-    import re as _re
-    from services.plan_quota import check_project_quota
-    from sqlalchemy.exc import IntegrityError as _IntegrityError
-
-    cookie = request.cookies.get("portal_session")
-    if not cookie:
-        raise HTTPException(status_code=401, detail="No session")
-    email = _verify_session(cookie, db)
-    if not email:
-        raise HTTPException(status_code=401, detail="Invalid session")
-
-    # Valider le nom du projet (slug simple)
-    name = body.name.strip()
-    if not name or not _re.match(r"^[a-zA-Z0-9_\-]{2,64}$", name):
-        raise HTTPException(
-            status_code=422,
-            detail="Project name must be 2-64 characters (letters, digits, - or _)",
-        )
-
-    # Récupérer le plan de l'utilisateur depuis ses projets existants
-    existing_projects = _get_projects_for_email(email, db)
-    if not existing_projects:
-        raise HTTPException(
-            status_code=403, detail="No existing project found for this account"
-        )
-
-    plan = existing_projects[0].plan
-
-    # Vérifier le quota
-    check_project_quota(email, plan, db)
-
-    # Créer le projet
-    new_project = Project(name=name, owner_email=email, plan=plan)
-    db.add(new_project)
-    try:
-        db.commit()
-        db.refresh(new_project)
-    except _IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="A project with this name already exists",
-        )
-
-    return {
-        "id": new_project.id,
-        "name": new_project.name,
-        "api_key": new_project.api_key,
-        "plan": new_project.plan,
-    }
 
 
 @router.post("/api/portal/logout")

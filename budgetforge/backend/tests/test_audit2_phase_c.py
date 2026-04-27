@@ -60,7 +60,7 @@ async def client(test_db):
 def _make_project(db, **kwargs):
     from core.models import Project
 
-    defaults = {"name": "test-proj", "budget_usd": 100.0}
+    defaults = {"name": "test-proj"}
     defaults.update(kwargs)
     p = Project(**defaults)
     db.add(p)

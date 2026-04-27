@@ -1,6 +1,6 @@
 import hmac
 
-from fastapi import Header, HTTPException, Depends, Request
+from fastapi import Header, HTTPException, Depends
 from sqlalchemy.orm import Session
 from core.config import settings
 from core.database import get_db
@@ -14,26 +14,15 @@ def _admin_key_matches(provided: str) -> bool:
 
 
 async def require_admin(
-    request: Request,
     x_admin_key: str = Header(default="", alias="X-Admin-Key"),
     db: Session = Depends(get_db),
 ) -> None:
     """Allow: global admin key, OR member with role=admin, OR dev mode (no key configured)."""
-    # H12: fallback to HttpOnly cookie if header is absent
-    if not x_admin_key:
-        x_admin_key = request.cookies.get("bf_admin_key", "")
-
     if not settings.admin_api_key:
         if settings.app_env == "production":
             raise HTTPException(
                 status_code=503,
                 detail="Service misconfigured: ADMIN_API_KEY not set in production",
-            )
-        if settings.app_env != "development":
-            # H2: bypass réservé à "development" uniquement — toute autre env (staging, ci…) refuse
-            raise HTTPException(
-                status_code=401,
-                detail="ADMIN_API_KEY not configured",
             )
         # Dev mode: block viewer members trying to reach write endpoints
         if x_admin_key and x_admin_key.startswith("bf-mbr-"):
@@ -67,25 +56,15 @@ async def require_admin(
 
 
 async def require_viewer(
-    request: Request,
     x_admin_key: str = Header(default="", alias="X-Admin-Key"),
     db: Session = Depends(get_db),
 ) -> None:
     """Allow: global admin key, OR any member (admin or viewer), OR dev mode."""
-    # H12: fallback to HttpOnly cookie if header is absent
-    if not x_admin_key:
-        x_admin_key = request.cookies.get("bf_admin_key", "")
-
     if not settings.admin_api_key:
         if settings.app_env == "production":
             raise HTTPException(
                 status_code=503,
                 detail="Service misconfigured: ADMIN_API_KEY not set in production",
-            )
-        if settings.app_env != "development":
-            raise HTTPException(
-                status_code=401,
-                detail="ADMIN_API_KEY not configured",
             )
         return  # dev mode
 

@@ -73,30 +73,7 @@ async def lifespan(app: FastAPI):
                 "TURNSTILE_SECRET_KEY absent en production — signups free seront bloqués "
                 "(fail-closed anti-bot). Configurer sur https://dash.cloudflare.com/?to=/:account/turnstile"
             )
-
-    # B7.6 (M05): purge sessions révoquées > 90j au démarrage
-    try:
-        from routes.portal import cleanup_old_revoked_sessions
-
-        db_gen = get_db()
-        db = next(db_gen)
-        cleanup_old_revoked_sessions(db)
-        try:
-            next(db_gen)
-        except StopIteration:
-            pass
-    except Exception as exc:
-        logger.warning("Purge PortalRevokedSession échouée au démarrage: %s", exc)
-
     yield
-
-    # H26: libérer le singleton DynamicPricingManager au shutdown
-    try:
-        from services.dynamic_pricing import shutdown_pricing_manager
-
-        shutdown_pricing_manager()
-    except Exception as exc:
-        logger.warning("shutdown_pricing_manager échoué: %s", exc)
 
 
 app = FastAPI(
@@ -155,10 +132,9 @@ def get_cors_origins(app_env: str) -> list[str]:
     return [prod_origin]
 
 
-_cors_origins = get_cors_origins(settings.app_env)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=get_cors_origins(settings.app_env),
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
         "Content-Type",

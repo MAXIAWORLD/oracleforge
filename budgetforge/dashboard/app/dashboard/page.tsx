@@ -494,14 +494,9 @@ export default function OverviewPage() {
       ? projects.reduce((s, p) => s + (p.usage?.used_usd ?? 0), 0)
       : (periodSpent ?? 0);
   const totalBudget = projects.reduce((s, p) => s + (p.budget_usd ?? 0), 0);
-  // H21: only count projects with loaded usage — null means load failed, not 0%
-  const projectsWithUsage = projects.filter((p) => p.usage != null);
-  const usageLoadFailed = projects.length - projectsWithUsage.length;
-  const atRisk = projectsWithUsage.filter(
-    (p) => (p.usage!.pct_used ?? 0) >= 80,
-  ).length;
-  const exceeded = projectsWithUsage.filter(
-    (p) => (p.usage!.pct_used ?? 0) >= 100,
+  const atRisk = projects.filter((p) => (p.usage?.pct_used ?? 0) >= 80).length;
+  const exceeded = projects.filter(
+    (p) => (p.usage?.pct_used ?? 0) >= 100,
   ).length;
   const overallPct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
@@ -682,22 +677,6 @@ export default function OverviewPage() {
             accent={exceeded > 0 ? "#ef4444" : "#22c55e"}
           />
         </motion.div>
-
-        {/* H21: warning when usage failed to load for some projects */}
-        {usageLoadFailed > 0 && (
-          <div
-            className="mb-4 rounded-lg px-4 py-3 text-sm flex items-center gap-2"
-            style={{
-              background: "#78350f20",
-              border: "1px solid #f59e0b50",
-              color: "#fbbf24",
-            }}
-          >
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            Usage data unavailable for {usageLoadFailed} project
-            {usageLoadFailed > 1 ? "s" : ""} — at-risk counts may be incomplete.
-          </div>
-        )}
 
         {/* Global health bar */}
         {totalBudget > 0 && (

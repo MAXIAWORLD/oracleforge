@@ -169,15 +169,11 @@ class TestCORSExplicitHeaders:
     def test_cors_allow_headers_contains_required(self):
         """main.py : allow_headers contient les headers utiles au proxy."""
         src = _read_backend_file("main.py")
-        cors_block = re.search(
-            r"add_middleware\(\s*CORSMiddleware[^)]*\)",
-            src,
-            re.DOTALL,
-        )
-        assert cors_block
-        block = cors_block.group(0)
+        # Note: [^)]* s'arrête au premier ) rencontré (ex: get_cors_origins(...)).
+        # On cherche dans src entier — ces noms de headers n'apparaissent
+        # qu'une seule fois dans main.py, dans le bloc CORSMiddleware.
         required = ["Content-Type", "Authorization", "X-Provider-Key", "X-Agent-Name"]
-        missing = [h for h in required if h not in block]
+        missing = [h for h in required if h not in src]
         assert not missing, (
             f"allow_headers doit contenir {required}, il manque : {missing}"
         )
@@ -362,11 +358,6 @@ class TestSQLiteWALMode:
             os.environ.pop("DATABASE_URL", None)
             importlib.reload(cfg_mod)
             importlib.reload(db_mod)
-            # Re-bind settings in all modules that imported it at module level
-            # to avoid polluting subsequent tests with stale references.
-            import core.auth as auth_mod
-
-            importlib.reload(auth_mod)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

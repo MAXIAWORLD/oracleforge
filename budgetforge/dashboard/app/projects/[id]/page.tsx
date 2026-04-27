@@ -17,8 +17,6 @@ import {
   Plus,
   X,
   GripVertical,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -348,7 +346,6 @@ export default function ProjectDetailPage({
     message: "",
   });
   const [rotating, setRotating] = useState(false);
-  const [showKey, setShowKey] = useState(false);
   function showToast(message: string) {
     setToast({ show: true, message });
   }
@@ -423,7 +420,7 @@ export default function ProjectDetailPage({
 
   async function saveBudget(e: React.FormEvent) {
     e.preventDefault();
-    if (!project || saving) return; // C2: guard double-submit avant re-render
+    if (!project) return;
     setSaveError(null);
     setThresholdError(null);
 
@@ -445,18 +442,14 @@ export default function ProjectDetailPage({
 
     setSaving(true);
     try {
-      const result = await api.projects.setBudget(project.id, {
+      await api.projects.setBudget(project.id, {
         budget_usd: parsed,
         alert_threshold_pct: thresholdParsed,
         action,
         allowed_providers: allowedProviders,
         downgrade_chain: downgradeChain.filter(Boolean),
       });
-      if (result?.warning) {
-        showToast(`⚠ ${result.warning}`);
-      } else {
-        showToast("Budget saved");
-      }
+      showToast("Budget saved");
       await refresh();
     } catch (err) {
       // H3: afficher l'erreur au lieu de la swallower silencieusement
@@ -532,21 +525,8 @@ export default function ProjectDetailPage({
           </h1>
           <div className="flex items-center gap-2">
             <code className="font-mono text-xs text-[--muted-fg] bg-white/5 px-2 py-0.5 rounded">
-              {showKey
-                ? project.api_key
-                : `${project.api_key.slice(0, 8)}...${project.api_key.slice(-4)}`}
+              {project.api_key}
             </code>
-            <button
-              onClick={() => setShowKey((v) => !v)}
-              title={showKey ? "Hide API key" : "Show API key"}
-              className="p-1.5 rounded-md text-[--muted-fg] hover:text-[--foreground] hover:bg-white/10 transition-all"
-            >
-              {showKey ? (
-                <EyeOff className="w-3.5 h-3.5" />
-              ) : (
-                <Eye className="w-3.5 h-3.5" />
-              )}
-            </button>
             <CopyButton
               text={project.api_key}
               onCopy={() => showToast("API key copied")}

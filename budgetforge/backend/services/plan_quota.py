@@ -1,28 +1,8 @@
-import time as _time_module
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from core.models import Usage, Project
-
-# H22: cache TTL pour éviter une requête SQL COUNT à chaque appel proxy
-_QUOTA_CACHE_TTL = 30  # secondes
-_quota_cache: dict[int, tuple[float, int]] = {}
-
-
-def time() -> float:
-    return _time_module.time()
-
-
-def get_calls_this_month_cached(project_id: int, db: Session) -> int:
-    now = time()
-    entry = _quota_cache.get(project_id)
-    if entry and now - entry[0] < _QUOTA_CACHE_TTL:
-        return entry[1]
-    count = get_calls_this_month(project_id, db)
-    _quota_cache[project_id] = (now, count)
-    return count
-
 
 PLAN_LIMITS: dict[str, int] = {
     "free": 1_000,
@@ -56,18 +36,7 @@ def check_project_quota(owner_email: str, plan: str, db: Session) -> None:
     limit = PLAN_PROJECT_LIMITS.get(plan, 1)
     if limit == -1:
         return
-    # B3.2 (C19): compter par owner_email, pas par name
-    # Fallback: si owner_email n'est pas défini (anciens projets), compter par name
-    count = (
-        db.query(Project)
-        .filter(
-            (Project.owner_email == owner_email)
-            | (
-                (Project.owner_email == None) & (Project.name == owner_email)  # noqa: E711
-            )
-        )
-        .count()
-    )
+    count = db.query(Project).filter(Project.name == owner_email).count()
     if count >= limit:
         raise HTTPException(
             status_code=429,
@@ -81,7 +50,7 @@ def check_project_quota(owner_email: str, plan: str, db: Session) -> None:
 def check_quota(project, db: Session) -> None:
     plan = getattr(project, "plan", None) or "free"
     limit = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
-    calls = get_calls_this_month_cached(project.id, db)
+    calls = get_calls_this_month(project.id, db)
     if calls >= limit:
         raise HTTPException(
             status_code=429,

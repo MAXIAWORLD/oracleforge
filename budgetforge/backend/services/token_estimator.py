@@ -3,29 +3,6 @@
 import re
 from typing import Dict, List
 
-# B4.7 (H05): limites réelles par modèle pour clamper max_tokens trop grand
-_MODEL_MAX_OUTPUT_TOKENS: dict[str, int] = {
-    "gpt-4o": 16_384,
-    "gpt-4o-mini": 16_384,
-    "gpt-4-turbo": 4_096,
-    "gpt-4": 4_096,
-    "gpt-3.5-turbo": 4_096,
-    "o1": 100_000,
-    "o3-mini": 100_000,
-    "claude-opus-4-7": 8_192,
-    "claude-sonnet-4-6": 8_192,
-    "claude-haiku-4-5-20251001": 8_192,
-    "claude-haiku-4-5": 8_192,
-    "gemini-1.5-pro": 8_192,
-    "gemini-1.5-flash": 8_192,
-    "gemini-2.0-flash": 8_192,
-    "deepseek-chat": 8_192,
-    "deepseek-reasoner": 8_192,
-    "mistral-large": 4_096,
-    "mistral-small": 4_096,
-}
-_DEFAULT_MAX_OUTPUT_TOKENS = 8_192
-
 
 class TokenEstimator:
     """Estimateur de tokens amélioré avec facteurs de correction par langue et type de contenu."""
@@ -44,19 +21,19 @@ class TokenEstimator:
         "code": 0.7,  # Code : tokens plus denses
     }
 
-    # Patterns pour détecter le type de contenu (précompilés — évite recompilation + réduit réentrée ReDoS)
+    # Patterns pour détecter le type de contenu
     CODE_PATTERNS = [
-        re.compile(r"def\s+\w+\s*\("),
-        re.compile(r"function\s+\w+\s*\("),
-        re.compile(r"class\s+\w+"),
-        re.compile(r"import\s+\w+"),
-        re.compile(r"from\s+\w+\s+import"),
-        re.compile(r"\w+\s*=\s*\w+\s*\("),
-        re.compile(r"\$\w+"),
-        re.compile(r"<\?php"),
-        re.compile(r"<script>"),
-        re.compile(r"public\s+class"),
-        re.compile(r"private\s+\w+"),
+        r"def\s+\w+\s*\(",
+        r"function\s+\w+\s*\(",
+        r"class\s+\w+",
+        r"import\s+\w+",
+        r"from\s+\w+\s+import",
+        r"\w+\s*=\s*\w+\s*\(",
+        r"\$\w+",  # Variables shell/PHP
+        r"<\?php",
+        r"<script>",
+        r"public\s+class",
+        r"private\s+\w+",
     ]
 
     @classmethod
@@ -118,7 +95,7 @@ class TokenEstimator:
             Estimation du nombre de tokens
         """
         if not text:
-            return 1  # H1: plancher à 1 — zéro token = bypass du budget check
+            return 0
 
         # Détection automatique de la langue si non spécifiée
         if language is None:
@@ -220,10 +197,7 @@ class TokenEstimator:
         """
         max_tokens = payload.get("max_tokens")
         if max_tokens is not None:
-            # B4.7 (H05): clamper max_tokens à la limite réelle du modèle
-            model = payload.get("model", "")
-            cap = _MODEL_MAX_OUTPUT_TOKENS.get(model, _DEFAULT_MAX_OUTPUT_TOKENS)
-            return min(max_tokens, cap)
+            return max_tokens
 
         if conservative:
             # Borne haute : réserve au moins 512 tokens, jusqu'à 4096.

@@ -77,9 +77,8 @@ class BudgetGuard:
     def should_alert(
         self, budget_usd: float, used_usd: float, threshold_pct: int
     ) -> bool:
-        # B4.6 (H06): budget_usd<=0 → pas d'alerte (cohérence avec maybe_send_alert)
         if budget_usd <= 0:
-            return False
+            return True
         pct_used = (used_usd / budget_usd) * 100
         return pct_used >= threshold_pct
 

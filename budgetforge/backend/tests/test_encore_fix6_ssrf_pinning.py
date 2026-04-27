@@ -53,8 +53,8 @@ class TestSendWebhookUsesIPPinning:
         )
 
     @pytest.mark.asyncio
-    async def test_post_uses_original_url_not_pinned_ip(self):
-        """httpx.post doit utiliser l'URL originale (TLS valide le cert via hostname)."""
+    async def test_post_uses_pinned_url_not_original(self):
+        """httpx.post doit être appelé avec l'URL pincée (IP), pas l'URL originale."""
         from services.alert_service import AlertService
 
         original_url = "https://legit.example.com/hook"
@@ -87,9 +87,9 @@ class TestSendWebhookUsesIPPinning:
             )
 
         assert len(posted_urls) == 1
-        assert posted_urls[0] == original_url, (
-            f"HTTP POST must use original URL '{original_url}' for TLS cert validation. "
-            f"Got: {posted_urls[0]}."
+        assert posted_urls[0] == pinned_url, (
+            f"HTTP POST must use pinned IP URL '{pinned_url}', not original '{original_url}'. "
+            f"Got: {posted_urls[0]}. Current code posts to the original URL (TOCTOU)."
         )
 
     @pytest.mark.asyncio
@@ -127,23 +127,28 @@ class TestSendWebhookUsesIPPinning:
         assert len(post_called) == 0, "POST must not be made when SSRF blocked"
 
     @pytest.mark.asyncio
-    async def test_tls_verify_enabled_not_disabled(self):
-        """verify=True doit être passé à AsyncClient (pas verify=False)."""
+    async def test_host_header_set_to_original_hostname(self):
+        """Le header Host doit contenir le hostname original (pas l'IP pincée)."""
         from services.alert_service import AlertService
+
+        captured_headers = []
+
+        async def fake_post(url, json=None, headers=None):
+            captured_headers.append(headers or {})
+            return AsyncMock()
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = fake_post
 
         with (
             patch(
                 "services.alert_service.resolve_safe_host",
                 return_value=("https://1.2.3.4/hook", "hooks.slack.com"),
             ),
-            patch("services.alert_service.httpx.AsyncClient") as mock_cls,
+            patch("httpx.AsyncClient", return_value=mock_client),
         ):
-            mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock()
-            mock_cls.return_value = mock_client
-
             await AlertService.send_webhook(
                 url="https://hooks.slack.com/T123/B456/xyz",
                 project_name="test",
@@ -151,7 +156,8 @@ class TestSendWebhookUsesIPPinning:
                 budget_usd=100.0,
             )
 
-        call_kwargs = mock_cls.call_args.kwargs if mock_cls.call_args else {}
-        assert call_kwargs.get("verify") is True, (
-            f"AsyncClient doit être construit avec verify=True. Got: {call_kwargs.get('verify')}"
+        assert len(captured_headers) == 1
+        assert captured_headers[0].get("Host") == "hooks.slack.com", (
+            f"Host header must be the original hostname. Got: {captured_headers[0]}. "
+            "Current code doesn't set Host header."
         )

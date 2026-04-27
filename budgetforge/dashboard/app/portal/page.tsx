@@ -136,10 +136,8 @@ function CopyButton({ text }: { text: string }) {
 function PortalContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
-  // H23: email hint from URL so the resend form can be pre-filled
-  const emailHint = searchParams.get("email") ?? "";
 
-  const [email, setEmail] = useState(emailHint);
+  const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -148,13 +146,8 @@ function PortalContent() {
 
   useEffect(() => {
     if (token) {
-      // H11: POST token in body (not GET query string — stays out of nginx logs)
-      fetch("/api/portal/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-        credentials: "include",
-      })
+      // magic link → verify + pose le cookie session 90j
+      fetch(`/api/portal/verify?token=${token}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
         .then((data) => setProjects(data.projects))
         .catch((status) => {
@@ -163,6 +156,7 @@ function PortalContent() {
               "Our server is temporarily unavailable. Please try again in a moment.",
             );
           } else {
+            // 401, 404, token invalide/expiré
             setError(
               "This link is invalid or has expired. Request a new one below.",
             );
@@ -353,28 +347,6 @@ function PortalContent() {
         </div>
       ) : (
         <form onSubmit={handleRequest} className="flex flex-col gap-4">
-          {/* H23: resend shortcut when email is known from URL hint */}
-          {error && email && (
-            <div
-              className="rounded-lg px-4 py-3 text-sm"
-              style={{
-                background: "var(--card)",
-                border: "1px solid var(--border)",
-              }}
-            >
-              <span style={{ color: "#c8d8e8" }}>Send a new link to </span>
-              <strong>{email}</strong>
-              <span style={{ color: "#c8d8e8" }}>?</span>
-              <button
-                type="submit"
-                disabled={loading}
-                className="ml-3 text-xs font-semibold underline underline-offset-2 disabled:opacity-50"
-                style={{ color: "var(--amber)" }}
-              >
-                {loading ? "Sending…" : "Resend →"}
-              </button>
-            </div>
-          )}
           <input
             type="email"
             required

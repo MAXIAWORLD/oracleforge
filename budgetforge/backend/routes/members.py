@@ -1,11 +1,9 @@
-import hmac
 import re
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from typing import Literal, Optional
-from core.config import settings
+from typing import Literal
 from core.database import get_db
 from core.models import Member
 from core.auth import require_admin
@@ -41,18 +39,7 @@ class MemberResponse(BaseModel):
     response_model=MemberResponse,
     dependencies=[Depends(require_admin)],
 )
-def create_member(
-    payload: MemberCreate,
-    x_admin_key: Optional[str] = Header(default="", alias="X-Admin-Key"),
-    db: Session = Depends(get_db),
-):
-    # B7.1 (H15): seul le global admin peut créer un member admin (si clé configurée)
-    if payload.role == "admin" and settings.admin_api_key:
-        if not hmac.compare_digest(x_admin_key or "", settings.admin_api_key):
-            raise HTTPException(
-                status_code=403,
-                detail="Only the global admin can create admin members",
-            )
+def create_member(payload: MemberCreate, db: Session = Depends(get_db)):
     member = Member(email=payload.email, role=payload.role)
     db.add(member)
     try:

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, date
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from core.config import settings
@@ -17,7 +17,7 @@ _MRR_BY_PLAN = {"free": 0, "pro": 29, "agency": 79}
 def billing_sync(db: Session = Depends(get_db)):
     """Réconcilier les plans avec Stripe (appelable par cron systemd)."""
     if not settings.stripe_secret_key:
-        raise HTTPException(status_code=503, detail="STRIPE_SECRET_KEY not configured")
+        return {"ok": False, "error": "STRIPE_SECRET_KEY not configured"}
     result = reconcile_stripe_subscriptions(db)
     return {"ok": True, **result}
 

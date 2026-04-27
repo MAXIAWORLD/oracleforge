@@ -107,13 +107,7 @@ class ProjectResponse(BaseModel):
     @classmethod
     def parse_json_list(cls, v: object) -> list[str]:
         if isinstance(v, str):
-            if not v:
-                return []
-            try:
-                return json.loads(v)
-            except json.JSONDecodeError:
-                # M2: dégradation gracieuse — JSON malformé en DB retourne []
-                return []
+            return json.loads(v) if v else []
         return v or []
 
 
@@ -223,7 +217,7 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db)):
 
 
 @router.get(
-    "", response_model=list[ProjectResponse], dependencies=[Depends(require_admin)]
+    "", response_model=list[ProjectResponse], dependencies=[Depends(require_viewer)]
 )
 @limiter.limit("60/minute")
 def list_projects(request: Request, db: Session = Depends(get_db)):

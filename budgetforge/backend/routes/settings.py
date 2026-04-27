@@ -1,4 +1,3 @@
-import ipaddress
 import re
 from typing import Optional
 from fastapi import APIRouter, Depends
@@ -20,37 +19,6 @@ _SMTP_KEYS = (
 )
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
-# B7.2 (H16): blocs IP privées/loopback pour smtp_host
-_PRIVATE_NETS = [
-    ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("169.254.0.0/16"),
-    ipaddress.ip_network("::1/128"),
-    ipaddress.ip_network("fc00::/7"),
-]
-_BLOCKED_SMTP_HOSTS = {"localhost", "metadata.google.internal"}
-
-
-def _validate_smtp_host(host: str) -> None:
-    """B7.2 (H16): refuse les IPs privées et les hostnames internes comme smtp_host."""
-    if not host or host == "":
-        return
-    if host.lower() in _BLOCKED_SMTP_HOSTS:
-        raise ValueError(f"smtp_host '{host}' is not allowed")
-    try:
-        addr = ipaddress.ip_address(host)
-        for net in _PRIVATE_NETS:
-            if addr in net:
-                raise ValueError(
-                    f"smtp_host '{host}' points to a private/internal IP range"
-                )
-    except ValueError as exc:
-        if "private" in str(exc) or "internal" in str(exc) or "not allowed" in str(exc):
-            raise
-        # C'est un hostname (pas une IP) → autorisé
-
 
 class SettingsUpdate(BaseModel):
     smtp_host: Optional[str] = None
@@ -58,13 +26,6 @@ class SettingsUpdate(BaseModel):
     smtp_user: Optional[str] = None
     smtp_password: Optional[str] = None
     alert_from_email: Optional[str] = None
-
-    @field_validator("smtp_host")
-    @classmethod
-    def valid_smtp_host(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            _validate_smtp_host(v)
-        return v
 
     @field_validator("smtp_port")
     @classmethod

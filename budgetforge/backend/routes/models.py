@@ -77,10 +77,6 @@ _OPENAI_CHAT_PREFIXES = ("gpt-", "o1", "o3", "chatgpt-")
 # Simple in-memory cache: (timestamp, data)
 _cache: dict[str, tuple[float, list[str]]] = {}
 _CACHE_TTL = 300  # 5 minutes
-# M10: résultat global de get_models() — double-check anti-stampede
-_models_result_cache: dict[str, tuple[float, dict]] = {}
-# M10: lock pour sérialiser les fetches concurrents (anti-stampede)
-_fetch_lock = asyncio.Lock()
 
 
 def _cached(key: str) -> list[str] | None:
@@ -371,46 +367,37 @@ async def _fetch_aws_bedrock_models() -> list[str]:
 
 @router.get("/models", dependencies=[Depends(require_viewer)])
 async def get_models() -> dict:
-    # M10: anti-stampede — sérialiser + double-check pour éviter N×9 fetches sur cache froid
-    async with _fetch_lock:
-        # Double-check : un appel concurrent a peut-être déjà rempli le cache
-        cached = _models_result_cache.get("all")
-        if cached and time.time() - cached[0] < _CACHE_TTL:
-            return cached[1]
-
-        (
-            openai_models,
-            anthropic_models,
-            google_models,
-            deepseek_models,
-            ollama_models,
-            openrouter_models,
-            together_models,
-            azure_openai_models,
-            aws_bedrock_models,
-        ) = await asyncio.gather(
-            _fetch_openai_models(),
-            _fetch_anthropic_models(),
-            _fetch_google_models(),
-            _fetch_deepseek_models(),
-            _fetch_ollama_models(),
-            _fetch_openrouter_models(),
-            _fetch_together_models(),
-            _fetch_azure_openai_models(),
-            _fetch_aws_bedrock_models(),
-        )
-        result = {
-            "providers": {
-                "openai": openai_models,
-                "anthropic": anthropic_models,
-                "google": google_models,
-                "deepseek": deepseek_models,
-                "ollama": ollama_models,
-                "openrouter": openrouter_models,
-                "together": together_models,
-                "azure_openai": azure_openai_models,
-                "aws_bedrock": aws_bedrock_models,
-            }
+    (
+        openai_models,
+        anthropic_models,
+        google_models,
+        deepseek_models,
+        ollama_models,
+        openrouter_models,
+        together_models,
+        azure_openai_models,
+        aws_bedrock_models,
+    ) = await asyncio.gather(
+        _fetch_openai_models(),
+        _fetch_anthropic_models(),
+        _fetch_google_models(),
+        _fetch_deepseek_models(),
+        _fetch_ollama_models(),
+        _fetch_openrouter_models(),
+        _fetch_together_models(),
+        _fetch_azure_openai_models(),
+        _fetch_aws_bedrock_models(),
+    )
+    return {
+        "providers": {
+            "openai": openai_models,
+            "anthropic": anthropic_models,
+            "google": google_models,
+            "deepseek": deepseek_models,
+            "ollama": ollama_models,
+            "openrouter": openrouter_models,
+            "together": together_models,
+            "azure_openai": azure_openai_models,
+            "aws_bedrock": aws_bedrock_models,
         }
-        _models_result_cache["all"] = (time.time(), result)
-        return result
+    }

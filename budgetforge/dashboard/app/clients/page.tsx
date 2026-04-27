@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Users, TrendingUp, CreditCard, Zap } from "lucide-react";
 import { Shell } from "@/components/shell";
-import { getStoredAdminKey } from "@/lib/api";
 import {
   AreaChart,
   Area,
@@ -130,10 +129,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const key = getStoredAdminKey();
-    fetch("/api/admin/stats", {
-      headers: key ? { "X-Admin-Key": key } : {},
-    })
+    fetch("/api/admin/stats")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setStats)
       .catch(() => {})

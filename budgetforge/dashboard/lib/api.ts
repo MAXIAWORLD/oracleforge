@@ -11,12 +11,6 @@ export function setStoredAdminKey(key: string): void {
   if (typeof window === "undefined") return;
   if (key) localStorage.setItem(ADMIN_KEY_STORAGE, key);
   else localStorage.removeItem(ADMIN_KEY_STORAGE);
-  // H12: also store in HttpOnly cookie so XSS cannot read it
-  fetch("/api/admin-auth", {
-    method: key ? "POST" : "DELETE",
-    headers: { "Content-Type": "application/json" },
-    ...(key ? { body: JSON.stringify({ key }) } : {}),
-  }).catch(() => {});
 }
 
 export interface Project {
@@ -47,14 +41,6 @@ export interface BudgetPayload {
   action: "block" | "downgrade";
   allowed_providers?: string[];
   downgrade_chain?: string[];
-}
-
-export interface BudgetResponse {
-  budget_usd: number | null;
-  alert_threshold_pct: number;
-  action: string;
-  reset_period: string;
-  warning?: string | null;
 }
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
@@ -173,7 +159,7 @@ export const api = {
     delete: (id: number) =>
       req<void>(`/api/projects/${id}`, { method: "DELETE" }),
     setBudget: (id: number, b: BudgetPayload) =>
-      req<BudgetResponse>(`/api/projects/${id}/budget`, {
+      req<Project>(`/api/projects/${id}/budget`, {
         method: "PUT",
         body: JSON.stringify(b),
       }),

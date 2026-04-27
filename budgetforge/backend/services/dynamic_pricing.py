@@ -432,24 +432,9 @@ class DynamicPricingManager:
         cache_duration = timedelta(seconds=self.config.cache_duration)
         return datetime.now(timezone.utc) - timestamp < cache_duration
 
-    def close(self) -> None:
-        """Libère les ressources du manager (cache + timestamps).
-        Appelé au shutdown de l'application."""
-        self._cache.clear()
-        self._cache_timestamps.clear()
-        self._last_refresh.clear()
-
 
 # Singleton global
 _pricing_manager: Optional[DynamicPricingManager] = None
-
-
-def shutdown_pricing_manager() -> None:
-    """Détruit le singleton au shutdown ASGI (appelé depuis lifespan)."""
-    global _pricing_manager
-    if _pricing_manager is not None:
-        _pricing_manager.close()
-        _pricing_manager = None
 
 
 def get_pricing_manager() -> DynamicPricingManager:

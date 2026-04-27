@@ -1,7 +1,5 @@
 import asyncio
-import secrets
 import sys
-from collections import OrderedDict
 import redis.asyncio as redis
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Optional
@@ -73,17 +71,15 @@ async def distributed_budget_lock(
     # TTL du lock (en secondes) - assez long pour couvrir la phase critique
     lock_ttl = 60
 
-    # B4.2 (C08): token unique pour delete-if-owner (Lua atomique)
-    token = secrets.token_urlsafe(16).encode()
-
     # Essayer d'acquérir le lock avec SET NX EX (atomic)
-    acquired = await redis_client.set(lock_key, token, nx=True, ex=lock_ttl)
+    acquired = await redis_client.set(lock_key, b"locked", nx=True, ex=lock_ttl)
 
     if not acquired:
         # Le lock est déjà pris, attendre avec timeout
         start_time = asyncio.get_event_loop().time()
         while asyncio.get_event_loop().time() - start_time < timeout:
-            acquired = await redis_client.set(lock_key, token, nx=True, ex=lock_ttl)
+            # Vérifier si le lock est libéré
+            acquired = await redis_client.set(lock_key, b"locked", nx=True, ex=lock_ttl)
             if acquired:
                 break
             await asyncio.sleep(0.1)  # Polling toutes les 100ms
@@ -92,52 +88,31 @@ async def distributed_budget_lock(
                 f"Could not acquire lock for project {project_id} within {timeout}s"
             )
 
-    # Script Lua : delete-if-token-matches (atomic, évite de supprimer le lock d'un autre worker)
-    _LUA_RELEASE = """
-if redis.call("get", KEYS[1]) == ARGV[1] then
-    return redis.call("del", KEYS[1])
-else
-    return 0
-end
-"""
-
     try:
         yield
     finally:
+        # Libérer le lock
         try:
-            await redis_client.eval(_LUA_RELEASE, 1, lock_key, token)
+            await redis_client.delete(lock_key)
         except Exception as e:
             logger.warning(f"Failed to release lock for project {project_id}: {e}")
 
 
 # Fallback: implémentation mémoire pour compatibilité
-_MEMORY_LOCKS_MAX_SIZE = 1024
-_memory_locks: OrderedDict[int, asyncio.Lock] = OrderedDict()
+_memory_locks: dict[int, asyncio.Lock] = {}
 _memory_registry_lock = asyncio.Lock()
 
 
 async def _get_memory_lock(project_id: int) -> asyncio.Lock:
-    """Fallback mémoire pour quand Redis n'est pas disponible.
-    Borné à _MEMORY_LOCKS_MAX_SIZE pour éviter la fuite mémoire."""
+    """Fallback mémoire pour quand Redis n'est pas disponible."""
     async with _memory_registry_lock:
-        if project_id in _memory_locks:
-            # LRU: déplacer en fin de file
-            _memory_locks.move_to_end(project_id)
-            return _memory_locks[project_id]
-        lock = asyncio.Lock()
-        _memory_locks[project_id] = lock
-        if len(_memory_locks) > _MEMORY_LOCKS_MAX_SIZE:
-            # Éviction FIFO: supprimer le plus ancien (premier inséré)
-            _memory_locks.popitem(last=False)
-        return lock
+        if project_id not in _memory_locks:
+            _memory_locks[project_id] = asyncio.Lock()
+        return _memory_locks[project_id]
 
 
 def _acquire_file_lock(path: str) -> object:
-    # B4.3 (H02): O_NOFOLLOW empêche l'attaque symlink par un utilisateur local
-    import os
-
-    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
-    fh = os.fdopen(fd, "r+")
+    fh = open(path, "w")
     _fcntl.flock(fh, _fcntl.LOCK_EX)
     return fh
 
@@ -172,18 +147,11 @@ async def budget_lock(project_id: int, timeout: float = 30.0) -> AsyncIterator[N
     """Verrou distribué avec fallback mémoire.
 
     Tente d'utiliser Redis d'abord, sinon utilise le verrou mémoire.
-    C1: lock_acquired distingue "échec acquisition" de "exception dans le body"
-    — seul l'échec d'acquisition déclenche le fallback, pas les exceptions du body.
     """
-    lock_acquired = False
     try:
         async with distributed_budget_lock(project_id, timeout):
-            lock_acquired = True
             yield
-            return
     except Exception as e:
-        if lock_acquired:
-            raise  # exception du body → propager, ne pas déclencher le fallback
         logger.warning(f"Redis lock failed, falling back to memory lock: {e}")
-    async with fallback_budget_lock(project_id):
-        yield
+        async with fallback_budget_lock(project_id):
+            yield

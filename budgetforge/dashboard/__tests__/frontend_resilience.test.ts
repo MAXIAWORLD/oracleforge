@@ -1,8 +1,7 @@
-"""TDD RED — Résilience frontend: test de la gestion d'erreurs réseau.
-
-Ces tests démontrent le manque de gestion d'erreurs côté frontend
-et préparent les tests pour une UX résiliente.
-"""
+// TDD RED — Résilience frontend: test de la gestion d'erreurs réseau.
+//
+// Ces tests démontrent le manque de gestion d'erreurs côté frontend
+// et préparent les tests pour une UX résiliente.
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'

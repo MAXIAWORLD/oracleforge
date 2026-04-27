@@ -8,6 +8,7 @@ const PROTECTED_PATHS = [
   "/clients",
   "/activity",
   "/settings",
+  "/playground",
 ];
 
 const TOKEN_TTL_S = 86400;
@@ -63,5 +64,7 @@ export const config = {
     "/clients/:path*",
     "/activity/:path*",
     "/settings/:path*",
+    "/playground",
+    "/playground/:path*",
   ],
 };

@@ -257,7 +257,7 @@ class TestPortalSession:
         assert resp.status_code == 200
         set_cookie = resp.headers.get("set-cookie", "").lower()
         assert "portal_session" in set_cookie
-        assert "max-age=1209600" in set_cookie
+        assert "max-age=7776000" in set_cookie
         assert "httponly" in set_cookie
 
     @pytest.mark.asyncio
