@@ -1,77 +1,83 @@
-# HANDOFF — BudgetForge post-session 26 avril 2026
+# HANDOFF — BudgetForge post-session 27 avril 2026
 
-## État : NON COMMITTÉ — prêt à commiter
+## État prod : DÉPLOYÉ — commits `3518c82` + `687b847`
 
 **URL prod** : https://llmbudget.maxiaworld.app  
-**Dernier commit prod** : `e6f1dc6`  
-**Branch locale** : master — nombreux fichiers modifiés, rien de commité
+**Health** : `{"status":"ok"}` ✅  
+**DB** : restaurée depuis backup (corrompue pendant session, restaurée avant fin)
 
 ---
 
 ## Ce qui a été fait cette session
 
-### Playground (nouveau — OpenCode) — 6 fixes appliqués
+### Deploy
+- Commit `3518c82` : playground fixes + test isolation + audit #4 B2-B8 backend
+- Commit `687b847` : migration Alembic merge dual heads (`b3_owner_email` + `e3_signup_attempts_email`)
+- DB SQLite prod corrompue → restaurée depuis `/opt/budgetforge.bak-20260427-093340`
+- Migrations re-appliquées : `e3_signup_attempts_email` + `975c3fce2c49_merge_dual_heads`
+- Build Next.js OK (21 pages) — services `active`
 
-| Fix | Fichier |
-|---|---|
-| URL `/api/proxy/` → `/proxy/` (route 404 corrigée) | `src/components/Playground.tsx:104` |
-| Provider change → modèle se réinitialise | `src/components/Playground.tsx:234` |
-| Anthropic retiré (format incompatible) → DeepSeek + Mistral ajoutés | `src/components/Playground.tsx:30` |
-| Champ API key dans la sidebar (plus de demo-key hardcodé) | `src/components/Playground.tsx:210` |
-| Guard apiKeyInput dans sendMessage + bouton disabled | `src/components/Playground.tsx:89` |
-| `timestamp` retiré du payload API | `src/components/Playground.tsx:116` |
-| `/playground` protégé par auth (PROTECTED_PATHS + matcher) | `dashboard/proxy.ts` |
-| page.tsx simplifiée (plus de "use client" inutile) | `src/app/playground/page.tsx` |
+### Audit #8 (Opus 4.7 — Trail of Bits methodology)
+Audit complet réalisé en session. 7 findings :
 
-### Tests / TypeScript — 3 fixes
+| # | Sévérité | Titre | État |
+|---|---|---|---|
+| X1 | CRITICAL | DB SQLite prod corrompue | **RÉSOLU** |
+| X2 | HIGH | Webhook Stripe email non normalisé | À corriger (plan A1) |
+| X3 | HIGH | `/webhook/stripe` payload illimité | À corriger (plan A3) |
+| X4 | HIGH | Magic-link token en query string | À corriger (plan A4) |
+| X5 | MEDIUM | Downgrade ne révoque pas les projets excédentaires | À corriger (plan A2) |
+| X6 | MEDIUM | Admin key en localStorage | À corriger (plan C1) |
+| X8 | LOW | Cookie `bf_session` sans flag Secure | À corriger (plan B1) |
 
-| Fix | Fichier |
-|---|---|
-| Regex CORS tronquée par `get_cors_origins()` — cherche dans `src` au lieu de `block` | `tests/test_audit2_phase_d.py:169` |
-| Docstring Python dans fichier `.ts` → commentaire JS | `dashboard/__tests__/frontend_resilience.test.ts:1` |
-| frontend_resilience.test.ts exclu de la compilation tsc (deps manquantes, JSX dans .ts) | `dashboard/tsconfig.json` |
+### Plan écrit
+`budgetforge/docs/superpowers/plans/2026-04-27-audit8-fixes.md`
 
-### Isolation tests backend
-
-| Fix | Fichier |
-|---|---|
-| `app_env = "test"` + `turnstile_secret_key = ""` ajoutés à l'autouse `_mock_api_keys` | `tests/conftest.py:148` |
-
----
-
-## Résultat tests
-
-- **Suite complète** : exit code 0 ✅ (~3 minutes)
-- **TypeScript** : 0 erreur ✅
-- **Failures pre-existantes** : `test_audit_b1_b6` (2 tests) — non liés aux changements, présents avant cette session
-
-## Prochaine action : commiter
+3 blocs :
+- **BLOC A** (bloquants mise en vente) : A1/A2/A3/A4 — X2/X5/X3/X4
+- **BLOC B** (effort ≤ 2) : B1→B8 — X8 + 7 findings audit #4 restants (H26/M01/M02/M03/M04/M10/M11)
+- **BLOC C** (session dédiée post-launch) : X6/H19/H20/H22/M08/M09
 
 ---
 
-## TypeScript : ✅ 0 erreur
-```bash
-cd dashboard && npx tsc --noEmit  # aucune sortie = clean
+## Pourquoi la DB était corrompue
+
+La DB prod (`budgetforge.db`) s'est corrompue après le premier deploy du jour (tar+ssh). La cause probable est un checkpoint WAL incomplet pendant le restart des services. La DB de backup (`/opt/budgetforge.bak-20260427-093340`) était saine (integrity_check = ok). Données perdues : 0 (la DB ne contenait que 2 projets de test et 0 usages réels).
+
+**Prévention future :** Avant restart, faire `sqlite3 budgetforge.db "PRAGMA wal_checkpoint(TRUNCATE);"` pour vider le WAL proprement.
+
+---
+
+## Pourquoi le deploy est complexe (Alembic dual heads)
+
+La migration `e3_signup_attempts_email` a été créée avec `down_revision = "daaa6555f2ce"` (22 avril) alors que la tête réelle était `b3_owner_email` (25 avril). Résultat : 2 branches parallèles. Fix : migration de merge `975c3fce2c49_merge_dual_heads` créée et committée.
+
+**Ne plus jamais créer de migration sans vérifier `alembic heads` d'abord.**
+
+---
+
+## Prochaine session — actions immédiates
+
+1. **Exécuter le plan `2026-04-27-audit8-fixes.md`** : Bloc A en priorité (A1→A4)
+2. Lire le plan : `budgetforge/docs/superpowers/plans/2026-04-27-audit8-fixes.md`
+3. Commencer par Task A1 (2 lignes, `billing.py:114`) — le plus rapide et le plus impactant
+4. Deploy après Bloc A complet, puis Bloc B, puis deploy final
+
+## Verdict audit #8
+
+**PRÊT AVEC RÉSERVES** — X1 résolu, X2+X5 à corriger avant premier client payant.
+
+---
+
+## Commits de cette session
+
+```
+687b847  fix(alembic): merge dual heads b3_owner_email + e3_signup_attempts_email
+3518c82  fix(budgetforge): playground fixes, test isolation, audit #4 backend corrections
 ```
 
----
-
-## Fichiers modifiés (non committés)
-
-### Dashboard
-- `dashboard/proxy.ts` — auth playground
-- `dashboard/tsconfig.json` — exclude test
-- `dashboard/src/components/Playground.tsx` — 6 fixes
-- `dashboard/src/app/playground/page.tsx` — simplification
-- `dashboard/__tests__/frontend_resilience.test.ts` — docstring Python → JS comment
-- `dashboard/app/clients/page.tsx`, `dashboard/app/dashboard/page.tsx`, etc. — modifiés par OpenCode, vérifiés OK
-
-### Backend
-- `backend/tests/conftest.py` — isolation app_env + turnstile_secret_key
-- `backend/tests/test_audit2_phase_d.py` — fix regex CORS
-- `backend/core/models.py`, `backend/routes/billing.py`, `backend/routes/signup.py` — fixes audit #7 OpenCode
-
----
+## Backup VPS actuel
+`/opt/budgetforge.bak-20260427-093340` — sain, 124K
 
 ## ADMIN_API_KEY prod
 `5b3eeaa7d9d4fa3915fc44ee67e23439639e8f001078da8766f5cb820d6c0998`
