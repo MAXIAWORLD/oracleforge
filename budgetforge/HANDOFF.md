@@ -1,87 +1,94 @@
-# HANDOFF — BudgetForge post-session 27 avril 2026 (session 2)
+# HANDOFF — BudgetForge post-session 27 avril 2026 (Phase 0 distribution)
 
-## État prod : DÉPLOYÉ — audit #8 Blocs A+B complets
+## État : CODE FREEZE — focus distribution
 
-**URL prod** : https://llmbudget.maxiaworld.app  
-**Health** : `{"status":"ok"}` ✅  
-**DB** : saine, migrations à jour (`975c3fce2c49`)  
-**Tests** : 31 tests audit8+effort2 verts. 1 échec pré-existant inter-modules (isolation, hors scope).
-
----
-
-## Ce qui a été fait cette session
-
-### Audit #8 — Blocs A + B (14 findings résolus)
-
-| # | Sévérité | Titre | Commit |
-|---|---|---|---|
-| X2 | HIGH | Webhook email normalisé (lower + strip +tag) | `7307d27` |
-| X5 | MEDIUM | Downgrade révoque TOUS les projets du customer | `61d4020` |
-| X3 | HIGH | Webhook payload cap 100KB | `cab9de0` |
-| X4 | HIGH | Magic-link token via hash fragment (+ dashboard) | `ce10e9c` |
-| X8 | LOW | Cookie bf_session flag Secure en prod | `b724d37` |
-| H26 | LOW | DynamicPricingManager.close() + shutdown lifespan | `7a5dfe7` + `123ba76` |
-| M01 | LOW | _memory_locks cap FIFO 1000 entrées | `0b630aa` |
-| M02 | LOW | CODE_PATTERNS regex compilées | `14c802f` |
-| M03 | LOW | CRLF injection rejeté (portal + signup + alert subject) | `3ac742d` + `a3a8486` |
-| M04 | LOW | portal_request constant-time (100ms floor) | `2dd8058` |
-| M10 | LOW | /api/models stampede protection + cache résultat | `a3a8486` |
-| M11 | LOW | billing_sync retourne 503 si Stripe non configuré | `07db5a4` |
-
-### Fix migration Alembic
-Chaîne linearisée : `e3` dépend de `e2`, `h6` dépend de `e3` (commit `356b33c`).  
-Plus de dual heads — upgrade propre de `daaa6555f2ce` → `975c3fce2c49` en 16 étapes.
+**URL prod** : https://llmbudget.maxiaworld.app
+**Dernier commit local** : `97b69c5` (audit #8 Bloc C backend)
+**Branch locale** : master
+**Modifs non committées** : voir liste plus bas
 
 ---
 
-## Ce qui reste
+## Verdict architecture (formalisé 27 avril)
 
-### BLOC C — Session dédiée (ne pas mélanger avec du support client)
+**Plus d'audit jusqu'à 50 paying users ou bug bloquant rapporté par paying user.**
 
-| Task | Finding | Description | Effort |
-|---|---|---|---|
-| C1 | X6 | Admin key → cookie httpOnly (breaking change dashboard) | 3-4h |
-| C2 | H19 | Worker bloqué si client coupe avant finalize (`asyncio.shield`) | 2h |
-| C3 | H20 | Timing attack API key lookup (`hmac.compare_digest`) | 1h |
-| C4 | H22 | SQL quota par appel proxy (cache TTL 30s) | 2h |
-| C5 | M08/M09 | History count lent (index) + dates naïves UTC | 2h |
+Référence mémoire : `project_budgetforge_ship_verdict.md`
 
-**C1 est le plus impactant** — commencer par C1 en priorité.
+Sur 8 audits, 95+ findings résolus. Le seul finding non bloquant restant est **M09 (LOW)** — date_from/to en UTC naive. Reporté.
+
+L'effort va à la distribution, pas à la qualité du code.
 
 ---
 
-## Prochaine session — première action
+## Ce qui a été ajouté dans cette session
 
-```
-Lis HANDOFF.md et memory/project_budgetforge_audit8_plan.md.
-Audit #8 Blocs A+B déployés. Prochain sprint : Bloc C (C1 = X6 admin httpOnly cookie).
-```
+| Item | Fichier(s) | Tests |
+|---|---|---|
+| **Loops audience sync** (push contact après signup) | `services/loops_sync.py` | 4/4 ✅ TDD |
+| Settings `loops_api_key` | `core/config.py` | — |
+| Wire signup → Loops fire-and-forget | `routes/signup.py` | — |
+| Hero kicker "Beta · 50% lifetime for first 50 users" | `dashboard/app/page.tsx` | — |
+| Sous-titre hero refait | `dashboard/app/page.tsx` | — |
+| Pricing visible hero | `dashboard/app/page.tsx` | — |
+| Email convention `ceo@` → `support@` | `dashboard/app/page.tsx`, `dashboard/app/docs/page.tsx` | — |
+| Umami snippet (analytics auto-hébergé) | `dashboard/app/layout.tsx` | — |
 
-Plan C1 détaillé dans `budgetforge/docs/superpowers/plans/2026-04-27-audit8-fixes.md` section "Task C1".
+Website ID Umami BudgetForge : `befd0e49-8570-4c0d-b420-66f4cebbfe3b`
 
 ---
 
-## Commits de cette session (chronologique)
+## Sur le VPS
+
+- `LOOPS_API_KEY` ajouté dans `/opt/budgetforge/backend/.env` (jamais committée localement)
+- Backups timestampés conservés sur le VPS (`*.bak-loops-*`, `.bak-lot1-*`, `.bak-20260427-*`)
+- Service `budgetforge-backend` redémarré, `is-active`
+- Service `budgetforge-dashboard` rebuild + redémarré, `is-active`
+
+---
+
+## Coupon Stripe
+
+- ID : `BETA50`
+- 50% off, validité Permanente, max 50 redemptions
+- Promotion code activé, code = `BETA50`
+
+---
+
+## Prochaines actions
+
+1. **Commit + push** des modifs locales (voir liste ci-dessous)
+2. **Phase 1 étape A** : submit BudgetForge sur 10 directories (Smithery, mcp.so, AI Tools List, Glama, etc.)
+3. **Phase 1 étape B** : 3 articles SEO ciblés "openai cost limit", "claude api budget", "stop runaway llm bills"
+4. **Phase 1 étape C** : submit AppSumo en lifetime deal
+5. **Phase 1 étape D** : cold email FR agences IA via Lemlist
+
+---
+
+## Fichiers modifiés (à committer)
 
 ```
-7307d27  fix(billing): normalize Stripe webhook email — X2
-61d4020  fix(billing): downgrade revokes all customer projects — X5
-cab9de0  fix(billing): cap webhook payload at 100KB — X3
-ce10e9c  fix(portal): magic-link token via hash fragment — X4
-b724d37  fix(dashboard): Secure flag on bf_session cookie — X8
-7a5dfe7  fix(dynamic_pricing): add close() + call in lifespan — H26
-0b630aa  fix(lock): cap _memory_locks at 1000 entries — M01
-14c802f  fix(estimator): pre-compile CODE_PATTERNS regex — M02
-3ac742d  fix(portal,signup): reject emails containing CRLF — M03
-2dd8058  fix(portal): constant-time response — M04
-07db5a4  fix(admin): billing_sync returns 503 — M11
-123ba76  fix(dynamic_pricing): sync close() + shutdown_pricing_manager() — H26
-a3a8486  fix(portal,models,alert): CRLF subject + portal helper + stampede — M03/M04/M10
-356b33c  fix(alembic): linearize migration chain e3→e2, h6→e3
+backend/services/loops_sync.py             (NEW)
+backend/tests/test_loops_sync.py           (NEW)
+backend/core/config.py                     (modified)
+backend/routes/signup.py                   (modified)
+dashboard/app/page.tsx                     (modified)
+dashboard/app/docs/page.tsx                (modified)
+dashboard/app/layout.tsx                   (modified — déjà fait Umami)
 ```
 
-## Backup VPS actuel
-`/opt/budgetforge.bak-20260427-*` (créé avant deploy de cette session)
+## Suggestion commit messages
 
-## ADMIN_API_KEY prod
-`5b3eeaa7d9d4fa3915fc44ee67e23439639e8f001078da8766f5cb820d6c0998`
+```
+feat(loops): sync signup emails to Loops.so audiences (TDD 4/4)
+feat(landing): hero copy lot 1 — beta badge + clearer value prop + pricing visible
+chore: ceo@ → support@ throughout dashboard
+chore(analytics): umami self-hosted tracker (already deployed)
+```
+
+---
+
+## ⚠️ Avant la prochaine session
+
+- Vérifier que `support@maxiaworld.app` existe dans OVH Email Pro (sinon créer alias)
+- Récupérer la stat Umami live → savoir si la landing convertit (visites / signups)

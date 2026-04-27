@@ -1,48 +1,111 @@
-# HANDOFF — BudgetForge audit #6 (session 25 avril 2026)
+# HANDOFF — Session 27 avril 2026 (Phase 0 distribution + V12 kill)
 
-## État : AUDIT #6 COMPLET ✅ — 4/4 findings résolus + 9 tests TDD verts
+## État global
 
-**URL prod** : https://llmbudget.maxiaworld.app  
-**Dernier commit** : `584e84b` (audit6 — M1 M2 M3 L1)
+- **Forge Suite** : 2 forges en prod, hub statique à `maxiaworld.app`
+- **BudgetForge** : code freeze (verdict ship), 0 paying user
+- **OracleForge** : v0.1.9 prod, 0 paying user
+- **MAXIA V12** : killé sur prod (régulé), archive conservée
 
-## ACTION PROCHAINE SESSION
+---
 
-1. **Deploy prod** : tar+scp vers VPS port 8011 (backup timestampé OBLIGATOIRE avant)
-2. `APP_ENV=production` et `STRIPE_WEBHOOK_SECRET` et `TURNSTILE_SECRET_KEY` configurés en prod
-3. Tests pré-existants cassés (hors scope, ne pas toucher) :
-   - `test_audit_a1_a5::TestA3ExceptTooLarge::test_network_error_propagates_not_swallowed`
-   - `test_audit_b1_b6::TestB1::test_all_proxy_endpoints_have_rate_limit`
-   - `test_audit_b1_b6::TestB5::test_set_budget_without_max_cost_returns_warning`
-   - `test_audit3_phase_f::TestF2::test_stripe_webhook_duplicate_returns_ok` (fixture db_session manquante)
-   - `test_autodowngrade::test_downgrade_applied_when_budget_80pct`
-   - `test_budget_guard::TestAlertThreshold::test_zero_budget_threshold_check`
-   - `test_webhook` × 4 (TestWebhookAlert)
-   - `test_plan_enforcement` × 4
-   - `test_per_call_cap_output` × 3
-   - `test_pricing_configuration` × 3, `test_proxy::TestMistralProxy` × 2
-   - `test_rate_limiting_global` × 4, `test_p1_security::test_production_both_set_starts_ok`
+## Ce qui a été fait dans cette session
 
-## Commits audit #6
+### Phase 0 distribution (DONE)
 
-| Commit | Contenu |
+| Item | Détail |
 |---|---|
-| `584e84b` | audit6 — M1 Turnstile, M2 TLS, M3 playground dead code, L1 409 name |
+| **Umami self-hosted analytics** | `https://analytics.maxiaworld.app` (login admin / mot de passe défini par Alexis le 27/04). 3 sites trackés : BudgetForge, OracleForge, Hub. SSL Let's Encrypt jusqu'au 2026-07-26. |
+| **Audit copy Lot 1** | Hero des 2 landings refait : "Stop unexpected LLM API bills" + "Stop your AI agent from trading on a wrong price". Pricing visible dans hero. |
+| **Beta badge** | Kicker "Beta · 50% lifetime for first 50 users" sur les 2 landings. |
+| **Coupon Stripe** | `BETA50` créé : 50% off, permanent (Forever), 50 max redemptions. Promotion code activé. |
+| **Loops audience sync** | Compte créé, sending domain `mail.maxiaworld.app` validé (DKIM/SPF/DMARC). API key en env var prod (jamais commitée). 2 audiences : `BudgetForge Beta` (sync via signup) + `OracleForge Beta` (sync via waitlist endpoint). |
+| **OracleForge waitlist** | Nouvel endpoint `POST /api/waitlist` (8 tests TDD verts). Form sur landing. |
+| **BudgetForge Loops integration** | `services/loops_sync.py` (4 tests TDD verts). Push Loops asynchrone après signup. |
+| **V12 marketplace killed** | `maxia.service` stoppé+disabled. `/opt/maxia/frontend` archivé. nginx config simplifié (static + monitor). |
+| **Forge Suite hub** | `maxiaworld.app` sert un hub minimal : 2 cards BudgetForge + OracleForge, footer support@. Umami tracker actif. |
+| **Email convention** | `ceo@maxiaworld.app` → `support@maxiaworld.app` partout (8 fichiers, 3 sites). |
+| **Code freeze BudgetForge** | Verdict formalisé : plus d'audit jusqu'à 50 paying users ou bug bloquant. Mémoire `project_budgetforge_ship_verdict.md`. |
 
-## Findings résolus
+### Tests verts ajoutés
 
-| ID | Sévérité | Fix |
-|----|----------|-----|
-| M1 | MEDIUM | `billing.py` — Turnstile sur `POST /api/checkout/free` (fail-closed prod) |
-| M2 | MEDIUM | `alert_service.py` — `verify=False→True`, URL originale (TLS hostname valide) |
-| M3 | MEDIUM | Suppression `playground/page.tsx` + `Playground.tsx` + CSS (`NEXT_PUBLIC` key) |
-| L1 | LOW | `portal.py` 409 — retire le nom du projet du message d'erreur |
+- BudgetForge `tests/test_loops_sync.py` : 4/4
+- OracleForge `tests/test_waitlist.py` : 8/8
 
-## Contamination test découverte et corrigée
+### Backups VPS
 
-`test_audit2_phase_d.py::test_sqlite_connection_has_wal_journal_mode` fait `importlib.reload(cfg_mod)` — après, `routes.billing.settings` et `routes.signup.settings` gardent une référence à l'ANCIEN objet settings. Les tests audit6 qui patchent `settings` doivent cibler `routes.billing.settings` / `routes.signup.settings` directement (pas `core.config.settings`).
+- `/opt/budgetforge/backend/.env.bak-*`
+- `/etc/maxia-oracle/env.bak-*`
+- `/opt/budgetforge/dashboard/app/page.tsx.bak-loops-*`
+- `/opt/budgetforge/backend/routes/signup.py.bak-loops-*`
+- `/opt/budgetforge/backend/core/config.py.bak-loops-*`
+- `/opt/maxia-oracle/oracleforge/backend/main.py.bak-loops-*`
+- `/var/www/oracle/index.html.bak-loops-*`
+- `/etc/nginx/sites-available/maxia.bak-pre-killV12-*`
+- `/opt/maxia/frontend.archive-v12-2026-04-27/` (68 HTML originaux V12)
 
-## Tests mis à jour (H3 comportement changé)
+---
 
-- `test_audit5.py` H3 : `called_url == pinned_url` → `called_url == original_url`
-- `test_encore_fix6_ssrf_pinning.py` : même changement + ajout test `verify=True`
-- `test_audit6.py` : 9 tests TDD couvrent M1/M2/L1
+## ⚠️ Action Alexis avant prochaine session
+
+1. **Vérifier l'alias `support@maxiaworld.app` dans OVH Email Pro Zimbra.** Si pas créé, le créer comme alias de ton inbox principale. Sinon les emails reçus bouncent.
+2. **Supprimer le contact test `smoketest@maxialab.example` dans Loops** (Audience → search → delete).
+
+---
+
+## Tâches pending pour prochaine session
+
+### #8 Phase 1 Distribution multi-canal (4 sem) — PRIORITÉ MAX
+
+Ordre recommandé :
+
+| Étape | Effort | Impact | Action |
+|---|---|---|---|
+| **A. Directories agents IA** | 1-2h | trafic gratuit récurrent | Submit BudgetForge + OracleForge sur Smithery, mcp.so, AI Tools List, Glama, AI Agents Directory, etc. (10 directories). Je rédige les fiches, Alexis copy-paste. |
+| **B. SEO content** | 3-4h | long terme | 3 articles ciblés mots-clés "openai cost limit", "claude api budget", "stop runaway llm bills". Hébergement : `/blog` sur llmbudget. |
+| **C. AppSumo Marketplace** | 2h + délai 2-4 sem | trafic massif si accepté | Submit BudgetForge en lifetime deal $59-79. |
+| **D. Cold email FR agences IA** | 2h setup + ongoing | meilleur ROI court terme | 50 emails/jour via Lemlist, scrape Welcome to the Jungle. |
+
+### #9 Phase 2 Optimisation conversion
+
+Après Phase 1 : Lot 2 + Lot 3 audit copy (B3 storytelling, B4 pricing visible, B5/B6/B7, O5/O6/O7).
+
+---
+
+## Décisions structurelles à mémoriser
+
+- **Code freeze BudgetForge** jusqu'à 50 paying users ou bug bloquant rapporté par paying user
+- **Pas de Calendly** (Alexis ne veut pas de calls) → support par email uniquement
+- **maxiaworld.app** = hub Forge Suite statique, pas un produit
+- **Loops.so** = stack email officielle (pas de SMTP custom au-delà des emails transactionnels existants)
+- **Umami self-hosted** = stack analytics officielle (jamais de Google Analytics, RGPD)
+
+---
+
+## Commits / files à committer côté Alexis
+
+Modifs locales non committées :
+- `budgetforge/dashboard/app/page.tsx`, `dashboard/app/docs/page.tsx`
+- `budgetforge/backend/services/loops_sync.py` (nouveau)
+- `budgetforge/backend/tests/test_loops_sync.py` (nouveau)
+- `budgetforge/backend/core/config.py`
+- `budgetforge/backend/routes/signup.py`
+- `oracleforge/backend/services/email/__init__.py` + `loops_sync.py` (nouveaux)
+- `oracleforge/backend/api/routes_waitlist.py` (nouveau)
+- `oracleforge/backend/tests/test_waitlist.py` (nouveau)
+- `oracleforge/backend/main.py`
+- `oracleforge/landing/index.html`, `landing/docs/index.html`, `llms.txt`, `placeholder.html`, `openapi.json`, `docs/openapi.json`
+- `maxia-hub/index.html` (nouveau dossier)
+
+Suggestion commit messages :
+- `feat(loops): sync signup emails to Loops.so audiences (TDD)`
+- `feat(oracleforge): waitlist endpoint + landing form`
+- `chore: ceo@ → support@ email throughout`
+- `feat(maxia-hub): static Forge Suite hub replaces V12 marketplace`
+- `chore(landings): hero copy lot 1 — beta badge + clearer value prop`
+
+---
+
+## Première action prochaine session
+
+Lire ce fichier en premier. Puis enchaîner sur **Phase 1 étape A — directories agents IA**.
