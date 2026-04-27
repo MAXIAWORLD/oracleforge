@@ -82,6 +82,8 @@ class SignupFreeRequest(BaseModel):
     @classmethod
     def validate_email(cls, v: str) -> str:
         v = v.strip().lower()
+        if "\r" in v or "\n" in v:
+            raise ValueError("Invalid email address")
         if not _EMAIL_RE.match(v):
             raise ValueError("Invalid email address")
         # Strip +tag alias (user+tag@gmail.com → user@gmail.com)

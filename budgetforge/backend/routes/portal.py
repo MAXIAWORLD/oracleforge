@@ -129,6 +129,8 @@ def portal_request(
 ):
     cleanup_expired_tokens(db)
     email = body.email.strip().lower()
+    if "\r" in email or "\n" in email:
+        raise HTTPException(status_code=400, detail="Invalid email")
     projects = db.query(Project).filter(Project.name == email).all()
     if not projects:
         return {"ok": True}
