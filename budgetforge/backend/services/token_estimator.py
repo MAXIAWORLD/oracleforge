@@ -21,19 +21,19 @@ class TokenEstimator:
         "code": 0.7,  # Code : tokens plus denses
     }
 
-    # Patterns pour détecter le type de contenu
+    # Patterns pour détecter le type de contenu (pre-compiled to avoid ReDoS overhead)
     CODE_PATTERNS = [
-        r"def\s+\w+\s*\(",
-        r"function\s+\w+\s*\(",
-        r"class\s+\w+",
-        r"import\s+\w+",
-        r"from\s+\w+\s+import",
-        r"\w+\s*=\s*\w+\s*\(",
-        r"\$\w+",  # Variables shell/PHP
-        r"<\?php",
-        r"<script>",
-        r"public\s+class",
-        r"private\s+\w+",
+        re.compile(r"def\s+\w+\s*\("),
+        re.compile(r"function\s+\w+\s*\("),
+        re.compile(r"class\s+\w+"),
+        re.compile(r"import\s+\w+"),
+        re.compile(r"from\s+\w+\s+import"),
+        re.compile(r"\w+\s*=\s*\w+\s*\("),
+        re.compile(r"\$\w+"),  # Variables shell/PHP
+        re.compile(r"<\?php"),
+        re.compile(r"<script>"),
+        re.compile(r"public\s+class"),
+        re.compile(r"private\s+\w+"),
     ]
 
     @classmethod
@@ -43,7 +43,7 @@ class TokenEstimator:
 
         # Détection du code
         for pattern in cls.CODE_PATTERNS:
-            if re.search(pattern, text_lower):
+            if pattern.search(text_lower):
                 return "code"
 
         # Détection par fréquence de caractères spécifiques
