@@ -307,8 +307,8 @@ print(result)`}</Code>
         >
           <span>
             Questions? Email{" "}
-            <a href="mailto:ceo@maxiaworld.app" className="underline">
-              ceo@maxiaworld.app
+            <a href="mailto:support@maxiaworld.app" className="underline">
+              support@maxiaworld.app
             </a>
           </span>
           <Link

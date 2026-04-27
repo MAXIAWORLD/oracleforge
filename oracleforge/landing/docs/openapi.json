@@ -6,7 +6,7 @@
     "description": "Multi-source price feed for AI agents. Data feed only. Not investment advice. No custody. No KYC.",
     "contact": {
       "name": "MAXIA",
-      "email": "ceo@maxiaworld.app",
+      "email": "support@maxiaworld.app",
       "url": "https://oracle.maxiaworld.app"
     },
     "license": {
@@ -17,9 +17,7 @@
   "paths": {
     "/health": {
       "get": {
-        "tags": [
-          "health"
-        ],
+        "tags": ["health"],
         "summary": "Health",
         "description": "Liveness probe with DB and circuit-breaker degradation reporting.",
         "operationId": "health_health_get",
@@ -41,9 +39,7 @@
     },
     "/api/register": {
       "post": {
-        "tags": [
-          "register"
-        ],
+        "tags": ["register"],
         "summary": "Register",
         "description": "Issue a new free-tier key. Returns the raw key once; never persisted.",
         "operationId": "register_api_register_post",
@@ -61,9 +57,7 @@
     },
     "/api/sources": {
       "get": {
-        "tags": [
-          "sources"
-        ],
+        "tags": ["sources"],
         "summary": "List Sources",
         "description": "List every price source with its current circuit-breaker state.",
         "operationId": "list_sources_api_sources_get",
@@ -109,9 +103,7 @@
     },
     "/api/symbols": {
       "get": {
-        "tags": [
-          "sources"
-        ],
+        "tags": ["sources"],
         "summary": "List Symbols",
         "description": "Return the union of supported symbols grouped by upstream source.\n\nMirrors the MCP `list_supported_symbols` tool (Phase 5) so the Python\nand TypeScript SDKs have parity with the MCP surface. No upstream\ncalls \u2014 just reads the in-memory feed dictionaries.",
         "operationId": "list_symbols_api_symbols_get",
@@ -157,9 +149,7 @@
     },
     "/api/price/{symbol}": {
       "get": {
-        "tags": [
-          "price"
-        ],
+        "tags": ["price"],
         "summary": "Get Single Price",
         "description": "Return a multi-source live price for a single symbol.",
         "operationId": "get_single_price_api_price__symbol__get",
@@ -214,9 +204,7 @@
     },
     "/api/price/{symbol}/context": {
       "get": {
-        "tags": [
-          "price"
-        ],
+        "tags": ["price"],
         "summary": "Get Price Context",
         "description": "Return price + confidence score + anomaly flag + agreement label in one call.\n\nV1.6 agent-native endpoint: everything an LLM agent needs to decide\nwhether to act on a price, in a single tool call.",
         "operationId": "get_price_context_api_price__symbol__context_get",
@@ -271,9 +259,7 @@
     },
     "/api/price/{symbol}/history": {
       "get": {
-        "tags": [
-          "price"
-        ],
+        "tags": ["price"],
         "summary": "Get Price History Route",
         "description": "V1.8 \u2014 Return historical price snapshots for a symbol.\n\nThe background sampler captures multi-source prices every 5 minutes.\nData is downsampled to the requested interval via averaging. Retention\nis 30 days.",
         "operationId": "get_price_history_route_api_price__symbol__history_get",
@@ -358,9 +344,7 @@
     },
     "/api/prices/batch": {
       "post": {
-        "tags": [
-          "price"
-        ],
+        "tags": ["price"],
         "summary": "Get Batch Prices Route",
         "description": "Return prices for up to 50 symbols in a single Pyth Hermes call.\n\nEach symbol counts for 1 unit against the daily quota to keep the\nincentive aligned with the underlying upstream cost.",
         "operationId": "get_batch_prices_route_api_prices_batch_post",
@@ -416,9 +400,7 @@
     },
     "/api/chainlink/{symbol}": {
       "get": {
-        "tags": [
-          "price"
-        ],
+        "tags": ["price"],
         "summary": "Get Chainlink Price Route",
         "description": "Return a single-source Chainlink on-chain price on the requested chain.\n\nV1.1: the `chain` query parameter selects Base (default), Ethereum or\nArbitrum. Default stays `base` for strict backward compatibility with\nV1.0 clients. Unsupported `symbol` + `chain` combinations return 404\nwith the list of symbols available on the requested chain.",
         "operationId": "get_chainlink_price_route_api_chainlink__symbol__get",
@@ -486,9 +468,7 @@
     },
     "/api/redstone/{symbol}": {
       "get": {
-        "tags": [
-          "price"
-        ],
+        "tags": ["price"],
         "summary": "Get Redstone Price Route",
         "description": "Return a single-source RedStone REST price for `symbol`.\n\nV1.3: RedStone is the 4th independent upstream. Coverage is dynamic\n(400+ assets across crypto majors, long-tail, forex and equities) so\nunknown symbols return 404 rather than being pre-rejected on a hardcoded\nallow-list. Callers that want the multi-source median should use\n`/api/price/{symbol}` instead \u2014 this route is for audit / cross-check.",
         "operationId": "get_redstone_price_route_api_redstone__symbol__get",
@@ -543,9 +523,7 @@
     },
     "/api/pyth/solana/{symbol}": {
       "get": {
-        "tags": [
-          "price"
-        ],
+        "tags": ["price"],
         "summary": "Get Pyth Solana Price Route",
         "description": "Return a single-source Pyth price read directly from Solana mainnet (V1.4).\n\nReads the Price Feed Account for `symbol` on shard 0 of the Pyth Push\nOracle program (`pythWSns...`) and decodes the Anchor `PriceUpdateV2`\nlayout inline. Coverage is restricted to the majors that are sponsored\nby the Pyth Data Association on shard 0 \u2014 see\n`pyth_solana_oracle.PYTH_SOLANA_FEEDS`. Unknown symbols return 404.\n\nThis route is intentionally independent of the multi-source path (see\n`/api/price/{symbol}`): Pyth is already reached via Hermes there, and\naggregating the same publishers twice would bias the divergence metric.",
         "operationId": "get_pyth_solana_price_route_api_pyth_solana__symbol__get",
@@ -600,9 +578,7 @@
     },
     "/api/twap/{symbol}": {
       "get": {
-        "tags": [
-          "price"
-        ],
+        "tags": ["price"],
         "summary": "Get Twap Price Route",
         "description": "V1.5 - Uniswap v3 time-weighted average price (TWAP) for `symbol`.\n\nReads tickCumulatives from a curated, high-TVL Uniswap v3 pool on\nthe requested EVM chain and returns the human-readable price\ncomputed from the slope over `window` seconds. Independently\nverifiable on-chain by any EVM client calling `observe()` on the\nsame pool.\n\nCoverage is intentionally narrow (high-liquidity pairs only -- ETH on\nBase/Ethereum + BTC on Ethereum). Listing more pairs requires a\nmanual audit per `docs/v1.5_uniswap_twap.md`.",
         "operationId": "get_twap_price_route_api_twap__symbol__get",
@@ -684,9 +660,7 @@
     },
     "/api/metadata/{symbol}": {
       "get": {
-        "tags": [
-          "price"
-        ],
+        "tags": ["price"],
         "summary": "Get Metadata Route",
         "description": "V1.7 \u2014 Return asset metadata from CoinGecko (market cap, volume, supply).\n\nCoverage: all symbols mapped in ``price_oracle.SYM_TO_COINGECKO`` (~80\ncrypto assets). Forex and equity symbols are not covered (no CoinGecko\nID mapping). Unknown symbols return 404.",
         "operationId": "get_metadata_route_api_metadata__symbol__get",
@@ -741,9 +715,7 @@
     },
     "/api/alerts": {
       "post": {
-        "tags": [
-          "alerts"
-        ],
+        "tags": ["alerts"],
         "summary": "Create Alert Route",
         "description": "Create a price alert. One-shot: triggers once then deactivates.",
         "operationId": "create_alert_route_api_alerts_post",
@@ -797,9 +769,7 @@
         }
       },
       "get": {
-        "tags": [
-          "alerts"
-        ],
+        "tags": ["alerts"],
         "summary": "List Alerts Route",
         "description": "List all alerts for the authenticated key.",
         "operationId": "list_alerts_route_api_alerts_get",
@@ -845,9 +815,7 @@
     },
     "/api/alerts/{alert_id}": {
       "delete": {
-        "tags": [
-          "alerts"
-        ],
+        "tags": ["alerts"],
         "summary": "Delete Alert Route",
         "description": "Delete an alert by id.",
         "operationId": "delete_alert_route_api_alerts__alert_id__delete",
@@ -902,9 +870,7 @@
     },
     "/api/prices/stream": {
       "get": {
-        "tags": [
-          "alerts"
-        ],
+        "tags": ["alerts"],
         "summary": "Stream Prices",
         "description": "SSE stream of live prices, polled every ~3 seconds.\n\nDoes not consume daily quota. Auto-closes after 1 hour.",
         "operationId": "stream_prices_api_prices_stream_get",
@@ -972,10 +938,7 @@
           },
           "condition": {
             "type": "string",
-            "enum": [
-              "above",
-              "below"
-            ],
+            "enum": ["above", "below"],
             "title": "Condition"
           },
           "threshold": {
@@ -992,12 +955,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "symbol",
-          "condition",
-          "threshold",
-          "callback_url"
-        ],
+        "required": ["symbol", "condition", "threshold", "callback_url"],
         "title": "AlertCreateRequest"
       },
       "BatchRequest": {
@@ -1013,9 +971,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "symbols"
-        ],
+        "required": ["symbols"],
         "title": "BatchRequest",
         "description": "POST /api/prices/batch request body."
       },
@@ -1065,11 +1021,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
+        "required": ["loc", "msg", "type"],
         "title": "ValidationError"
       }
     }

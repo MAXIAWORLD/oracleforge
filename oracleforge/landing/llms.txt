@@ -67,7 +67,7 @@ A method `register` is deliberately absent from the tool surface — operators c
 
 - Backend: Python 3.12 + FastAPI, served behind nginx with TLS (Let's Encrypt, auto-renewed). SQLite for rate-limit state, payment replay protection, historical snapshots, and price alerts.
 - Licence: Apache-2.0 on every package and on the backend source (repo `github.com/MAXIAWORLD/oracleforge`).
-- Contact: `ceo@maxiaworld.app`.
+- Contact: `support@maxiaworld.app`.
 - Version: 0.1.9 (April 2026).
 
 ## Optional
