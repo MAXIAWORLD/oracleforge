@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 revision = "e3_signup_attempts_email"
-down_revision = "daaa6555f2ce"
+down_revision = "e2_signup_attempts"
 branch_labels = None
 depends_on = None
 

@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy import inspect
 
 revision = "h6_portal_revoked_sessions"
-down_revision = "e2_signup_attempts"
+down_revision = "e3_signup_attempts_email"
 branch_labels = None
 depends_on = None
 
