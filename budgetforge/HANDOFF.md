@@ -1,83 +1,87 @@
-# HANDOFF — BudgetForge post-session 27 avril 2026
+# HANDOFF — BudgetForge post-session 27 avril 2026 (session 2)
 
-## État prod : DÉPLOYÉ — commits `3518c82` + `687b847`
+## État prod : DÉPLOYÉ — audit #8 Blocs A+B complets
 
 **URL prod** : https://llmbudget.maxiaworld.app  
 **Health** : `{"status":"ok"}` ✅  
-**DB** : restaurée depuis backup (corrompue pendant session, restaurée avant fin)
+**DB** : saine, migrations à jour (`975c3fce2c49`)  
+**Tests** : 31 tests audit8+effort2 verts. 1 échec pré-existant inter-modules (isolation, hors scope).
 
 ---
 
 ## Ce qui a été fait cette session
 
-### Deploy
-- Commit `3518c82` : playground fixes + test isolation + audit #4 B2-B8 backend
-- Commit `687b847` : migration Alembic merge dual heads (`b3_owner_email` + `e3_signup_attempts_email`)
-- DB SQLite prod corrompue → restaurée depuis `/opt/budgetforge.bak-20260427-093340`
-- Migrations re-appliquées : `e3_signup_attempts_email` + `975c3fce2c49_merge_dual_heads`
-- Build Next.js OK (21 pages) — services `active`
+### Audit #8 — Blocs A + B (14 findings résolus)
 
-### Audit #8 (Opus 4.7 — Trail of Bits methodology)
-Audit complet réalisé en session. 7 findings :
-
-| # | Sévérité | Titre | État |
+| # | Sévérité | Titre | Commit |
 |---|---|---|---|
-| X1 | CRITICAL | DB SQLite prod corrompue | **RÉSOLU** |
-| X2 | HIGH | Webhook Stripe email non normalisé | À corriger (plan A1) |
-| X3 | HIGH | `/webhook/stripe` payload illimité | À corriger (plan A3) |
-| X4 | HIGH | Magic-link token en query string | À corriger (plan A4) |
-| X5 | MEDIUM | Downgrade ne révoque pas les projets excédentaires | À corriger (plan A2) |
-| X6 | MEDIUM | Admin key en localStorage | À corriger (plan C1) |
-| X8 | LOW | Cookie `bf_session` sans flag Secure | À corriger (plan B1) |
+| X2 | HIGH | Webhook email normalisé (lower + strip +tag) | `7307d27` |
+| X5 | MEDIUM | Downgrade révoque TOUS les projets du customer | `61d4020` |
+| X3 | HIGH | Webhook payload cap 100KB | `cab9de0` |
+| X4 | HIGH | Magic-link token via hash fragment (+ dashboard) | `ce10e9c` |
+| X8 | LOW | Cookie bf_session flag Secure en prod | `b724d37` |
+| H26 | LOW | DynamicPricingManager.close() + shutdown lifespan | `7a5dfe7` + `123ba76` |
+| M01 | LOW | _memory_locks cap FIFO 1000 entrées | `0b630aa` |
+| M02 | LOW | CODE_PATTERNS regex compilées | `14c802f` |
+| M03 | LOW | CRLF injection rejeté (portal + signup + alert subject) | `3ac742d` + `a3a8486` |
+| M04 | LOW | portal_request constant-time (100ms floor) | `2dd8058` |
+| M10 | LOW | /api/models stampede protection + cache résultat | `a3a8486` |
+| M11 | LOW | billing_sync retourne 503 si Stripe non configuré | `07db5a4` |
 
-### Plan écrit
-`budgetforge/docs/superpowers/plans/2026-04-27-audit8-fixes.md`
-
-3 blocs :
-- **BLOC A** (bloquants mise en vente) : A1/A2/A3/A4 — X2/X5/X3/X4
-- **BLOC B** (effort ≤ 2) : B1→B8 — X8 + 7 findings audit #4 restants (H26/M01/M02/M03/M04/M10/M11)
-- **BLOC C** (session dédiée post-launch) : X6/H19/H20/H22/M08/M09
-
----
-
-## Pourquoi la DB était corrompue
-
-La DB prod (`budgetforge.db`) s'est corrompue après le premier deploy du jour (tar+ssh). La cause probable est un checkpoint WAL incomplet pendant le restart des services. La DB de backup (`/opt/budgetforge.bak-20260427-093340`) était saine (integrity_check = ok). Données perdues : 0 (la DB ne contenait que 2 projets de test et 0 usages réels).
-
-**Prévention future :** Avant restart, faire `sqlite3 budgetforge.db "PRAGMA wal_checkpoint(TRUNCATE);"` pour vider le WAL proprement.
+### Fix migration Alembic
+Chaîne linearisée : `e3` dépend de `e2`, `h6` dépend de `e3` (commit `356b33c`).  
+Plus de dual heads — upgrade propre de `daaa6555f2ce` → `975c3fce2c49` en 16 étapes.
 
 ---
 
-## Pourquoi le deploy est complexe (Alembic dual heads)
+## Ce qui reste
 
-La migration `e3_signup_attempts_email` a été créée avec `down_revision = "daaa6555f2ce"` (22 avril) alors que la tête réelle était `b3_owner_email` (25 avril). Résultat : 2 branches parallèles. Fix : migration de merge `975c3fce2c49_merge_dual_heads` créée et committée.
+### BLOC C — Session dédiée (ne pas mélanger avec du support client)
 
-**Ne plus jamais créer de migration sans vérifier `alembic heads` d'abord.**
+| Task | Finding | Description | Effort |
+|---|---|---|---|
+| C1 | X6 | Admin key → cookie httpOnly (breaking change dashboard) | 3-4h |
+| C2 | H19 | Worker bloqué si client coupe avant finalize (`asyncio.shield`) | 2h |
+| C3 | H20 | Timing attack API key lookup (`hmac.compare_digest`) | 1h |
+| C4 | H22 | SQL quota par appel proxy (cache TTL 30s) | 2h |
+| C5 | M08/M09 | History count lent (index) + dates naïves UTC | 2h |
 
----
-
-## Prochaine session — actions immédiates
-
-1. **Exécuter le plan `2026-04-27-audit8-fixes.md`** : Bloc A en priorité (A1→A4)
-2. Lire le plan : `budgetforge/docs/superpowers/plans/2026-04-27-audit8-fixes.md`
-3. Commencer par Task A1 (2 lignes, `billing.py:114`) — le plus rapide et le plus impactant
-4. Deploy après Bloc A complet, puis Bloc B, puis deploy final
-
-## Verdict audit #8
-
-**PRÊT AVEC RÉSERVES** — X1 résolu, X2+X5 à corriger avant premier client payant.
+**C1 est le plus impactant** — commencer par C1 en priorité.
 
 ---
 
-## Commits de cette session
+## Prochaine session — première action
 
 ```
-687b847  fix(alembic): merge dual heads b3_owner_email + e3_signup_attempts_email
-3518c82  fix(budgetforge): playground fixes, test isolation, audit #4 backend corrections
+Lis HANDOFF.md et memory/project_budgetforge_audit8_plan.md.
+Audit #8 Blocs A+B déployés. Prochain sprint : Bloc C (C1 = X6 admin httpOnly cookie).
+```
+
+Plan C1 détaillé dans `budgetforge/docs/superpowers/plans/2026-04-27-audit8-fixes.md` section "Task C1".
+
+---
+
+## Commits de cette session (chronologique)
+
+```
+7307d27  fix(billing): normalize Stripe webhook email — X2
+61d4020  fix(billing): downgrade revokes all customer projects — X5
+cab9de0  fix(billing): cap webhook payload at 100KB — X3
+ce10e9c  fix(portal): magic-link token via hash fragment — X4
+b724d37  fix(dashboard): Secure flag on bf_session cookie — X8
+7a5dfe7  fix(dynamic_pricing): add close() + call in lifespan — H26
+0b630aa  fix(lock): cap _memory_locks at 1000 entries — M01
+14c802f  fix(estimator): pre-compile CODE_PATTERNS regex — M02
+3ac742d  fix(portal,signup): reject emails containing CRLF — M03
+2dd8058  fix(portal): constant-time response — M04
+07db5a4  fix(admin): billing_sync returns 503 — M11
+123ba76  fix(dynamic_pricing): sync close() + shutdown_pricing_manager() — H26
+a3a8486  fix(portal,models,alert): CRLF subject + portal helper + stampede — M03/M04/M10
+356b33c  fix(alembic): linearize migration chain e3→e2, h6→e3
 ```
 
 ## Backup VPS actuel
-`/opt/budgetforge.bak-20260427-093340` — sain, 124K
+`/opt/budgetforge.bak-20260427-*` (créé avant deploy de cette session)
 
 ## ADMIN_API_KEY prod
 `5b3eeaa7d9d4fa3915fc44ee67e23439639e8f001078da8766f5cb820d6c0998`
