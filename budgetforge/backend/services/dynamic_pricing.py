@@ -110,6 +110,13 @@ class DynamicPricingManager:
                 ),
             }
 
+    async def close(self) -> None:
+        """Close any persistent HTTP client if present."""
+        client = getattr(self, "_http_client", None)
+        if client is not None:
+            await client.aclose()
+            self._http_client = None
+
     async def get_price(self, model: str) -> PriceConfig:
         """Obtient le prix pour un modèle, avec cache et fallback."""
         normalized_model = model.lower()
