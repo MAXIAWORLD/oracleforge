@@ -106,6 +106,21 @@ Suggestion commit messages :
 
 ---
 
+## ⚠️ PIVOT STRATÉGIE — fin de session 27 avril
+
+Phase 0 a été exécutée par erreur en **mode indie** (BETA50 lifetime, pricing $29-79, AppSumo planifié, signup form perso). Le vrai ICP décidé dès le 12 avril est **équipes dev 3-20 personnes avec budget IT** = team/entreprise.
+
+**Plan d'adaptation à exécuter en priorité prochaine session :** voir mémoire `project_strategy_pivot_team_enterprise.md`.
+
+Résumé : refonte pricing ($199 Team / $599 Business / Custom Enterprise), refonte hero copy ("Cap your team's LLM spend before the CFO sees the bill"), drop BETA50 → Design Partner Program, Loom walkthrough à enregistrer, distrib refondue (LinkedIn outbound + cold email senior + cabinets conseil — kill AppSumo/Smithery), OracleForge repositionné asset marketing OSS sans revenue attendu.
+
+Question à reposer à Alexis dès le début : "tu acceptes ou pas 1 call B2B / sem max ? Si non, on double le besoin social proof."
+
 ## Première action prochaine session
 
-Lire ce fichier en premier. Puis enchaîner sur **Phase 1 étape A — directories agents IA**.
+1. Lire ce fichier en premier
+2. Lire `feedback_icp_team_enterprise.md` (règle dure ICP)
+3. Lire `project_strategy_pivot_team_enterprise.md` (plan d'exécution)
+4. Reposer la question "1 call/sem max" à Alexis
+5. Démarrer refonte pricing + landing copy team/entreprise
+6. **NE PAS** enchaîner sur "Phase 1 étape A directories agents IA" — c'était la stratégie indie obsolète
