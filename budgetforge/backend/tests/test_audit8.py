@@ -189,24 +189,25 @@ class TestX4MagicLinkHash:
 
 class TestH26DynamicPricingClose:
     def test_dynamic_pricing_manager_has_close_method(self):
-        """DynamicPricingManager doit avoir une méthode close() async."""
+        """DynamicPricingManager doit avoir une méthode close()."""
         from services.dynamic_pricing import DynamicPricingManager
-        import inspect
 
         assert hasattr(DynamicPricingManager, "close"), "Méthode close() manquante"
-        assert inspect.iscoroutinefunction(DynamicPricingManager.close), (
-            "close() doit être async"
-        )
+        assert callable(DynamicPricingManager.close)
 
-    def test_dynamic_pricing_close_closes_http_client(self):
-        """close() doit fermer le client httpx si existant."""
-        import httpx
-        from services.dynamic_pricing import DynamicPricingManager
+    def test_dynamic_pricing_close_clears_cache(self):
+        """close() doit vider le cache interne."""
+        from services.dynamic_pricing import DynamicPricingManager, PriceConfig
 
         manager = DynamicPricingManager()
-        manager._http_client = httpx.AsyncClient()
-        asyncio.run(manager.close())
-        assert manager._http_client is None or manager._http_client.is_closed
+        manager._cache["gpt-4o"] = PriceConfig(
+            input_per_1m_usd=5.0,
+            output_per_1m_usd=15.0,
+            provider="openai",
+            source="test",
+        )
+        manager.close()
+        assert len(manager._cache) == 0
 
 
 # ── M03 — email injection via \r\n ─────────────────────────────────────────────

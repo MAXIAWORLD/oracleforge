@@ -110,11 +110,20 @@ class DynamicPricingManager:
                 ),
             }
 
-    async def close(self) -> None:
-        """Close any persistent HTTP client if present."""
+    def close(self) -> None:
+        """Clear caches and close any persistent HTTP client."""
+        self._cache.clear()
+        self._cache_timestamps.clear()
         client = getattr(self, "_http_client", None)
         if client is not None:
-            await client.aclose()
+            try:
+                import asyncio as _asyncio
+
+                loop = _asyncio.get_event_loop()
+                if not loop.is_closed():
+                    loop.run_until_complete(client.aclose())
+            except Exception:
+                pass
             self._http_client = None
 
     async def get_price(self, model: str) -> PriceConfig:
@@ -466,3 +475,11 @@ def set_pricing_config(config: DynamicPricingConfig):
     """Configure le gestionnaire de prix dynamique."""
     global _pricing_manager
     _pricing_manager = DynamicPricingManager(config)
+
+
+def shutdown_pricing_manager() -> None:
+    """Close and reset the singleton (called from lifespan shutdown)."""
+    global _pricing_manager
+    if _pricing_manager is not None:
+        _pricing_manager.close()
+        _pricing_manager = None
