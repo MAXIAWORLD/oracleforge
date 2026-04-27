@@ -165,11 +165,23 @@ class TestX4MagicLinkHash:
             send_portal_email("user@test.com", "tok123")
 
         assert captured_body, "Email non envoyé"
-        body = captured_body[0]
-        assert "#token=tok123" in body, (
+        raw = captured_body[0]
+        # Decode base64-encoded MIME parts to get the plain text content
+        import email as _email_lib
+
+        msg = _email_lib.message_from_string(raw)
+        decoded_parts = []
+        for part in msg.walk():
+            payload = part.get_payload(decode=True)
+            if payload:
+                decoded_parts.append(payload.decode("utf-8", errors="ignore"))
+        full_text = raw + "\n".join(decoded_parts)
+        assert "#token=tok123" in full_text, (
             "Token doit être dans le hash, pas en query string"
         )
-        assert "?token=tok123" not in body, "Token NE DOIT PAS être en query string"
+        assert "?token=tok123" not in full_text, (
+            "Token NE DOIT PAS être en query string"
+        )
 
 
 # ── H26 — dynamic_pricing close ───────────────────────────────────────────────

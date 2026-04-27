@@ -89,7 +89,7 @@ def send_portal_email(email: str, token: str) -> bool:
         )
         return False
 
-    link = f"{settings.app_url}/portal?token={token}"
+    link = f"{settings.app_url}/portal#token={token}"
     body = f"""\
 Access your BudgetForge projects
 
