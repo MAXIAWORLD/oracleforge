@@ -124,27 +124,35 @@ https://llmbudget.maxiaworld.app
 
 @router.post("/api/portal/request")
 @limiter.limit("5/hour")
-def portal_request(
+async def portal_request(
     request: Request, body: PortalRequestBody, db: Session = Depends(get_db)
 ):
+    import asyncio as _asyncio
+    import time as _time
+
+    _MIN_RESPONSE_S = 0.1  # constant-time floor prevents email enumeration by timing
+    _start = _time.monotonic()
+
     cleanup_expired_tokens(db)
     email = body.email.strip().lower()
     if "\r" in email or "\n" in email:
         raise HTTPException(status_code=400, detail="Invalid email")
     projects = db.query(Project).filter(Project.name == email).all()
-    if not projects:
-        return {"ok": True}
+    if projects:
+        token = PortalToken(
+            email=email,
+            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+            + timedelta(hours=_TOKEN_TTL_HOURS),
+        )
+        db.add(token)
+        db.commit()
+        db.refresh(token)
+        await _asyncio.to_thread(send_portal_email, email, token.token)
 
-    token = PortalToken(
-        email=email,
-        expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
-        + timedelta(hours=_TOKEN_TTL_HOURS),
-    )
-    db.add(token)
-    db.commit()
-    db.refresh(token)
+    elapsed = _time.monotonic() - _start
+    if elapsed < _MIN_RESPONSE_S:
+        await _asyncio.sleep(_MIN_RESPONSE_S - elapsed)
 
-    send_portal_email(email, token.token)
     return {"ok": True}
 
 
