@@ -71,6 +71,8 @@ async def create_checkout_session(request: Request, plan: str):
 @router.post("/webhook/stripe")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     payload = await request.body()
+    if len(payload) > 100_000:
+        raise HTTPException(status_code=413, detail="Payload too large")
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
