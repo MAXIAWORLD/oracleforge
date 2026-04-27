@@ -214,19 +214,39 @@ async def reconcile_stripe_session(
 
 def _handle_subscription_deleted(subscription: dict, db: Session) -> None:
     subscription_id = subscription.get("id")
+    customer_id = subscription.get("customer")
     if not subscription_id:
         return
-    project = (
-        db.query(Project)
-        .filter(Project.stripe_subscription_id == subscription_id)
-        .first()
+
+    # Downgrade ALL projects of the customer (not just the one matching the sub)
+    projects = (
+        db.query(Project).filter(Project.stripe_customer_id == customer_id).all()
+        if customer_id
+        else []
     )
-    if project:
-        project.plan = "free"
-        db.commit()
-        logger.info(
-            "Project %s downgraded to free (subscription %s cancelled)",
-            project.id,
-            subscription_id,
+
+    # Fallback: match by subscription_id if no customer_id
+    if not projects:
+        project = (
+            db.query(Project)
+            .filter(Project.stripe_subscription_id == subscription_id)
+            .first()
         )
-        send_downgrade_email(project.name)
+        if project:
+            projects = [project]
+
+    if not projects:
+        return
+
+    for project in projects:
+        project.plan = "free"
+        project.stripe_subscription_id = None
+    db.commit()
+
+    logger.info(
+        "%d project(s) downgraded to free (customer=%s subscription=%s)",
+        len(projects),
+        customer_id,
+        subscription_id,
+    )
+    send_downgrade_email(projects[0].name)
