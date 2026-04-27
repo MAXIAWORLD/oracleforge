@@ -2,6 +2,7 @@ import secrets
 from datetime import datetime, timezone
 from sqlalchemy import (
     Column,
+    Index,
     Integer,
     String,
     Float,
@@ -147,6 +148,7 @@ class StripeEvent(Base):
 
 class Usage(Base):
     __tablename__ = "usages"
+    __table_args__ = (Index("ix_usages_project_created", "project_id", "created_at"),)
 
     id = Column(Integer, primary_key=True, index=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)

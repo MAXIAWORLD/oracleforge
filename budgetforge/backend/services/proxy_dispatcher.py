@@ -8,6 +8,7 @@ Regroupe tout ce qui tourne APRÈS l'auth + budget check :
 """
 
 import asyncio
+import hmac
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -64,7 +65,7 @@ def get_project_by_api_key(authorization: Optional[str], db: Session) -> Project
         )
     api_key = authorization.removeprefix("Bearer ").strip()
     project = db.query(Project).filter(Project.api_key == api_key).first()
-    if project:
+    if project and hmac.compare_digest(project.api_key, api_key):
         return project
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
         minutes=_GRACE_PERIOD_MINUTES
@@ -74,7 +75,11 @@ def get_project_by_api_key(authorization: Optional[str], db: Session) -> Project
         .filter(Project.previous_api_key == api_key, Project.key_rotated_at >= cutoff)
         .first()
     )
-    if project:
+    if (
+        project
+        and project.previous_api_key
+        and hmac.compare_digest(project.previous_api_key, api_key)
+    ):
         return project
     raise HTTPException(status_code=401, detail="Invalid API key")
 
@@ -448,6 +453,8 @@ async def _openai_format_stream_gen(
             cancel_usage(db, usage_id)
         elif got_usage:
             await finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
+        else:
+            cancel_usage(db, usage_id)
         await _call_maybe_send_alert(project, db)
 
 
@@ -575,6 +582,8 @@ async def _anthropic_stream_gen(
             cancel_usage(db, usage_id)
         elif got_usage:
             await finalize_usage(db, usage_id, tokens_in, tokens_out, final_model)
+        else:
+            cancel_usage(db, usage_id)
         await _call_maybe_send_alert(project, db)
 
 

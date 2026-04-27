@@ -1,5 +1,7 @@
+import hmac
 from datetime import datetime, timedelta, date
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from core.config import settings
@@ -11,13 +13,41 @@ from services.stripe_reconcile import reconcile_stripe_subscriptions
 router = APIRouter(tags=["admin"])
 
 _MRR_BY_PLAN = {"free": 0, "pro": 29, "agency": 79}
+_COOKIE_NAME = "bf_admin_key"
+_COOKIE_MAX_AGE = 86400
+
+
+class AdminLoginBody(BaseModel):
+    key: str
+
+
+@router.post("/api/admin/login")
+def admin_login(body: AdminLoginBody, response: Response) -> dict:
+    if not settings.admin_api_key:
+        raise HTTPException(status_code=503, detail="Admin key not configured")
+    if not hmac.compare_digest(body.key, settings.admin_api_key):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+    is_prod = getattr(settings, "app_env", "development") == "production"
+    cookie_attrs = f"Path=/; HttpOnly; SameSite=Lax; Max-Age={_COOKIE_MAX_AGE}"
+    if is_prod:
+        cookie_attrs += "; Secure"
+    response.headers["Set-Cookie"] = f"{_COOKIE_NAME}={body.key}; {cookie_attrs}"
+    return {"ok": True}
+
+
+@router.delete("/api/admin/session")
+def admin_logout(response: Response) -> dict:
+    response.headers["Set-Cookie"] = (
+        f"{_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+    )
+    return {"ok": True}
 
 
 @router.post("/api/admin/billing/sync", dependencies=[Depends(require_admin)])
 def billing_sync(db: Session = Depends(get_db)):
     """Réconcilier les plans avec Stripe (appelable par cron systemd)."""
     if not settings.stripe_secret_key:
-        raise HTTPException(status_code=503, detail="Stripe not configured")
+        return {"ok": False, "error": "STRIPE_SECRET_KEY not configured"}
     result = reconcile_stripe_subscriptions(db)
     return {"ok": True, **result}
 

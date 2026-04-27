@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -16,8 +17,16 @@ PLAN_PROJECT_LIMITS: dict[str, int] = {
     "agency": -1,  # illimité
 }
 
+_quota_cache: dict[int, tuple[int, float]] = {}
+_QUOTA_CACHE_TTL: float = 30.0
+
 
 def get_calls_this_month(project_id: int, db: Session) -> int:
+    now = time.monotonic()
+    cached = _quota_cache.get(project_id)
+    if cached is not None and (now - cached[1]) < _QUOTA_CACHE_TTL:
+        return cached[0]
+
     first_of_month = datetime.now(timezone.utc).replace(
         tzinfo=None, day=1, hour=0, minute=0, second=0, microsecond=0
     )
@@ -29,7 +38,9 @@ def get_calls_this_month(project_id: int, db: Session) -> int:
         )
         .scalar()
     )
-    return result or 0
+    count = result or 0
+    _quota_cache[project_id] = (count, now)
+    return count
 
 
 def check_project_quota(owner_email: str, plan: str, db: Session) -> None:
