@@ -111,14 +111,24 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
 
 async def _handle_checkout_completed(session: dict, db: Session) -> None:
-    email = (session.get("customer_details") or {}).get("email") or session.get(
+    raw_email = (session.get("customer_details") or {}).get("email") or session.get(
         "customer_email"
     )
-    if not email or not _EMAIL_RE.match(str(email)):
+    if not raw_email or not _EMAIL_RE.match(str(raw_email)):
         logger.warning(
             "Invalid or missing email in checkout — customer=%s session=%s",
             session.get("customer"),
             session.get("id"),
+        )
+        return
+    # Normalize like signup_free and portal_request (lowercase + strip +tag)
+    _local, _domain = str(raw_email).strip().lower().split("@", 1)
+    email = _local.split("+")[0] + "@" + _domain
+    if not _EMAIL_RE.match(email):
+        logger.warning(
+            "Normalized email invalid — raw=%s customer=%s",
+            raw_email,
+            session.get("customer"),
         )
         return
 
