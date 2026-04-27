@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     portal_secret: str = ""  # obligatoire en production
     # ── Anti-bot (Cloudflare Turnstile) ──
     turnstile_secret_key: str = ""  # obligatoire en production
+    # ── Email marketing (Loops.so) ──
+    loops_api_key: str = ""  # vide = pas de sync Loops (no-op)
 
 
 settings = Settings()

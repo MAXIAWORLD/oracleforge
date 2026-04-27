@@ -15,6 +15,7 @@ from core.config import settings
 from core.database import get_db
 from core.log_utils import mask_email
 from core.models import Project, SignupAttempt
+from services.loops_sync import add_contact as loops_add_contact
 from services.onboarding_email import send_onboarding_email
 from services.plan_quota import check_project_quota
 
@@ -82,8 +83,6 @@ class SignupFreeRequest(BaseModel):
     @classmethod
     def validate_email(cls, v: str) -> str:
         v = v.strip().lower()
-        if "\r" in v or "\n" in v:
-            raise ValueError("Invalid email address")
         if not _EMAIL_RE.match(v):
             raise ValueError("Invalid email address")
         # Strip +tag alias (user+tag@gmail.com → user@gmail.com)
@@ -172,4 +171,5 @@ async def signup_free(
     await asyncio.to_thread(
         send_onboarding_email, body.email, project.api_key, project.plan
     )
+    asyncio.create_task(loops_add_contact(body.email, "BudgetForge Beta"))
     return {"ok": True}
