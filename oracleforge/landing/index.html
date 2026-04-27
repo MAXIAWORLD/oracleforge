@@ -36,7 +36,7 @@
       "@id": "https://oracle.maxiaworld.app/#org",
       "name": "MAXIA",
       "url": "https://oracle.maxiaworld.app/",
-      "email": "ceo@maxiaworld.app",
+      "email": "support@maxiaworld.app",
       "sameAs": ["https://github.com/MAXIAWORLD"]
     },
     {
@@ -935,6 +935,7 @@
     }
   }
 </style>
+<script async defer src="https://analytics.maxiaworld.app/script.js" data-website-id="0b8a4545-8330-415a-b6f3-fa586c3ec189"></script>
 </head>
 <body>
 <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -961,17 +962,16 @@
     <div class="wrap">
       <div class="hero-grid">
         <div>
-          <span class="hero-kicker reveal">v0.1.9 · apache-2.0 · multi-source</span>
+          <span class="hero-kicker reveal">Beta · 50% lifetime for first 50 users</span>
           <h1 id="hero-heading" class="hero-title reveal">
-            Multi-source price&nbsp;feed<br>
-            <em>for AI agents.</em>
+            Stop your AI agent<br>
+            <em>from trading on a wrong&nbsp;price.</em>
           </h1>
           <p class="hero-lede reveal">
-            A drop-in oracle for autonomous agents. Six independent sources — Pyth Hermes,
-            Chainlink on-chain, CoinPaprika, RedStone, Pyth Solana, and Uniswap v3 TWAP —
-            cross-validated into a single call, with a divergence figure you can trust or refuse.
+            Six oracles cross-checked. One API call. If they disagree, you know —
+            before your agent moves money.
             <br><br>
-            Six client libraries. One MCP server. Zero custody.
+            Free 1k requests/month · no card required.
           </p>
           <div class="hero-cta reveal">
             <a class="btn btn--primary" href="#install">
@@ -1256,6 +1256,33 @@ curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxia
   </section>
 
   <!-- ── Disclaimers ──────────────────────────────────────── -->
+  <!-- ── Waitlist ─────────────────────────────────────────── -->
+  <section class="section" id="waitlist" aria-labelledby="waitlist-heading">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="numeral" aria-hidden="true">07 / 07</span>
+        <div>
+          <h2 id="waitlist-heading">Not ready yet? Get notified when v0.2 ships.</h2>
+          <p>One email when we ship the next batch of features. No spam, no drip sequence, no marketing tricks. Unsubscribe in one click.</p>
+        </div>
+      </div>
+      <form id="waitlist-form" style="max-width:520px;display:flex;gap:12px;flex-wrap:wrap;">
+        <input
+          type="email"
+          name="email"
+          required
+          placeholder="your@email.com"
+          aria-label="Email address"
+          style="flex:1 1 240px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-2);color:var(--text);font:inherit;"
+        >
+        <button type="submit" class="btn btn--primary" style="white-space:nowrap;">
+          Get notified <span class="arrow" aria-hidden="true">→</span>
+        </button>
+      </form>
+      <p id="waitlist-msg" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;color:var(--text-faint);min-height:1.4em;"></p>
+    </div>
+  </section>
+
   <section class="section" style="padding-top:0;" id="disclaimers">
     <div class="wrap">
       <div class="disc">
@@ -1272,7 +1299,7 @@ curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxia
   <div class="wrap foot-inner">
     <div class="foot-cols">
       <span>© 2026 MAXIA</span>
-      <a href="mailto:ceo@maxiaworld.app">ceo@maxiaworld.app</a>
+      <a href="mailto:support@maxiaworld.app">support@maxiaworld.app</a>
       <a href="/docs/">/docs</a>
       <a href="/llms.txt">/llms.txt</a>
       <a href="https://github.com/MAXIAWORLD/oracleforge" rel="noreferrer">github</a>
@@ -1340,6 +1367,46 @@ curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxia
       el.style.transform = 'translateY(10px)';
       el.style.transition = 'opacity 600ms ease, transform 600ms cubic-bezier(.16,.84,.44,1)';
       io.observe(el);
+    });
+  })();
+
+  // ── Waitlist form ─────────────────────────────────────────────
+  (function () {
+    var form = document.getElementById('waitlist-form');
+    var msg = document.getElementById('waitlist-msg');
+    if (!form || !msg) return;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var input = form.querySelector('input[name="email"]');
+      var btn = form.querySelector('button[type="submit"]');
+      var email = (input.value || '').trim();
+      if (!email) return;
+      btn.disabled = true;
+      msg.style.color = 'var(--text-faint)';
+      msg.textContent = 'Sending…';
+      fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      }).then(function (r) {
+        if (r.status === 200) {
+          msg.style.color = '#7BD389';
+          msg.textContent = 'You are on the list. We will email you when v0.2 ships.';
+          input.value = '';
+        } else if (r.status === 429) {
+          msg.style.color = '#E9B872';
+          msg.textContent = 'Slow down — try again in a minute.';
+        } else if (r.status === 422) {
+          msg.style.color = '#E9967A';
+          msg.textContent = 'That email looks invalid.';
+        } else {
+          msg.style.color = '#E9967A';
+          msg.textContent = 'Something went wrong — please try again.';
+        }
+      }).catch(function () {
+        msg.style.color = '#E9967A';
+        msg.textContent = 'Network error — please try again.';
+      }).finally(function () { btn.disabled = false; });
     });
   })();
 

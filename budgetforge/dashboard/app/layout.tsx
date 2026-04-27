@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Syne, DM_Sans, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const syne = Syne({
@@ -36,7 +37,15 @@ export default function RootLayout({
       lang="en"
       className={`${syne.variable} ${dmSans.variable} ${jetbrains.variable} h-full`}
     >
-      <body className="h-full">{children}</body>
+      <body className="h-full">
+        {children}
+        <Script
+          async
+          defer
+          src="https://analytics.maxiaworld.app/script.js"
+          data-website-id="befd0e49-8570-4c0d-b420-66f4cebbfe3b"
+        />
+      </body>
     </html>
   );
 }

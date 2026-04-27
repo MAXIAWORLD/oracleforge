@@ -21,7 +21,7 @@ export default function LandingPage() {
           className="inline-block text-xs font-semibold px-3 py-1 rounded-full mb-6"
           style={{ border: "1px solid var(--amber)", color: "var(--amber)" }}
         >
-          Hard budget limits for LLM APIs
+          Beta · 50% lifetime for first 50 users
         </div>
         <h1 className="text-4xl sm:text-5xl font-bold leading-tight mb-6">
           Stop unexpected
@@ -29,12 +29,17 @@ export default function LandingPage() {
           <span style={{ color: "var(--amber)" }}>LLM API bills</span>
         </h1>
         <p
-          className="text-lg mb-10 max-w-xl mx-auto"
+          className="text-lg mb-4 max-w-xl mx-auto"
           style={{ color: "#c8d8e8" }}
         >
-          BudgetForge sits between your code and the LLM APIs. Set hard limits
-          per project, get alerts before you blow your budget, and
-          auto-downgrade to cheaper models when limits are reached.
+          Set hard limits. Get alerts. Auto-downgrade. Never burn $500 on a
+          runaway loop again.
+        </p>
+        <p
+          className="text-sm mb-10 max-w-xl mx-auto"
+          style={{ color: "#94a3b8" }}
+        >
+          Free 1k calls/month · Pro $29 · Agency $79
         </p>
 
         {/* Free signup — primary CTA */}
@@ -243,7 +248,7 @@ export default function LandingPage() {
           </Link>
           {" · "}
           <a
-            href="mailto:ceo@maxiaworld.app"
+            href="mailto:support@maxiaworld.app"
             className="hover:opacity-80"
             style={{ color: "var(--amber)" }}
           >
