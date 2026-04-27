@@ -1,3 +1,4 @@
+import asyncio
 import hmac
 import hashlib
 import logging
@@ -122,22 +123,23 @@ https://llmbudget.maxiaworld.app
         return False
 
 
+def _get_projects_for_email(email: str, db: Session) -> list:
+    return db.query(Project).filter(Project.name == email).all()
+
+
 @router.post("/api/portal/request")
 @limiter.limit("5/hour")
 async def portal_request(
     request: Request, body: PortalRequestBody, db: Session = Depends(get_db)
 ):
-    import asyncio as _asyncio
-    import time as _time
-
     _MIN_RESPONSE_S = 0.1  # constant-time floor prevents email enumeration by timing
-    _start = _time.monotonic()
+    _start = time.monotonic()
 
     cleanup_expired_tokens(db)
     email = body.email.strip().lower()
     if "\r" in email or "\n" in email:
         raise HTTPException(status_code=400, detail="Invalid email")
-    projects = db.query(Project).filter(Project.name == email).all()
+    projects = _get_projects_for_email(email, db)
     if projects:
         token = PortalToken(
             email=email,
@@ -147,11 +149,11 @@ async def portal_request(
         db.add(token)
         db.commit()
         db.refresh(token)
-        await _asyncio.to_thread(send_portal_email, email, token.token)
+        await asyncio.to_thread(send_portal_email, email, token.token)
 
-    elapsed = _time.monotonic() - _start
+    elapsed = time.monotonic() - _start
     if elapsed < _MIN_RESPONSE_S:
-        await _asyncio.sleep(_MIN_RESPONSE_S - elapsed)
+        await asyncio.sleep(_MIN_RESPONSE_S - elapsed)
 
     return {"ok": True}
 
