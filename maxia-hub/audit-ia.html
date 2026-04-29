@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit IA Express — MAXIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue: #0099cc;
+  --blue-dark: #0077a8;
+  --blue-deep: #004d6e;
+  --yellow: #FDE74C;
+  --yellow-dark: #D4C000;
+  --dark: #060b14;
+  --dark2: #0d1520;
+  --dark3: #111d2e;
+  --card: rgba(255,255,255,0.04);
+  --card-border: rgba(255,255,255,0.08);
+  --text: #e2e8f0;
+  --text-muted: #7b8fa6;
+  --white: #ffffff;
+  --radius: 16px;
+  --transition: 0.35s cubic-bezier(.25,.8,.25,1);
+}
+
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', sans-serif; background: var(--dark); color: var(--text); line-height: 1.7; overflow-x: hidden; }
+h1,h2,h3,h4 { font-family: 'Montserrat', sans-serif; }
+a { text-decoration: none; color: inherit; }
+
+#progress-bar {
+  position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+  background: linear-gradient(90deg, var(--blue), var(--yellow));
+  z-index: 2000; transition: width 0.1s linear; pointer-events: none;
+}
+
+#cursor-glow {
+  position: fixed; width: 400px; height: 400px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,153,204,0.1) 0%, transparent 70%);
+  pointer-events: none; z-index: 0; transform: translate(-50%, -50%);
+  transition: left 0.2s ease, top 0.2s ease; will-change: left,top;
+}
+
+/* NAV */
+#nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  padding: 0 40px; height: 72px;
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(6,11,20,0.7); backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.nav-logo {
+  font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 18px;
+  letter-spacing: -0.5px; color: var(--white);
+  display: flex; align-items: center; gap: 10px;
+}
+.nav-logo .dot { color: var(--blue); }
+.nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
+.nav-links a {
+  padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  color: var(--text-muted); transition: color var(--transition), background var(--transition);
+}
+.nav-links a:hover { color: var(--white); background: rgba(255,255,255,0.07); }
+.nav-cta {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px;
+  background: var(--blue); color: #fff; border-radius: 50px;
+  font-weight: 600; font-size: 14px;
+  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+  box-shadow: 0 4px 16px rgba(0,153,204,0.35);
+}
+.nav-cta:hover { background: var(--blue-dark); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,153,204,0.45); }
+
+/* HERO */
+#hero { position: relative; min-height: 100vh; display: flex; align-items: center; overflow: hidden; padding: 120px 40px 80px; }
+.hero-bg {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 60% 40%, rgba(0,153,204,0.18) 0%, transparent 70%),
+              radial-gradient(ellipse 50% 40% at 20% 70%, rgba(253,231,76,0.08) 0%, transparent 60%),
+              linear-gradient(160deg, #060b14 0%, #0d1829 50%, #060b14 100%);
+}
+.hero-grid {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(0,153,204,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,153,204,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+}
+.hero-content { position: relative; z-index: 2; max-width: 680px; }
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px;
+  background: rgba(253,231,76,0.12); border: 1px solid rgba(253,231,76,0.3);
+  border-radius: 50px; font-size: 13px; font-weight: 600; color: var(--yellow);
+  margin-bottom: 28px; letter-spacing: 0.5px;
+}
+.hero-title { font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 900; line-height: 1.1; letter-spacing: -1.5px; margin-bottom: 24px; color: var(--white); }
+.hero-title .hl { background: linear-gradient(90deg, var(--blue), #00d4ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hero-subtitle { font-size: 17px; color: var(--text-muted); line-height: 1.75; max-width: 540px; margin-bottom: 40px; }
+.hero-actions { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 56px; }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 10px; padding: 16px 32px;
+  background: linear-gradient(135deg, var(--blue), var(--blue-dark)); color: #fff;
+  border-radius: 50px; font-weight: 700; font-size: 15px;
+  transition: transform var(--transition), box-shadow var(--transition);
+  box-shadow: 0 6px 24px rgba(0,153,204,0.4);
+}
+.btn-primary:hover { transform: translateY(-3px); box-shadow: 0 12px 36px rgba(0,153,204,0.55); }
+.btn-outline {
+  display: inline-flex; align-items: center; gap: 10px; padding: 15px 30px;
+  border: 1.5px solid rgba(255,255,255,0.2); color: var(--text);
+  border-radius: 50px; font-weight: 600; font-size: 15px;
+  transition: border-color var(--transition), background var(--transition);
+  backdrop-filter: blur(4px);
+}
+.btn-outline:hover { border-color: var(--blue); background: rgba(0,153,204,0.1); color: var(--white); }
+.hero-stats { display: flex; gap: 40px; flex-wrap: wrap; }
+.hero-stat { display: flex; flex-direction: column; }
+.hero-stat-num { font-family: 'Montserrat', sans-serif; font-size: 28px; font-weight: 800; color: var(--white); letter-spacing: -0.5px; }
+.hero-stat-num span { color: var(--yellow); }
+.hero-stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 500; }
+.hero-float { position: absolute; z-index: 3; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); backdrop-filter: blur(12px); border-radius: 14px; padding: 16px 20px; animation: floatUp 4s ease-in-out infinite; }
+.hero-float-1 { right: 8%; top: 30%; animation-delay: 0s; }
+.hero-float-2 { right: 8%; top: 52%; animation-delay: 1.5s; }
+@keyframes floatUp { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-12px); } }
+.float-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+.float-value { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 20px; color: var(--yellow); }
+.float-value-sm { font-size: 14px; font-weight: 600; color: var(--white); }
+
+/* SECTIONS */
+.section-header { text-align: center; margin-bottom: 72px; }
+.section-tag { display: inline-block; padding: 5px 16px; background: rgba(0,153,204,0.12); border: 1px solid rgba(0,153,204,0.25); border-radius: 50px; font-size: 12px; font-weight: 700; color: var(--blue); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 20px; }
+.section-title { font-size: clamp(1.8rem, 3vw, 2.8rem); font-weight: 800; color: var(--white); letter-spacing: -0.5px; margin-bottom: 16px; line-height: 1.2; }
+.section-desc { font-size: 16px; color: var(--text-muted); max-width: 520px; margin: 0 auto; line-height: 1.75; }
+
+/* PROCESSUS */
+#processus { padding: 120px 40px; background: var(--dark2); border-top: 1px solid rgba(255,255,255,0.04); }
+.steps-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; max-width: 1100px; margin: 0 auto; position: relative; }
+.steps-grid::before {
+  content: ''; position: absolute; top: 44px; left: calc(12.5% + 12px); right: calc(12.5% + 12px);
+  height: 1px; background: linear-gradient(90deg, transparent, var(--blue), transparent);
+  opacity: 0.3;
+}
+.step-card {
+  background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+  padding: 36px 28px; text-align: center; position: relative;
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+.step-card:hover { transform: translateY(-8px); border-color: rgba(0,153,204,0.3); box-shadow: 0 20px 48px rgba(0,0,0,0.35); }
+.step-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--blue), #00d4ff); opacity: 0; border-radius: var(--radius) var(--radius) 0 0; transition: opacity var(--transition); }
+.step-card:hover::before { opacity: 1; }
+.step-num {
+  width: 52px; height: 52px; border-radius: 50%; margin: 0 auto 24px;
+  background: linear-gradient(135deg, rgba(0,153,204,0.25), rgba(0,153,204,0.05));
+  border: 1px solid rgba(0,153,204,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 18px; color: var(--blue);
+}
+.step-icon { font-size: 26px; color: var(--blue); margin-bottom: 20px; transition: transform var(--transition); }
+.step-card:hover .step-icon { transform: scale(1.15); }
+.step-title { font-size: 16px; font-weight: 700; color: var(--white); margin-bottom: 12px; }
+.step-desc { font-size: 13px; color: var(--text-muted); line-height: 1.8; }
+
+/* CAS CLIENTS */
+#exemples { padding: 120px 40px; }
+.exemples-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; max-width: 1100px; margin: 0 auto; }
+.exemple-card {
+  background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+  padding: 36px 32px; position: relative; overflow: hidden;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.exemple-card:hover { transform: translateY(-10px); box-shadow: 0 24px 56px rgba(0,0,0,0.4); border-color: rgba(0,153,204,0.25); }
+.exemple-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--blue), #00d4ff); opacity: 0; transition: opacity var(--transition); }
+.exemple-card:hover::before { opacity: 1; }
+.exemple-client { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.exemple-avatar {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+.exemple-avatar.blue { background: rgba(0,153,204,0.15); border: 1px solid rgba(0,153,204,0.25); color: var(--blue); }
+.exemple-avatar.yellow { background: rgba(253,231,76,0.12); border: 1px solid rgba(253,231,76,0.25); color: var(--yellow); }
+.exemple-avatar.green { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.25); color: #22c55e; }
+.exemple-name { font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 14px; color: var(--white); }
+.exemple-type { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.exemple-probleme { font-size: 13px; color: var(--text-muted); line-height: 1.75; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.exemple-result {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: rgba(0,153,204,0.06); border: 1px solid rgba(0,153,204,0.15);
+  border-radius: 10px; padding: 16px;
+}
+.exemple-result i { color: var(--blue); font-size: 16px; margin-top: 2px; flex-shrink: 0; }
+.exemple-result-text { font-size: 13px; color: var(--text); line-height: 1.7; }
+.exemple-result-text strong { color: var(--yellow); font-weight: 700; }
+.exemple-tag { display: inline-block; margin-top: 20px; padding: 4px 12px; background: rgba(253,231,76,0.1); border: 1px solid rgba(253,231,76,0.2); border-radius: 50px; font-size: 11px; font-weight: 700; color: var(--yellow); letter-spacing: 1px; text-transform: uppercase; }
+
+/* TARIFS */
+#tarifs { padding: 120px 40px; background: var(--dark2); border-top: 1px solid rgba(255,255,255,0.04); }
+.tarifs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto; }
+.tarif-card {
+  background: var(--card); border: 1px solid var(--card-border); border-radius: 20px;
+  padding: 40px 32px; text-align: center; position: relative;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.tarif-card:hover { transform: translateY(-10px); box-shadow: 0 24px 56px rgba(0,0,0,0.4); }
+.tarif-card.featured {
+  border-color: rgba(0,153,204,0.4);
+  background: linear-gradient(160deg, rgba(0,153,204,0.1) 0%, var(--card) 60%);
+}
+.tarif-card.featured::before {
+  content: '★ POPULAIRE'; position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+  background: var(--blue); color: #fff; font-size: 11px; font-weight: 800;
+  letter-spacing: 1.5px; padding: 5px 18px; border-radius: 50px; white-space: nowrap;
+  font-family: 'Montserrat', sans-serif; box-shadow: 0 4px 12px rgba(0,153,204,0.4);
+}
+.tarif-icon { font-size: 32px; color: var(--blue); margin-bottom: 20px; }
+.tarif-name { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 18px; color: var(--white); margin-bottom: 8px; }
+.tarif-price { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 48px; color: var(--yellow); line-height: 1; letter-spacing: -2px; margin: 8px 0 4px; }
+.tarif-price sup { font-size: 22px; vertical-align: top; margin-top: 10px; letter-spacing: 0; }
+.tarif-old { font-size: 18px; color: var(--text-muted); text-decoration: line-through; margin-bottom: 4px; }
+.tarif-badge { display: inline-block; padding: 3px 10px; background: rgba(253,231,76,0.15); border: 1px solid rgba(253,231,76,0.3); border-radius: 50px; font-size: 11px; font-weight: 700; color: var(--yellow); letter-spacing: 1px; margin-bottom: 16px; }
+.tarif-delai { font-size: 13px; color: var(--text-muted); margin-bottom: 28px; }
+.tarif-features { list-style: none; text-align: left; margin-bottom: 32px; }
+.tarif-features li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text); padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.tarif-features li:last-child { border-bottom: none; }
+.tarif-features li i { color: var(--blue); font-size: 12px; margin-top: 4px; flex-shrink: 0; }
+.tarif-cta {
+  display: block; width: 100%; padding: 14px; border-radius: 50px;
+  font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 14px;
+  transition: all var(--transition); text-align: center;
+}
+.tarif-cta.primary { background: var(--blue); color: #fff; box-shadow: 0 4px 16px rgba(0,153,204,0.35); }
+.tarif-cta.primary:hover { background: var(--blue-dark); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,153,204,0.45); }
+.tarif-cta.outline { border: 1.5px solid rgba(255,255,255,0.2); color: var(--text); }
+.tarif-cta.outline:hover { border-color: var(--blue); background: rgba(0,153,204,0.1); color: var(--white); }
+
+/* CTA FINAL */
+#cta-final {
+  padding: 100px 40px;
+  background: linear-gradient(135deg, rgba(0,153,204,0.12) 0%, rgba(253,231,76,0.06) 100%);
+  border-top: 1px solid rgba(0,153,204,0.15); border-bottom: 1px solid rgba(0,153,204,0.15);
+  text-align: center; position: relative; overflow: hidden;
+}
+#cta-final::before {
+  content: 'MAXIA'; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  font-family: 'Montserrat', sans-serif; font-size: 200px; font-weight: 900;
+  color: rgba(0,153,204,0.04); white-space: nowrap; pointer-events: none; line-height: 1;
+}
+.cta-tag { display: inline-block; padding: 5px 16px; background: rgba(253,231,76,0.12); border: 1px solid rgba(253,231,76,0.3); border-radius: 50px; font-size: 12px; font-weight: 700; color: var(--yellow); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 24px; }
+.cta-title { font-size: clamp(2rem, 4vw, 3rem); font-weight: 900; color: var(--white); letter-spacing: -1px; margin-bottom: 16px; line-height: 1.15; }
+.cta-title .hl { background: linear-gradient(90deg, var(--blue), #00d4ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.cta-sub { font-size: 16px; color: var(--text-muted); margin-bottom: 40px; max-width: 480px; margin-left: auto; margin-right: auto; }
+.cta-email-btn {
+  display: inline-flex; align-items: center; gap: 12px; padding: 18px 40px;
+  background: linear-gradient(135deg, var(--blue), var(--blue-dark)); color: #fff;
+  border-radius: 50px; font-weight: 700; font-size: 16px;
+  box-shadow: 0 8px 32px rgba(0,153,204,0.45);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.cta-email-btn:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0,153,204,0.6); }
+.cta-note { font-size: 13px; color: var(--text-muted); margin-top: 20px; }
+
+/* FOOTER */
+#footer { background: #030709; border-top: 1px solid rgba(255,255,255,0.05); padding: 48px 40px; }
+.footer-inner { max-width: 1100px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+.footer-brand { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 16px; color: var(--white); }
+.footer-brand span { color: var(--blue); }
+.footer-links { display: flex; gap: 24px; }
+.footer-links a { font-size: 13px; color: var(--text-muted); transition: color var(--transition); }
+.footer-links a:hover { color: var(--white); }
+.footer-copy { font-size: 12px; color: rgba(255,255,255,0.2); text-align: center; padding-top: 32px; max-width: 1100px; margin: 0 auto; }
+
+/* SCROLL REVEAL */
+.reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* RESPONSIVE */
+@media (max-width: 1024px) {
+  .steps-grid { grid-template-columns: repeat(2, 1fr); }
+  .steps-grid::before { display: none; }
+  .exemples-grid { grid-template-columns: 1fr 1fr; }
+  .tarifs-grid { grid-template-columns: 1fr; max-width: 400px; }
+}
+@media (max-width: 768px) {
+  #nav { padding: 0 24px; }
+  .nav-links { display: none; }
+  #hero { padding: 100px 24px 60px; }
+  .hero-float { display: none; }
+  .steps-grid { grid-template-columns: 1fr; }
+  .exemples-grid { grid-template-columns: 1fr; }
+  #processus, #exemples, #tarifs, #cta-final { padding: 80px 24px; }
+  #footer { padding: 40px 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+  .reveal { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+<div id="cursor-glow"></div>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-logo">
+    MAXIA<span class="dot">.</span>audit
+  </div>
+  <ul class="nav-links">
+    <li><a href="#processus">Comment ça marche</a></li>
+    <li><a href="#exemples">Exemples</a></li>
+    <li><a href="#tarifs">Tarifs</a></li>
+  </ul>
+  <a href="mailto:support@maxiaworld.app" class="nav-cta">
+    <i class="fas fa-envelope"></i> Demander un audit
+  </a>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <i class="fas fa-bolt"></i>
+      AUDIT IA EXPRESS
+    </div>
+    <h1 class="hero-title">
+      Votre projet IA coûte<br>
+      probablement <span class="hl">3× trop cher</span>
+    </h1>
+    <p class="hero-subtitle">
+      Rapport écrit livré sous 48–72h. Stack, APIs, coûts réels, recommandations actionnables.
+      Pas de call, pas d'abonnement.
+    </p>
+    <div class="hero-actions">
+      <a href="mailto:support@maxiaworld.app" class="btn-primary">
+        <i class="fas fa-envelope"></i> Demander mon audit
+      </a>
+      <a href="#processus" class="btn-outline">
+        <i class="fas fa-arrow-down"></i> Comment ça marche
+      </a>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <span class="hero-stat-num"><span>48</span><span style="color:var(--text-muted);font-size:18px;">h</span></span>
+        <span class="hero-stat-label">délai livraison</span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-num"><span>100</span><span style="color:var(--text-muted);font-size:18px;">%</span></span>
+        <span class="hero-stat-label">async, zéro call</span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-num"><span style="color:var(--yellow);">−</span><span>70</span><span style="color:var(--text-muted);font-size:18px;">%</span></span>
+        <span class="hero-stat-label">coûts moyens évités</span>
+      </div>
+    </div>
+  </div>
+  <div class="hero-float hero-float-1">
+    <div class="float-label">Livraison</div>
+    <div class="float-value-sm">48 – 72h</div>
+  </div>
+  <div class="hero-float hero-float-2">
+    <div class="float-label">Format</div>
+    <div class="float-value" style="font-size:15px;color:var(--text);">PDF écrit</div>
+  </div>
+</section>
+
+<!-- COMMENT ÇA MARCHE -->
+<section id="processus">
+  <div class="section-header reveal">
+    <div class="section-tag">Processus</div>
+    <h2 class="section-title">Comment ça marche</h2>
+    <p class="section-desc">Un processus entièrement async, conçu pour aller à l'essentiel sans perdre votre temps.</p>
+  </div>
+  <div class="steps-grid">
+    <div class="step-card reveal">
+      <div class="step-num">1</div>
+      <div class="step-icon"><i class="fas fa-paper-plane"></i></div>
+      <div class="step-title">Vous envoyez votre contexte</div>
+      <p class="step-desc">Décrivez votre projet, vos APIs utilisées, vos volumes, vos doutes — un email suffit. Pas de formulaire compliqué.</p>
+    </div>
+    <div class="step-card reveal">
+      <div class="step-num">2</div>
+      <div class="step-icon"><i class="fas fa-search"></i></div>
+      <div class="step-title">Je pose des questions ciblées</div>
+      <p class="step-desc">Sous 24h, je vous envoie des questions précises pour affiner l'analyse. Pas de réunion, pas d'appel — uniquement par email.</p>
+    </div>
+    <div class="step-card reveal">
+      <div class="step-num">3</div>
+      <div class="step-icon"><i class="fas fa-reply"></i></div>
+      <div class="step-title">Vous répondez</div>
+      <p class="step-desc">Répondez à votre rythme. Vos réponses déclenchent l'analyse approfondie — c'est là que commence le vrai travail.</p>
+    </div>
+    <div class="step-card reveal">
+      <div class="step-num">4</div>
+      <div class="step-icon"><i class="fas fa-file-alt"></i></div>
+      <div class="step-title">Vous recevez le rapport PDF</div>
+      <p class="step-desc">Stack recommandée, coûts réels estimés, 3 quick wins actionnables immédiatement. Livré sous 48–72h après vos réponses.</p>
+    </div>
+  </div>
+</section>
+
+<!-- EXEMPLES -->
+<section id="exemples">
+  <div class="section-header reveal">
+    <div class="section-tag">Cas clients</div>
+    <h2 class="section-title">Ce que révèle un audit</h2>
+    <p class="section-desc">Des économies concrètes, trouvées en 48h sans audit de 3 mois.</p>
+  </div>
+  <div class="exemples-grid">
+
+    <div class="exemple-card reveal">
+      <div class="exemple-client">
+        <div class="exemple-avatar blue"><i class="fas fa-shopping-bag"></i></div>
+        <div>
+          <div class="exemple-name">E-commerce mode</div>
+          <div class="exemple-type">Startup · 8 personnes</div>
+        </div>
+      </div>
+      <p class="exemple-probleme">Voulait utiliser GPT-4 pour générer les descriptions de ses 12 000 produits. Budget estimé en interne : €800/mois. Hésitait à lancer.</p>
+      <div class="exemple-result">
+        <i class="fas fa-check-circle"></i>
+        <div class="exemple-result-text">
+          Audit révèle : GPT-4o-mini + cache sémantique pour les descriptions répétitives.<br>
+          <strong>Résultat : €42/mois. Économie de 95%.</strong>
+        </div>
+      </div>
+      <span class="exemple-tag">−95% de coût</span>
+    </div>
+
+    <div class="exemple-card reveal">
+      <div class="exemple-client">
+        <div class="exemple-avatar yellow"><i class="fas fa-users"></i></div>
+        <div>
+          <div class="exemple-name">PME RH</div>
+          <div class="exemple-type">Conseil RH · 15 personnes</div>
+        </div>
+      </div>
+      <p class="exemple-probleme">Voulait un chatbot interne pour répondre aux questions des salariés sur la convention collective. Prestataire externe devisait €600/mois.</p>
+      <div class="exemple-result">
+        <i class="fas fa-check-circle"></i>
+        <div class="exemple-result-text">
+          Audit révèle : Claude Haiku + RAG sur leurs 3 documents internes. Solution no-vendor-lock.<br>
+          <strong>Résultat : €75/mois en self-hosted.</strong>
+        </div>
+      </div>
+      <span class="exemple-tag">−87% de coût</span>
+    </div>
+
+    <div class="exemple-card reveal">
+      <div class="exemple-client">
+        <div class="exemple-avatar green"><i class="fas fa-pen-nib"></i></div>
+        <div>
+          <div class="exemple-name">Agence SEO</div>
+          <div class="exemple-type">Agence digitale · 6 personnes</div>
+        </div>
+      </div>
+      <p class="exemple-probleme">Automatisait 400 articles/mois via l'API OpenAI. Coût opaque, facture qui montait chaque mois. Cherchait à comprendre pourquoi.</p>
+      <div class="exemple-result">
+        <i class="fas fa-check-circle"></i>
+        <div class="exemple-result-text">
+          Audit révèle : prompts 3× trop longs, zéro Batch API, modèle surdimensionné.<br>
+          <strong>Résultat : €0.11/article au lieu de €0.87. −87%.</strong>
+        </div>
+      </div>
+      <span class="exemple-tag">−87% de coût</span>
+    </div>
+
+  </div>
+</section>
+
+<!-- TARIFS -->
+<section id="tarifs">
+  <div class="section-header reveal">
+    <div class="section-tag">Tarifs</div>
+    <h2 class="section-title">Choisissez votre audit</h2>
+    <p class="section-desc">Prix fixes. Pas de surprise, pas d'abonnement.</p>
+  </div>
+  <div class="tarifs-grid">
+
+    <div class="tarif-card reveal">
+      <div class="tarif-icon"><i class="fas fa-search"></i></div>
+      <div class="tarif-name">Essentiel</div>
+      <div class="tarif-old">€427</div>
+      <div class="tarif-price"><sup>€</sup>299</div>
+      <div class="tarif-badge">LANCEMENT −30%</div>
+      <div class="tarif-delai"><i class="fas fa-clock" style="color:var(--blue);margin-right:6px;"></i>Livraison sous 48h</div>
+      <ul class="tarif-features">
+        <li><i class="fas fa-check"></i>1 outil ou API à évaluer</li>
+        <li><i class="fas fa-check"></i>Estimation coûts réels</li>
+        <li><i class="fas fa-check"></i>Modèle recommandé</li>
+        <li><i class="fas fa-check"></i>3 quick wins</li>
+        <li><i class="fas fa-check"></i>Rapport PDF 5 pages</li>
+      </ul>
+      <a href="https://buy.stripe.com/8x2eVdfHm9Bg4o560QbbG00" class="tarif-cta outline" target="_blank" rel="noopener">Commander →</a>
+    </div>
+
+    <div class="tarif-card featured reveal">
+      <div class="tarif-icon"><i class="fas fa-layer-group"></i></div>
+      <div class="tarif-name">Pro</div>
+      <div class="tarif-old">€713</div>
+      <div class="tarif-price"><sup>€</sup>499</div>
+      <div class="tarif-badge">LANCEMENT −30%</div>
+      <div class="tarif-delai"><i class="fas fa-clock" style="color:var(--blue);margin-right:6px;"></i>Livraison sous 72h</div>
+      <ul class="tarif-features">
+        <li><i class="fas fa-check"></i>Stack complète analysée</li>
+        <li><i class="fas fa-check"></i>Plusieurs cas d'usage</li>
+        <li><i class="fas fa-check"></i>Comparatif fournisseurs</li>
+        <li><i class="fas fa-check"></i>Roadmap priorisée</li>
+        <li><i class="fas fa-check"></i>Rapport PDF 10 pages</li>
+      </ul>
+      <a href="https://buy.stripe.com/6oU9ATdzebJo2fX88YbbG01" class="tarif-cta primary" target="_blank" rel="noopener">Commander →</a>
+    </div>
+
+    <div class="tarif-card reveal">
+      <div class="tarif-icon"><i class="fas fa-bolt"></i></div>
+      <div class="tarif-name">Complet</div>
+      <div class="tarif-old">€1 070</div>
+      <div class="tarif-price"><sup>€</sup>749</div>
+      <div class="tarif-badge">LANCEMENT −30%</div>
+      <div class="tarif-delai"><i class="fas fa-clock" style="color:var(--yellow);margin-right:6px;"></i>Livraison sous 24h</div>
+      <ul class="tarif-features">
+        <li><i class="fas fa-check"></i>Tout l'audit Complet</li>
+        <li><i class="fas fa-check"></i>Priorité absolue</li>
+        <li><i class="fas fa-check"></i>Réponse questions en 2h</li>
+        <li><i class="fas fa-check"></i>Livraison garantie 24h</li>
+        <li><i class="fas fa-check"></i>Rapport PDF 10 pages</li>
+      </ul>
+      <a href="https://buy.stripe.com/5kQ5kD9iY8xc5s988YbbG02" class="tarif-cta outline" target="_blank" rel="noopener">Commander →</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section id="cta-final">
+  <div class="reveal">
+    <div class="cta-tag">Première étape</div>
+    <h2 class="cta-title">Un email.<br><span class="hl">Un rapport qui change tout.</span></h2>
+    <p class="cta-sub">Décrivez votre projet en quelques lignes. Je prends en charge le reste.</p>
+    <a href="mailto:support@maxiaworld.app?subject=Demande d'audit IA" class="cta-email-btn">
+      <i class="fas fa-envelope"></i>
+      support@maxiaworld.app
+    </a>
+    <p class="cta-note">Réponse sous 24h · Pas d'engagement · 100% async</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">MAXIA<span>.</span>audit</div>
+    <div class="footer-links">
+      <a href="https://maxiaworld.app">Forge Suite</a>
+      <a href="mailto:support@maxiaworld.app">Contact</a>
+    </div>
+  </div>
+  <p class="footer-copy">© 2026 MAXIA · maxiaworld.app</p>
+</footer>
+
+<script>
+// Progress bar
+window.addEventListener('scroll', () => {
+  const s = document.documentElement, b = document.body;
+  const p = (s.scrollTop || b.scrollTop) / ((s.scrollHeight || b.scrollHeight) - s.clientHeight) * 100;
+  document.getElementById('progress-bar').style.width = p + '%';
+});
+
+// Cursor glow
+document.addEventListener('mousemove', e => {
+  const g = document.getElementById('cursor-glow');
+  g.style.left = e.clientX + 'px';
+  g.style.top = e.clientY + 'px';
+});
+
+// Scroll reveal
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+}, { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Shine effect on cards
+document.querySelectorAll('.exemple-card, .step-card, .tarif-card').forEach(card => {
+  card.addEventListener('mousemove', e => {
+    const r = card.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width * 100).toFixed(1);
+    const y = ((e.clientY - r.top) / r.height * 100).toFixed(1);
+    card.style.setProperty('--mx', x + '%');
+    card.style.setProperty('--my', y + '%');
+  });
+});
+</script>
+</body>
+</html>
