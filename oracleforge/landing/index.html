@@ -597,7 +597,7 @@ curl -s -H "X-API-Key: $KEY" https://oracle.maxiaworld.app/api/price/BTC \
           `<span class="panel-symbol">BTC</span>$${whole}<span style="font-size:24px;color:var(--text-muted)">${dec}</span>`;
         document.getElementById('panel-diverg-display').textContent =
           `◆ divergence ${d.divergence_pct.toFixed(2)}% across ${d.source_count} sources`;
-        const srcs = (d.sources||[]).slice(0,3);
+        const srcs = (d.sources||[]);
         document.getElementById('panel-sources-display').innerHTML = srcs.map(s=>{
           const age = s.age_s!=null ? (s.age_s<60 ? s.age_s+'s' : Math.floor(s.age_s/60)+'m') : '—';
           return `<div class="panel-source-row"><span class="panel-source-name">${s.name}</span><span class="panel-source-val">$${Math.round(s.price).toLocaleString('en-US')}</span><span class="panel-source-age">${age}</span></div>`;
