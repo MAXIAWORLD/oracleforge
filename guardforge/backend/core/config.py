@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     debug: bool = False
     secret_key: str = Field(..., min_length=16)
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = ["http://localhost:3003", "http://localhost:3000"]
     database_url: str = "sqlite+aiosqlite:///./guardforge.db"
 
     vault_database_url: str = Field(
