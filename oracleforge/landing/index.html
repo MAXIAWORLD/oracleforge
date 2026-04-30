@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>MAXIA Oracle — Oracle de prix multi-sources pour agents IA</title>
+<title>MAXIA Oracle, Oracle de prix multi-sources pour agents IA</title>
 <meta name="description" content="Oracle de prix drop-in pour agents autonomes. Six sources indépendantes croisées, un seul appel API. REST + MCP + 7 SDKs. Données seules, pas de conseil en investissement.">
 <link rel="canonical" href="https://oracle.maxiaworld.app/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,7 +45,7 @@ a{text-decoration:none;color:inherit;}
 
 /* HERO */
 #hero{position:relative;min-height:100vh;display:flex;align-items:center;overflow:hidden;padding:120px 40px 80px;}
-.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 60% 40%,rgba(94,234,212,0.12) 0%,transparent 70%),radial-gradient(ellipse 50% 40% at 20% 70%,rgba(0,153,204,0.08) 0%,transparent 60%),linear-gradient(160deg,#060b14 0%,#0d1829 50%,#060b14 100%);}
+.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 60% 40%,rgba(94,234,212,0.12) 0%,transparent 70%),radial-gradient(ellipse 50% 40% at 20% 70%,rgba(0,153,204,0.08) 0%,transparent 60%),#060b14;}
 .hero-grid{display:none;}
 .hero-inner{position:relative;z-index:2;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 420px;gap:60px;align-items:center;}
 @media(max-width:900px){.hero-inner{grid-template-columns:1fr;}}
@@ -206,8 +206,8 @@ pre{background:var(--dark3);border:1px solid rgba(255,255,255,0.08);border-radiu
         <span data-en>Stop your AI agent<br>from trading on a <span class="hl">wrong price.</span></span>
       </h1>
       <p class="hero-subtitle">
-        <span data-fr>Six oracles croisés. Un seul appel API. Si ils divergent, vous le savez — avant que votre agent ne bouge des fonds. · 1 000 req/mois gratuites · aucune carte requise.</span>
-        <span data-en>Six oracles cross-checked. One API call. If they disagree, you know — before your agent moves money. · Free 1k requests/month · no card required.</span>
+        <span data-fr>Six oracles croisés. Un seul appel API. Si ils divergent, vous le savez, avant que votre agent ne bouge des fonds. · 1 000 req/mois gratuites · aucune carte requise.</span>
+        <span data-en>Six oracles cross-checked. One API call. If they disagree, you know, before your agent moves money. · Free 1k requests/month · no card required.</span>
       </p>
       <div class="hero-actions">
         <a href="#install" class="btn-primary">
@@ -360,7 +360,7 @@ pre{background:var(--dark3);border:1px solid rgba(255,255,255,0.08);border-radiu
     <div class="tool-row reveal">
       <span class="tool-idx">T.06</span>
       <span class="tool-name-cell">list_supported_symbols</span>
-      <span class="tool-desc-cell"><span data-fr>Tous les symboles couverts — crypto majeurs, actions, forex, stablecoins.</span><span data-en>All symbols currently covered — crypto majors, equities, forex, stablecoins.</span></span>
+      <span class="tool-desc-cell"><span data-fr>Tous les symboles couverts, crypto majeurs, actions, forex, stablecoins.</span><span data-en>All symbols currently covered, crypto majors, equities, forex, stablecoins.</span></span>
     </div>
     <div class="tool-row reveal">
       <span class="tool-idx">T.07</span>
@@ -390,7 +390,7 @@ pre{background:var(--dark3);border:1px solid rgba(255,255,255,0.08);border-radiu
     <div class="tool-row reveal">
       <span class="tool-idx">T.12</span>
       <span class="tool-name-cell">get_price_context</span>
-      <span class="tool-desc-cell"><span data-fr>Score de confiance, flag anomalie, accord sources — un appel pour décisions agent.</span><span data-en>Confidence score, anomaly flag, sources agreement — one call for agent decisions.</span></span>
+      <span class="tool-desc-cell"><span data-fr>Score de confiance, flag anomalie, accord sources, un appel pour décisions agent.</span><span data-en>Confidence score, anomaly flag, sources agreement, one call for agent decisions.</span></span>
     </div>
     <div class="tool-row reveal">
       <span class="tool-idx">T.13</span>
@@ -485,7 +485,7 @@ pre{background:var(--dark3);border:1px solid rgba(255,255,255,0.08);border-radiu
     </div>
   </div>
   <div style="max-width:900px;margin:0 auto;" class="reveal">
-    <pre style="font-size:13px;line-height:1.8;"># 1. <span data-fr>Clé gratuite (100 req/jour) — sans email, sans dashboard</span><span data-en>Free key (100 req/day) — no email, no dashboard</span>
+    <pre style="font-size:13px;line-height:1.8;"># 1. <span data-fr>Clé gratuite (100 req/jour), sans email, sans dashboard</span><span data-en>Free key (100 req/day), no email, no dashboard</span>
 KEY=$(curl -s -X POST https://oracle.maxiaworld.app/api/register \
   | python -c "import sys,json;print(json.load(sys.stdin)['data']['api_key'])")
 
@@ -532,14 +532,14 @@ curl -s -H "X-API-Key: $KEY" https://oracle.maxiaworld.app/api/price/BTC \
       <div class="plan-name-label">Pay-per-call · x402</div>
       <div class="plan-price-big"><sup>$</sup>0.001<span class="per"><span data-fr>/requête</span><span data-en>/request</span></span></div>
       <p class="plan-sub">
-        <span data-fr>USDC sur Base mainnet via le protocole x402. Vente directe — pas d'intermédiation, pas d'escrow.</span>
-        <span data-en>USDC on Base mainnet via the x402 protocol. Direct sale — no intermediation, no escrow.</span>
+        <span data-fr>USDC sur Base mainnet via le protocole x402. Vente directe, pas d'intermédiation, pas d'escrow.</span>
+        <span data-en>USDC on Base mainnet via the x402 protocol. Direct sale, no intermediation, no escrow.</span>
       </p>
       <ul class="plan-features">
         <li><i class="fas fa-check"></i><span data-fr>0.001 USDC par requête</span><span data-en>0.001 USDC per single request</span></li>
         <li><i class="fas fa-check"></i><span data-fr>0.005 USDC par batch (50)</span><span data-en>0.005 USDC per batch (up to 50)</span></li>
         <li><i class="fas fa-check"></i><span data-fr>Facilitateur Coinbase x402</span><span data-en>Coinbase x402 facilitator</span></li>
-        <li><i class="fas fa-check"></i><span data-fr>Anonyme — pas de clé requise</span><span data-en>Anonymous — no key required</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Anonyme, pas de clé requise</span><span data-en>Anonymous, no key required</span></li>
       </ul>
       <a href="/docs/" class="plan-cta teal">
         <span data-fr>Lire la doc x402 →</span>
@@ -549,7 +549,7 @@ curl -s -H "X-API-Key: $KEY" https://oracle.maxiaworld.app/api/price/BTC \
   </div>
   <div class="disc reveal">
     <span data-fr>
-      <strong>Ce qu'est MAXIA Oracle — et ce qu'il n'est pas</strong>
+      <strong>Ce qu'est MAXIA Oracle, et ce qu'il n'est pas</strong>
       MAXIA Oracle lit des données de prix publiques depuis des oracles amont, les réconcilie et les retourne. Il ne passe pas d'ordres. Il ne détient pas de fonds. Il ne route pas de transactions. Rien dans une réponse ne constitue un conseil en investissement, une sollicitation d'achat ou de vente, ou une recommandation quelconque. Chaque intégrateur est seul responsable de l'utilisation des données retournées.
     </span>
     <span data-en>

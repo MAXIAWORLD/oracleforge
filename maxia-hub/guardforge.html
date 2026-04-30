@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GuardForge — Anonymisation PII pour pipelines LLM | MAXIA</title>
+<title>GuardForge, Anonymisation PII pour pipelines LLM | MAXIA</title>
 <meta name="description" content="Détection et tokenisation locale des données sensibles avant tout appel LLM. Auto-hébergé, aucune inscription, Apache 2.0. Fonctionne en 3 commandes.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -162,8 +162,8 @@ code{font-family:'JetBrains Mono','Fira Code',monospace;}
       <span data-en>PII redaction<br>for <span class="hl">LLM pipelines.</span><br>Local. Free. No signup.</span>
     </h1>
     <p class="hero-subtitle">
-      <span data-fr>Détecte et tokenise les données sensibles avant tout appel à une API LLM. Tourne entièrement sur votre machine — aucune donnée ne quitte votre infra, aucun compte requis.</span>
-      <span data-en>Redact and tokenize sensitive data before it hits any LLM API. Runs entirely on your machine — no data leaves your infra, no account required.</span>
+      <span data-fr>Détecte et tokenise les données sensibles avant tout appel à une API LLM. Tourne entièrement sur votre machine, aucune donnée ne quitte votre infra, aucun compte requis.</span>
+      <span data-en>Redact and tokenize sensitive data before it hits any LLM API. Runs entirely on your machine, no data leaves your infra, no account required.</span>
     </p>
     <div class="hero-actions">
       <a class="btn-primary" href="https://github.com/MAXIAWORLD/guardforge" target="_blank" rel="noopener">
@@ -406,29 +406,29 @@ docker compose up
         <li>
           <i class="fas fa-exclamation-triangle"></i>
           <span>
-            <span data-fr>Regex uniquement — pas de ML NER (Presidio, spaCy). Fonctionne bien pour les PII structurées, moins pour les noms libres dans de longs textes.</span>
-            <span data-en>Regex-only — no ML NER (Presidio, spaCy). Works well for structured PII, less so for free-form names in long text.</span>
+            <span data-fr>Regex uniquement, pas de ML NER (Presidio, spaCy). Fonctionne bien pour les PII structurées, moins pour les noms libres dans de longs textes.</span>
+            <span data-en>Regex-only, no ML NER (Presidio, spaCy). Works well for structured PII, less so for free-form names in long text.</span>
           </span>
         </li>
         <li>
           <i class="fas fa-exclamation-triangle"></i>
           <span>
-            <span data-fr>SQLite uniquement — pas encore d'adaptateur PostgreSQL pour le vault.</span>
-            <span data-en>SQLite only — no PostgreSQL vault adapter yet.</span>
+            <span data-fr>SQLite uniquement, pas encore d'adaptateur PostgreSQL pour le vault.</span>
+            <span data-en>SQLite only, no PostgreSQL vault adapter yet.</span>
           </span>
         </li>
         <li>
           <i class="fas fa-exclamation-triangle"></i>
           <span>
-            <span data-fr>Pas d'isolation multi-tenant — conçu pour usage self-hosted mono-utilisateur / équipe.</span>
-            <span data-en>No multi-tenant isolation — designed for single-user / team self-hosted use.</span>
+            <span data-fr>Pas d'isolation multi-tenant, conçu pour usage self-hosted mono-utilisateur / équipe.</span>
+            <span data-en>No multi-tenant isolation, designed for single-user / team self-hosted use.</span>
           </span>
         </li>
         <li>
           <i class="fas fa-exclamation-triangle"></i>
           <span>
-            <span data-fr>Pas de streaming — <code>stream=True</code> lève <code>NotImplementedError</code> explicitement.</span>
-            <span data-en>No streaming support — <code>stream=True</code> raises <code>NotImplementedError</code> explicitly.</span>
+            <span data-fr>Pas de streaming, <code>stream=True</code> lève <code>NotImplementedError</code> explicitement.</span>
+            <span data-en>No streaming support, <code>stream=True</code> raises <code>NotImplementedError</code> explicitly.</span>
           </span>
         </li>
         <li>
