@@ -195,8 +195,62 @@ a { text-decoration: none; color: inherit; }
 .exemple-result-text strong { color: var(--yellow); font-weight: 700; }
 .exemple-tag { display: inline-block; margin-top: 20px; padding: 4px 12px; background: rgba(253,231,76,0.1); border: 1px solid rgba(253,231,76,0.2); border-radius: 50px; font-size: 11px; font-weight: 700; color: var(--yellow); letter-spacing: 1px; text-transform: uppercase; }
 
+/* GUARDFORGE */
+#guardforge { padding: 120px 40px; background: var(--dark2); border-top: 1px solid rgba(255,255,255,0.04); }
+.gf-inner { max-width: 1100px; margin: 0 auto; }
+.gf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+@media (max-width: 900px) { .gf-grid { grid-template-columns: 1fr; gap: 40px; } }
+.gf-badge {
+  display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px;
+  background: rgba(0,153,204,0.1); border: 1px solid rgba(0,153,204,0.25);
+  border-radius: 50px; font-size: 11px; font-weight: 700; color: var(--blue);
+  letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 20px;
+}
+.gf-title { font-size: clamp(1.6rem, 2.5vw, 2.2rem); font-weight: 800; color: var(--white); letter-spacing: -0.5px; line-height: 1.2; margin-bottom: 16px; }
+.gf-title span { color: var(--yellow); }
+.gf-desc { font-size: 15px; color: var(--text-muted); line-height: 1.8; margin-bottom: 28px; }
+.gf-steps { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
+.gf-step { display: flex; align-items: flex-start; gap: 14px; }
+.gf-step-icon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  background: rgba(0,153,204,0.1); border: 1px solid rgba(0,153,204,0.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: var(--blue);
+}
+.gf-step-text { font-size: 14px; color: var(--text); line-height: 1.6; }
+.gf-step-text strong { color: var(--white); }
+.gf-link {
+  display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px;
+  border: 1px solid rgba(0,153,204,0.3); border-radius: 50px;
+  font-size: 13px; font-weight: 600; color: var(--blue);
+  transition: background var(--transition), border-color var(--transition);
+}
+.gf-link:hover { background: rgba(0,153,204,0.08); border-color: rgba(0,153,204,0.5); }
+.gf-right { display: flex; flex-direction: column; gap: 16px; }
+.gf-card {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px; padding: 22px 24px;
+  transition: border-color var(--transition);
+}
+.gf-card:hover { border-color: rgba(0,153,204,0.2); }
+.gf-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.gf-card-icon { font-size: 18px; }
+.gf-card-title { font-size: 14px; font-weight: 700; color: var(--white); }
+.gf-card-body { font-size: 13px; color: var(--text-muted); line-height: 1.65; }
+.gf-card-body code {
+  background: rgba(0,153,204,0.1); color: var(--blue); padding: 1px 6px;
+  border-radius: 4px; font-size: 12px; font-family: monospace;
+}
+.gf-included {
+  background: rgba(0,153,204,0.06); border: 1px solid rgba(0,153,204,0.2);
+  border-radius: 10px; padding: 14px 18px;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 13px; color: var(--text);
+}
+.gf-included i { color: var(--blue); font-size: 16px; flex-shrink: 0; }
+
 /* TARIFS */
-#tarifs { padding: 120px 40px; background: var(--dark2); border-top: 1px solid rgba(255,255,255,0.04); }
+#tarifs { padding: 120px 40px; background: var(--dark); border-top: 1px solid rgba(255,255,255,0.04); }
 .tarifs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto; }
 .tarif-card {
   background: var(--card); border: 1px solid var(--card-border); border-radius: 20px;
@@ -472,6 +526,79 @@ a { text-decoration: none; color: inherit; }
   </div>
 </section>
 
+<!-- GUARDFORGE -->
+<section id="guardforge">
+  <div class="gf-inner">
+    <div class="gf-grid">
+
+      <!-- Gauche : explication -->
+      <div class="reveal">
+        <div class="gf-badge"><i class="fas fa-shield-alt"></i> Inclus dans votre rapport</div>
+        <h2 class="gf-title">Vos données client partent<br>chez OpenAI <span>à votre insu.</span></h2>
+        <p class="gf-desc">
+          Chaque appel à ChatGPT ou Claude transmet le texte en clair à des serveurs américains.
+          Si ce texte contient des noms, emails, numéros de CB ou données médicales —
+          c'est une violation du RGPD. La plupart des entreprises ne le savent pas.
+        </p>
+        <div class="gf-steps">
+          <div class="gf-step">
+            <div class="gf-step-icon"><i class="fas fa-search"></i></div>
+            <div class="gf-step-text"><strong>Détecte</strong> automatiquement 17 types de données sensibles dans vos textes (email, IBAN, carte bancaire, clés API, numéro de sécu…)</div>
+          </div>
+          <div class="gf-step">
+            <div class="gf-step-icon"><i class="fas fa-exchange-alt"></i></div>
+            <div class="gf-step-text"><strong>Remplace</strong> les données réelles par des codes neutres avant l'envoi au LLM — le LLM répond normalement, sans voir les vraies valeurs.</div>
+          </div>
+          <div class="gf-step">
+            <div class="gf-step-icon"><i class="fas fa-undo"></i></div>
+            <div class="gf-step-text"><strong>Restaure</strong> les vraies valeurs dans la réponse finale. Vos données ne quittent jamais votre serveur.</div>
+          </div>
+        </div>
+        <a href="https://maxiaworld.app/guardforge.html" class="gf-link" target="_blank" rel="noopener">
+          <i class="fas fa-external-link-alt"></i> En savoir plus sur GuardForge
+        </a>
+      </div>
+
+      <!-- Droite : cards techniques -->
+      <div class="gf-right reveal">
+
+        <div class="gf-card">
+          <div class="gf-card-head">
+            <span class="gf-card-icon">🔒</span>
+            <span class="gf-card-title">Chiffrement local AES-256</span>
+          </div>
+          <div class="gf-card-body">Les données originales sont stockées chiffrées sur votre machine. Aucun tiers n'y a accès — ni MAXIA, ni OpenAI, ni personne.</div>
+        </div>
+
+        <div class="gf-card">
+          <div class="gf-card-head">
+            <span class="gf-card-icon">⚡</span>
+            <span class="gf-card-title">3 commandes pour démarrer</span>
+          </div>
+          <div class="gf-card-body">
+            <code>git clone</code> · <code>cp .env.example .env</code> · <code>docker compose up</code><br><br>
+            Compatible avec vos outils existants : n8n, Make, Python, ou toute API REST.
+          </div>
+        </div>
+
+        <div class="gf-card">
+          <div class="gf-card-head">
+            <span class="gf-card-icon">🇪🇺</span>
+            <span class="gf-card-title">RGPD · HIPAA · PCI-DSS intégrés</span>
+          </div>
+          <div class="gf-card-body">6 politiques de conformité prêtes à l'emploi. Journal d'audit complet. Rapport PDF exportable pour votre DPO.</div>
+        </div>
+
+        <div class="gf-included">
+          <i class="fas fa-check-circle"></i>
+          <span><strong>Gratuit · Open source · Apache 2.0.</strong> Si votre audit révèle un risque RGPD sur vos LLMs, je vous livre le guide d'installation personnalisé dans votre rapport.</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- TARIFS -->
 <section id="tarifs">
   <div class="section-header reveal">
@@ -511,6 +638,7 @@ a { text-decoration: none; color: inherit; }
         <li><i class="fas fa-check"></i>Comparatif fournisseurs</li>
         <li><i class="fas fa-check"></i>Roadmap priorisée</li>
         <li><i class="fas fa-check"></i>Rapport PDF 10 pages</li>
+        <li><i class="fas fa-check"></i>Guide GuardForge si risque RGPD détecté</li>
       </ul>
       <a href="https://buy.stripe.com/6oU9ATdzebJo2fX88YbbG01" class="tarif-cta primary" target="_blank" rel="noopener">Commander →</a>
     </div>
@@ -528,6 +656,7 @@ a { text-decoration: none; color: inherit; }
         <li><i class="fas fa-check"></i>Réponse questions en 2h</li>
         <li><i class="fas fa-check"></i>Livraison garantie 24h</li>
         <li><i class="fas fa-check"></i>Rapport PDF 10 pages</li>
+        <li><i class="fas fa-check"></i>Guide GuardForge si risque RGPD détecté</li>
       </ul>
       <a href="https://buy.stripe.com/5kQ5kD9iY8xc5s988YbbG02" class="tarif-cta outline" target="_blank" rel="noopener">Commander →</a>
     </div>

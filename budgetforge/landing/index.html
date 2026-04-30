@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BudgetForge — Contrôlez vos dépenses LLM | MAXIA</title>
+  <meta name="description" content="Proxy LLM drop-in avec limites de budget strictes. Alertes avant dépassement, downgrade automatique, compatible OpenAI / Anthropic / Google / DeepSeek.">
+  <link rel="canonical" href="https://llmbudget.maxiaworld.app/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script async defer src="https://analytics.maxiaworld.app/script.js" data-website-id="31774da4-f92a-4822-8fd0-bb66c948809b"></script>
+  <style>
+    :root {
+      --blue: #0099cc; --blue-dark: #0077a8; --blue-deep: #004d6e;
+      --yellow: #FDE74C; --yellow-dark: #D4C000;
+      --dark: #060b14; --dark2: #0d1520; --dark3: #111d2e;
+      --card: rgba(255,255,255,0.04); --card-border: rgba(255,255,255,0.08);
+      --text: #e2e8f0; --text-muted: #7b8fa6; --white: #ffffff;
+      --radius: 16px; --transition: 0.35s cubic-bezier(.25,.8,.25,1);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html{scroll-behavior:smooth;}
+    body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--text);line-height:1.7;overflow-x:hidden;}
+    h1,h2,h3,h4{font-family:'Montserrat',sans-serif;}
+    a{text-decoration:none;color:inherit;}
+
+    [lang="en"] [data-fr], [lang="fr"] [data-en] { display: none; }
+
+    #progress-bar{position:fixed;top:0;left:0;height:3px;width:0%;background:linear-gradient(90deg,var(--blue),var(--yellow));z-index:2000;transition:width 0.1s linear;pointer-events:none;}
+    #cursor-glow{position:fixed;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(0,153,204,0.1) 0%,transparent 70%);pointer-events:none;z-index:0;transform:translate(-50%,-50%);transition:left 0.2s ease,top 0.2s ease;}
+
+    /* NAV */
+    #nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 40px;height:72px;display:flex;align-items:center;justify-content:space-between;background:rgba(6,11,20,0.7);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.06);}
+    .nav-logo{font-family:'Montserrat',sans-serif;font-weight:900;font-size:18px;letter-spacing:-0.5px;color:var(--white);display:flex;align-items:center;gap:10px;}
+    .nav-logo .dot{color:var(--blue);}
+    .nav-links{display:flex;align-items:center;gap:4px;list-style:none;}
+    .nav-links a{padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--text-muted);transition:color var(--transition),background var(--transition);}
+    .nav-links a:hover{color:var(--white);background:rgba(255,255,255,0.07);}
+    .nav-right{display:flex;align-items:center;gap:12px;}
+    .nav-cta{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;background:var(--blue);color:#fff;border-radius:50px;font-weight:600;font-size:14px;box-shadow:0 4px 16px rgba(0,153,204,0.35);transition:all var(--transition);}
+    .nav-cta:hover{background:var(--blue-dark);transform:translateY(-1px);}
+    .lang-btn{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:var(--text);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;transition:background var(--transition);}
+    .lang-btn:hover{background:rgba(0,153,204,0.15);}
+
+    /* HERO */
+    #hero{position:relative;min-height:100vh;display:flex;align-items:center;overflow:hidden;padding:120px 40px 80px;}
+    .hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 60% 40%,rgba(0,153,204,0.18) 0%,transparent 70%),radial-gradient(ellipse 50% 40% at 20% 70%,rgba(253,231,76,0.08) 0%,transparent 60%),linear-gradient(160deg,#060b14 0%,#0d1829 50%,#060b14 100%);}
+    .hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(0,153,204,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,153,204,0.04) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse at center,black 40%,transparent 80%);}
+    .hero-content{position:relative;z-index:2;max-width:700px;}
+    .hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(253,231,76,0.12);border:1px solid rgba(253,231,76,0.3);border-radius:50px;font-size:13px;font-weight:600;color:var(--yellow);margin-bottom:28px;letter-spacing:0.5px;}
+    .hero-title{font-size:clamp(2.4rem,5vw,4rem);font-weight:900;line-height:1.1;letter-spacing:-1.5px;margin-bottom:24px;color:var(--white);}
+    .hero-title .hl{background:linear-gradient(90deg,var(--blue),#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    .hero-subtitle{font-size:17px;color:var(--text-muted);line-height:1.75;max-width:560px;margin-bottom:40px;}
+    .hero-actions{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:56px;}
+    .btn-primary{display:inline-flex;align-items:center;gap:10px;padding:16px 32px;background:linear-gradient(135deg,var(--blue),var(--blue-dark));color:#fff;border-radius:50px;font-weight:700;font-size:15px;transition:transform var(--transition),box-shadow var(--transition);box-shadow:0 6px 24px rgba(0,153,204,0.4);}
+    .btn-primary:hover{transform:translateY(-3px);box-shadow:0 12px 36px rgba(0,153,204,0.55);}
+    .btn-outline{display:inline-flex;align-items:center;gap:10px;padding:15px 30px;border:1.5px solid rgba(255,255,255,0.2);color:var(--text);border-radius:50px;font-weight:600;font-size:15px;transition:border-color var(--transition),background var(--transition);}
+    .btn-outline:hover{border-color:var(--blue);background:rgba(0,153,204,0.1);color:var(--white);}
+    .hero-stats{display:flex;gap:40px;flex-wrap:wrap;}
+    .hero-stat{display:flex;flex-direction:column;}
+    .hero-stat-num{font-family:'Montserrat',sans-serif;font-size:28px;font-weight:800;color:var(--white);letter-spacing:-0.5px;}
+    .hero-stat-label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:500;}
+    .hero-float{position:absolute;z-index:3;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(12px);border-radius:14px;padding:16px 20px;animation:floatUp 4s ease-in-out infinite;}
+    .hero-float-1{right:8%;top:30%;animation-delay:0s;}
+    .hero-float-2{right:8%;top:52%;animation-delay:1.5s;}
+    @keyframes floatUp{0%,100%{transform:translateY(0px);}50%{transform:translateY(-12px);}}
+    .float-label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;}
+    .float-value{font-family:'Montserrat',sans-serif;font-weight:800;font-size:20px;color:var(--yellow);}
+    .float-value-sm{font-size:14px;font-weight:600;color:var(--white);}
+
+    /* SECTION HEADERS */
+    .section-header{text-align:center;margin-bottom:72px;}
+    .section-tag{display:inline-block;padding:5px 16px;background:rgba(0,153,204,0.12);border:1px solid rgba(0,153,204,0.25);border-radius:50px;font-size:12px;font-weight:700;color:var(--blue);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:20px;}
+    .section-title{font-size:clamp(1.8rem,3vw,2.8rem);font-weight:800;color:var(--white);letter-spacing:-0.5px;margin-bottom:16px;line-height:1.2;}
+    .section-desc{font-size:16px;color:var(--text-muted);max-width:520px;margin:0 auto;line-height:1.75;}
+
+    /* FEATURES */
+    #features{padding:120px 40px;background:var(--dark2);border-top:1px solid rgba(255,255,255,0.04);}
+    .features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1100px;margin:0 auto;}
+    @media(max-width:900px){.features-grid{grid-template-columns:repeat(2,1fr);}}
+    @media(max-width:600px){.features-grid{grid-template-columns:1fr;}}
+    .feat-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:36px 32px;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition);position:relative;}
+    .feat-card:hover{transform:translateY(-8px);border-color:rgba(0,153,204,0.3);box-shadow:0 20px 48px rgba(0,0,0,0.35);}
+    .feat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),#00d4ff);opacity:0;border-radius:var(--radius) var(--radius) 0 0;transition:opacity var(--transition);}
+    .feat-card:hover::before{opacity:1;}
+    .feat-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:20px;background:linear-gradient(135deg,rgba(0,153,204,0.2),rgba(0,153,204,0.05));border:1px solid rgba(0,153,204,0.25);}
+    .feat-name{font-family:'Montserrat',sans-serif;font-weight:800;font-size:17px;color:var(--white);margin-bottom:10px;}
+    .feat-desc{font-size:14px;color:var(--text-muted);line-height:1.75;}
+
+    /* HOW IT WORKS (STEPS) */
+    #how{padding:120px 40px;border-top:1px solid rgba(255,255,255,0.04);}
+    .steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;max-width:1100px;margin:0 auto;position:relative;}
+    .steps-grid::before{content:'';position:absolute;top:44px;left:calc(12.5% + 12px);right:calc(12.5% + 12px);height:1px;background:linear-gradient(90deg,transparent,var(--blue),transparent);opacity:0.3;}
+    @media(max-width:900px){.steps-grid{grid-template-columns:repeat(2,1fr);}.steps-grid::before{display:none;}}
+    @media(max-width:600px){.steps-grid{grid-template-columns:1fr;}}
+    .step-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:36px 28px;text-align:center;position:relative;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition);}
+    .step-card:hover{transform:translateY(-8px);border-color:rgba(0,153,204,0.3);box-shadow:0 20px 48px rgba(0,0,0,0.35);}
+    .step-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--blue),#00d4ff);opacity:0;border-radius:var(--radius) var(--radius) 0 0;transition:opacity var(--transition);}
+    .step-card:hover::before{opacity:1;}
+    .step-num{width:52px;height:52px;border-radius:50%;margin:0 auto 24px;background:linear-gradient(135deg,rgba(0,153,204,0.25),rgba(0,153,204,0.05));border:1px solid rgba(0,153,204,0.3);display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-weight:900;font-size:18px;color:var(--blue);}
+    .step-icon{font-size:26px;color:var(--blue);margin-bottom:20px;transition:transform var(--transition);}
+    .step-card:hover .step-icon{transform:scale(1.15);}
+    .step-title{font-size:16px;font-weight:700;color:var(--white);margin-bottom:12px;}
+    .step-desc{font-size:13px;color:var(--text-muted);line-height:1.8;}
+
+    /* PROVIDERS */
+    #providers{padding:120px 40px;background:var(--dark2);border-top:1px solid rgba(255,255,255,0.04);}
+    .providers-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:900px;margin:0 auto;}
+    @media(max-width:600px){.providers-grid{grid-template-columns:repeat(2,1fr);}}
+    .provider-badge{background:var(--card);border:1px solid var(--card-border);border-radius:10px;padding:16px 20px;text-align:center;font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;color:var(--white);transition:border-color var(--transition);}
+    .provider-badge:hover{border-color:rgba(0,153,204,0.3);}
+
+    /* PRICING */
+    #pricing{padding:120px 40px;border-top:1px solid rgba(255,255,255,0.04);}
+    .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:960px;margin:0 auto;}
+    @media(max-width:900px){.pricing-grid{grid-template-columns:1fr;max-width:400px;}}
+    .plan-card{background:var(--card);border:1px solid var(--card-border);border-radius:20px;padding:40px 32px;text-align:center;position:relative;transition:transform var(--transition),box-shadow var(--transition),border-color var(--transition);}
+    .plan-card:hover{transform:translateY(-10px);box-shadow:0 24px 56px rgba(0,0,0,0.4);}
+    .plan-card.featured{border-color:rgba(0,153,204,0.4);background:linear-gradient(160deg,rgba(0,153,204,0.1) 0%,var(--card) 60%);}
+    .plan-badge{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:var(--blue);color:#fff;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:5px 18px;border-radius:50px;white-space:nowrap;font-family:'Montserrat',sans-serif;box-shadow:0 4px 12px rgba(0,153,204,0.4);}
+    .plan-icon{font-size:32px;color:var(--blue);margin-bottom:20px;}
+    .plan-name{font-family:'Montserrat',sans-serif;font-weight:800;font-size:18px;color:var(--white);margin-bottom:8px;}
+    .plan-price{font-family:'Montserrat',sans-serif;font-weight:900;font-size:52px;color:var(--yellow);line-height:1;letter-spacing:-2px;margin:8px 0 4px;}
+    .plan-price sup{font-size:22px;vertical-align:top;margin-top:10px;letter-spacing:0;}
+    .plan-price .per{font-size:16px;color:var(--text-muted);font-weight:400;letter-spacing:0;}
+    .plan-sub{font-size:13px;color:var(--text-muted);margin-bottom:28px;}
+    .plan-features{list-style:none;text-align:left;margin-bottom:32px;}
+    .plan-features li{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--text);padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+    .plan-features li:last-child{border-bottom:none;}
+    .plan-features li i{color:var(--blue);font-size:12px;margin-top:4px;flex-shrink:0;}
+    .plan-cta{display:block;width:100%;padding:14px;border-radius:50px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;text-align:center;transition:all var(--transition);}
+    .plan-cta.primary{background:var(--blue);color:#fff;box-shadow:0 4px 16px rgba(0,153,204,0.35);}
+    .plan-cta.primary:hover{background:var(--blue-dark);transform:translateY(-2px);}
+    .plan-cta.outline{border:1.5px solid rgba(255,255,255,0.2);color:var(--text);}
+    .plan-cta.outline:hover{border-color:var(--blue);background:rgba(0,153,204,0.1);}
+
+    /* CTA FINAL */
+    #cta-final{padding:100px 40px;background:linear-gradient(135deg,rgba(0,153,204,0.12) 0%,rgba(253,231,76,0.06) 100%);border-top:1px solid rgba(0,153,204,0.15);text-align:center;position:relative;overflow:hidden;}
+    #cta-final::before{content:'BUDGET';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Montserrat',sans-serif;font-size:180px;font-weight:900;color:rgba(0,153,204,0.03);white-space:nowrap;pointer-events:none;}
+    .cta-tag{display:inline-block;padding:5px 16px;background:rgba(253,231,76,0.12);border:1px solid rgba(253,231,76,0.3);border-radius:50px;font-size:12px;font-weight:700;color:var(--yellow);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:24px;}
+    .cta-title{font-size:clamp(2rem,4vw,3rem);font-weight:900;color:var(--white);letter-spacing:-1px;margin-bottom:16px;line-height:1.15;}
+    .cta-title .hl{background:linear-gradient(90deg,var(--blue),#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    .cta-sub{font-size:16px;color:var(--text-muted);margin-bottom:40px;max-width:480px;margin-left:auto;margin-right:auto;}
+    .cta-btn{display:inline-flex;align-items:center;gap:12px;padding:18px 40px;background:linear-gradient(135deg,var(--blue),var(--blue-dark));color:#fff;border-radius:50px;font-weight:700;font-size:16px;box-shadow:0 8px 32px rgba(0,153,204,0.45);transition:transform var(--transition),box-shadow var(--transition);}
+    .cta-btn:hover{transform:translateY(-4px);box-shadow:0 16px 48px rgba(0,153,204,0.6);}
+
+    /* REVEAL + FOOTER */
+    .reveal{opacity:0;transform:translateY(32px);transition:opacity 0.7s ease,transform 0.7s ease;}
+    .reveal.visible{opacity:1;transform:translateY(0);}
+    #footer{background:#030709;border-top:1px solid rgba(255,255,255,0.05);padding:48px 40px;}
+    .footer-inner{max-width:1100px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;}
+    .footer-brand{font-family:'Montserrat',sans-serif;font-weight:900;font-size:16px;color:var(--white);}
+    .footer-brand span{color:var(--blue);}
+    .footer-links{display:flex;gap:24px;}
+    .footer-links a{font-size:13px;color:var(--text-muted);transition:color var(--transition);}
+    .footer-links a:hover{color:var(--white);}
+    .footer-copy{font-size:12px;color:rgba(255,255,255,0.2);text-align:center;padding-top:32px;max-width:1100px;margin:0 auto;}
+    @media(max-width:768px){#nav{padding:0 24px;}.nav-links{display:none;}.hero-float{display:none;}#hero{padding:100px 24px 60px;}#features,#how,#providers,#pricing,#cta-final{padding:80px 24px;}#footer{padding:40px 24px;}}
+    @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}.reveal{opacity:1;transform:none;}}
+  </style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+<div id="cursor-glow"></div>
+
+<!-- NAV -->
+<nav id="nav">
+  <a href="/" class="nav-logo">MAXIA<span class="dot">.</span>budget</a>
+  <ul class="nav-links">
+    <li><a href="#features" data-fr>Fonctionnalités</a><a href="#features" data-en>Features</a></li>
+    <li><a href="#how" data-fr>Comment ça marche</a><a href="#how" data-en>How it works</a></li>
+    <li><a href="#pricing" data-fr>Tarifs</a><a href="#pricing" data-en>Pricing</a></li>
+    <li><a href="https://maxiaworld.app">Forge Suite</a></li>
+  </ul>
+  <div class="nav-right">
+    <button class="lang-btn" onclick="var l=document.documentElement;l.lang=l.lang==='fr'?'en':'fr';this.textContent=l.lang==='fr'?'EN':'FR';">EN</button>
+    <a href="#pricing" class="nav-cta">
+      <i class="fas fa-dollar-sign"></i>
+      <span data-fr>Voir les plans</span><span data-en>See plans</span>
+    </a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="hero-badge"><i class="fas fa-shield-alt"></i> LLM BUDGET GUARD</div>
+    <h1 class="hero-title">
+      <span data-fr>Vos APIs LLM vous coûtent<br><span class="hl">3× trop cher.</span><br>Arrêtez ça.</span>
+      <span data-en>Your LLM APIs are costing you<br><span class="hl">3× too much.</span><br>Stop that.</span>
+    </h1>
+    <p class="hero-subtitle">
+      <span data-fr>BudgetForge est un proxy drop-in qui pose des limites strictes sur vos dépenses LLM. Alertes avant dépassement, downgrade automatique vers des modèles moins chers, compatible OpenAI, Anthropic, Google et DeepSeek.</span>
+      <span data-en>BudgetForge is a drop-in proxy that enforces hard budget limits on your LLM spend. Alerts before you blow it, auto-downgrade to cheaper models, compatible with OpenAI, Anthropic, Google, and DeepSeek.</span>
+    </p>
+    <div class="hero-actions">
+      <a href="https://llmbudget.maxiaworld.app/" class="btn-primary">
+        <i class="fas fa-play"></i>
+        <span data-fr>Essayer maintenant</span><span data-en>Try now</span>
+      </a>
+      <a href="#pricing" class="btn-outline">
+        <span data-fr>Voir les plans</span><span data-en>See plans</span>
+      </a>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <span class="hero-stat-num" style="color:var(--yellow)">−70%</span>
+        <span class="hero-stat-label"><span data-fr>coûts moyens économisés</span><span data-en>avg costs saved</span></span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-num">5+</span>
+        <span class="hero-stat-label"><span data-fr>providers supportés</span><span data-en>providers supported</span></span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat-num">&lt;10ms</span>
+        <span class="hero-stat-label"><span data-fr>overhead proxy</span><span data-en>proxy overhead</span></span>
+      </div>
+    </div>
+  </div>
+  <div class="hero-float hero-float-1">
+    <div class="float-label">Budget Free</div>
+    <div class="float-value">100%</div>
+  </div>
+  <div class="hero-float hero-float-2">
+    <div class="float-label"><span data-fr>Modèle</span><span data-en>Model</span></div>
+    <div class="float-value-sm">Auto-downgrade</div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-header reveal">
+    <div class="section-tag"><span data-fr>FONCTIONNALITÉS</span><span data-en>FEATURES</span></div>
+    <h2 class="section-title">
+      <span data-fr>Tout ce qu'il faut pour garder le contrôle</span>
+      <span data-en>Everything you need to stay in control</span>
+    </h2>
+    <p class="section-desc">
+      <span data-fr>Un proxy. Des limites strictes. Zéro surprise.</span>
+      <span data-en>One proxy. Hard limits. Zero surprises.</span>
+    </p>
+  </div>
+  <div class="features-grid">
+    <div class="feat-card reveal">
+      <div class="feat-icon"><i class="fas fa-dollar-sign" style="color:var(--blue)"></i></div>
+      <div class="feat-name"><span data-fr>Limites de budget</span><span data-en>Budget limits</span></div>
+      <p class="feat-desc">
+        <span data-fr>Définissez un budget précis par projet. Bloquez automatiquement les requêtes dès que le budget est atteint.</span>
+        <span data-en>Set a precise budget per project. Automatically block requests when the budget is hit.</span>
+      </p>
+    </div>
+    <div class="feat-card reveal">
+      <div class="feat-icon"><i class="fas fa-bell" style="color:var(--blue)"></i></div>
+      <div class="feat-name"><span data-fr>Alertes avant dépassement</span><span data-en>Pre-overspend alerts</span></div>
+      <p class="feat-desc">
+        <span data-fr>Recevez une alerte à 50%, 80% et 95% du budget. Agissez avant de vous retrouver en dépassement.</span>
+        <span data-en>Get alerted at 50%, 80%, and 95% of your budget. Act before you overspend.</span>
+      </p>
+    </div>
+    <div class="feat-card reveal">
+      <div class="feat-icon"><i class="fas fa-exchange-alt" style="color:var(--blue)"></i></div>
+      <div class="feat-name"><span data-fr>Downgrade automatique</span><span data-en>Auto-downgrade</span></div>
+      <p class="feat-desc">
+        <span data-fr>Basculez automatiquement vers des modèles moins chers quand le budget est serré. GPT-4o → GPT-4o-mini sans changer votre code.</span>
+        <span data-en>Automatically switch to cheaper models when the budget is tight. GPT-4o → GPT-4o-mini without changing your code.</span>
+      </p>
+    </div>
+    <div class="feat-card reveal">
+      <div class="feat-icon"><i class="fas fa-plug" style="color:var(--blue)"></i></div>
+      <div class="feat-name"><span data-fr>Proxy drop-in</span><span data-en>Drop-in proxy</span></div>
+      <p class="feat-desc">
+        <span data-fr>Un changement d'URL. Aucune modification de code. Compatible OpenAI, Anthropic, Google, DeepSeek et plus.</span>
+        <span data-en>One URL change. No code modification. Compatible with OpenAI, Anthropic, Google, DeepSeek and more.</span>
+      </p>
+    </div>
+    <div class="feat-card reveal">
+      <div class="feat-icon"><i class="fas fa-chart-bar" style="color:var(--blue)"></i></div>
+      <div class="feat-name"><span data-fr>Analytics détaillées</span><span data-en>Detailed analytics</span></div>
+      <p class="feat-desc">
+        <span data-fr>Suivi des dépenses par provider, modèle, projet et période. Visualisez exactement où part l'argent.</span>
+        <span data-en>Spend tracking by provider, model, project, and period. See exactly where the money goes.</span>
+      </p>
+    </div>
+    <div class="feat-card reveal">
+      <div class="feat-icon"><i class="fas fa-code" style="color:var(--blue)"></i></div>
+      <div class="feat-name"><span data-fr>SDK Python</span><span data-en>Python SDK</span></div>
+      <p class="feat-desc">
+        <span data-fr><code>pip install budgetforge</code>. Intégration en 3 lignes dans vos scripts Python existants.</span>
+        <span data-en><code>pip install budgetforge</code>. Integration in 3 lines in your existing Python scripts.</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="section-header reveal">
+    <div class="section-tag"><span data-fr>COMMENT ÇA MARCHE</span><span data-en>HOW IT WORKS</span></div>
+    <h2 class="section-title">
+      <span data-fr>Un proxy entre vous et vos LLMs</span>
+      <span data-en>A proxy between you and your LLMs</span>
+    </h2>
+    <p class="section-desc">
+      <span data-fr>Pointez votre URL API vers BudgetForge. C'est tout.</span>
+      <span data-en>Point your API URL at BudgetForge. That's it.</span>
+    </p>
+  </div>
+  <div class="steps-grid">
+    <div class="step-card reveal">
+      <div class="step-num">1</div>
+      <div class="step-icon"><i class="fas fa-link"></i></div>
+      <div class="step-title"><span data-fr>Changez votre URL</span><span data-en>Change your URL</span></div>
+      <p class="step-desc">
+        <span data-fr>Remplacez <code>api.openai.com</code> par votre endpoint BudgetForge. Aucune autre modification.</span>
+        <span data-en>Replace <code>api.openai.com</code> with your BudgetForge endpoint. No other changes needed.</span>
+      </p>
+    </div>
+    <div class="step-card reveal">
+      <div class="step-num">2</div>
+      <div class="step-icon"><i class="fas fa-sliders-h"></i></div>
+      <div class="step-title"><span data-fr>Définissez vos budgets</span><span data-en>Set your budgets</span></div>
+      <p class="step-desc">
+        <span data-fr>Créez un projet, définissez une limite en $ ou en tokens. Choisissez vos seuils d'alerte.</span>
+        <span data-en>Create a project, set a $ or token limit. Choose your alert thresholds.</span>
+      </p>
+    </div>
+    <div class="step-card reveal">
+      <div class="step-num">3</div>
+      <div class="step-icon"><i class="fas fa-shield-alt"></i></div>
+      <div class="step-title"><span data-fr>BudgetForge surveille</span><span data-en>BudgetForge watches</span></div>
+      <p class="step-desc">
+        <span data-fr>Chaque requête est comptabilisée en temps réel. Alertes, logs, downgrade — tout est automatique.</span>
+        <span data-en>Every request is counted in real time. Alerts, logs, downgrade — all automatic.</span>
+      </p>
+    </div>
+    <div class="step-card reveal">
+      <div class="step-num">4</div>
+      <div class="step-icon"><i class="fas fa-check-circle"></i></div>
+      <div class="step-title"><span data-fr>Vous gardez le contrôle</span><span data-en>You stay in control</span></div>
+      <p class="step-desc">
+        <span data-fr>Dashboard temps réel, export CSV, webhooks. Vos données ne quittent jamais votre infra.</span>
+        <span data-en>Real-time dashboard, CSV export, webhooks. Your data never leaves your infra.</span>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- PROVIDERS -->
+<section id="providers">
+  <div class="section-header reveal">
+    <div class="section-tag"><span data-fr>COMPATIBILITÉ</span><span data-en>COMPATIBILITY</span></div>
+    <h2 class="section-title">
+      <span data-fr>Compatible avec tous vos LLMs</span>
+      <span data-en>Compatible with all your LLMs</span>
+    </h2>
+    <p class="section-desc">
+      <span data-fr>Un proxy. Tous les providers. Zéro re-learning.</span>
+      <span data-en>One proxy. All providers. Zero relearning.</span>
+    </p>
+  </div>
+  <div class="providers-grid reveal">
+    <div class="provider-badge">OpenAI</div>
+    <div class="provider-badge">Anthropic</div>
+    <div class="provider-badge">Google Gemini</div>
+    <div class="provider-badge">DeepSeek</div>
+    <div class="provider-badge">Mistral</div>
+    <div class="provider-badge">Ollama</div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="section-header reveal">
+    <div class="section-tag"><span data-fr>TARIFS</span><span data-en>PRICING</span></div>
+    <h2 class="section-title">
+      <span data-fr>Simple. Prévisible. Pas de surprise.</span>
+      <span data-en>Simple. Predictable. No surprises.</span>
+    </h2>
+    <p class="section-desc">
+      <span data-fr>Comme BudgetForge lui-même : des limites claires, aucune mauvaise surprise.</span>
+      <span data-en>Like BudgetForge itself: clear limits, no bad surprises.</span>
+    </p>
+  </div>
+  <div class="pricing-grid">
+    <!-- Free -->
+    <div class="plan-card reveal">
+      <div class="plan-icon"><i class="fas fa-seedling"></i></div>
+      <div class="plan-name">Free</div>
+      <div class="plan-price"><sup>$</sup>0<span class="per">/mois</span></div>
+      <div class="plan-sub">
+        <span data-fr>Pour démarrer et tester.</span>
+        <span data-en>To get started and test.</span>
+      </div>
+      <ul class="plan-features">
+        <li><i class="fas fa-check"></i><span data-fr>1 projet</span><span data-en>1 project</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>100 requêtes/jour</span><span data-en>100 requests/day</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Alertes email</span><span data-en>Email alerts</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Dashboard basique</span><span data-en>Basic dashboard</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Support communauté</span><span data-en>Community support</span></li>
+      </ul>
+      <a href="https://llmbudget.maxiaworld.app/login" class="plan-cta outline">
+        <span data-fr>Commencer gratuitement →</span><span data-en>Start for free →</span>
+      </a>
+    </div>
+    <!-- Pro -->
+    <div class="plan-card featured reveal">
+      <div class="plan-badge"><span data-fr>★ POPULAIRE</span><span data-en>★ POPULAR</span></div>
+      <div class="plan-icon"><i class="fas fa-rocket"></i></div>
+      <div class="plan-name">Pro</div>
+      <div class="plan-price"><sup>$</sup>29<span class="per">/mois</span></div>
+      <div class="plan-sub">
+        <span data-fr>Pour les équipes qui veulent du contrôle.</span>
+        <span data-en>For teams that want control.</span>
+      </div>
+      <ul class="plan-features">
+        <li><i class="fas fa-check"></i><span data-fr>10 projets</span><span data-en>10 projects</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Requêtes illimitées</span><span data-en>Unlimited requests</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Downgrade automatique</span><span data-en>Auto-downgrade</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Analytics avancées</span><span data-en>Advanced analytics</span></li>
+        <li><i class="fas fa-check"></i>SDK Python</li>
+        <li><i class="fas fa-check"></i><span data-fr>Support prioritaire</span><span data-en>Priority support</span></li>
+      </ul>
+      <a href="https://llmbudget.maxiaworld.app/login" class="plan-cta primary">
+        <span data-fr>Choisir Pro →</span><span data-en>Choose Pro →</span>
+      </a>
+    </div>
+    <!-- Agency -->
+    <div class="plan-card reveal">
+      <div class="plan-icon"><i class="fas fa-building"></i></div>
+      <div class="plan-name">Agency</div>
+      <div class="plan-price"><sup>$</sup>79<span class="per">/mois</span></div>
+      <div class="plan-sub">
+        <span data-fr>Pour les agences et les grandes équipes.</span>
+        <span data-en>For agencies and large teams.</span>
+      </div>
+      <ul class="plan-features">
+        <li><i class="fas fa-check"></i><span data-fr>Projets illimités</span><span data-en>Unlimited projects</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Clients séparés</span><span data-en>Separate clients</span></li>
+        <li><i class="fas fa-check"></i>SSO</li>
+        <li><i class="fas fa-check"></i><span data-fr>Export CSV</span><span data-en>CSV export</span></li>
+        <li><i class="fas fa-check"></i>Webhooks</li>
+        <li><i class="fas fa-check"></i><span data-fr>Support dédié</span><span data-en>Dedicated support</span></li>
+      </ul>
+      <a href="mailto:support@maxiaworld.app" class="plan-cta outline">
+        <span data-fr>Nous contacter →</span><span data-en>Contact us →</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section id="cta-final">
+  <div class="reveal">
+    <div class="cta-tag"><span data-fr>Première étape</span><span data-en>First step</span></div>
+    <h2 class="cta-title">
+      <span data-fr>Vos LLMs.<br><span class="hl">Enfin sous contrôle.</span></span>
+      <span data-en>Your LLMs.<br><span class="hl">Finally under control.</span></span>
+    </h2>
+    <p class="cta-sub">
+      <span data-fr>Démarrez en 2 minutes. Changez une URL. Regardez vos coûts chuter.</span>
+      <span data-en>Get started in 2 minutes. Change one URL. Watch your costs drop.</span>
+    </p>
+    <a href="https://llmbudget.maxiaworld.app/login" class="cta-btn">
+      <i class="fas fa-play"></i>
+      <span data-fr>Commencer maintenant — c'est gratuit</span>
+      <span data-en>Start now — it's free</span>
+    </a>
+    <p style="margin-top:20px;font-size:13px;color:var(--text-muted);">
+      <span data-fr>Pas de carte bancaire · Installation en 2 min · Annulation à tout moment</span>
+      <span data-en>No credit card · Setup in 2 min · Cancel anytime</span>
+    </p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">MAXIA<span>.</span>budget</div>
+    <div class="footer-links">
+      <a href="https://maxiaworld.app">Forge Suite</a>
+      <a href="https://llmbudget.maxiaworld.app">Dashboard</a>
+      <a href="mailto:support@maxiaworld.app">Contact</a>
+    </div>
+  </div>
+  <p class="footer-copy">© 2026 MAXIA · BudgetForge</p>
+</footer>
+
+<script>
+window.addEventListener('scroll',()=>{const s=document.documentElement,b=document.body;const p=(s.scrollTop||b.scrollTop)/((s.scrollHeight||b.scrollHeight)-s.clientHeight)*100;document.getElementById('progress-bar').style.width=p+'%';});
+document.addEventListener('mousemove',e=>{const g=document.getElementById('cursor-glow');g.style.left=e.clientX+'px';g.style.top=e.clientY+'px';});
+const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target);}});},{threshold:0.12});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+document.querySelectorAll('.feat-card,.step-card,.plan-card').forEach(card=>{card.addEventListener('mousemove',e=>{const r=card.getBoundingClientRect();card.style.setProperty('--mx',((e.clientX-r.left)/r.width*100).toFixed(1)+'%');card.style.setProperty('--my',((e.clientY-r.top)/r.height*100).toFixed(1)+'%');});});
+</script>
+</body>
+</html>

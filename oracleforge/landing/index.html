@@ -1,1463 +1,618 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>MAXIA Oracle — Multi-source price feed for AI agents</title>
-<meta name="description" content="A drop-in price oracle for autonomous agents. Six independent sources — Pyth, Chainlink, RedStone, Pyth Solana, Uniswap v3 TWAP, Coinpaprika — aggregated and served as one call. Data feed only. Not investment advice. No custody. No KYC.">
-<meta name="robots" content="index,follow,max-image-preview:large">
-<meta name="theme-color" content="#0a0a0b">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
-<link rel="apple-touch-icon" href="/logo.png">
-<meta name="color-scheme" content="dark">
+<title>MAXIA Oracle — Oracle de prix multi-sources pour agents IA</title>
+<meta name="description" content="Oracle de prix drop-in pour agents autonomes. Six sources indépendantes croisées, un seul appel API. REST + MCP + 7 SDKs. Données seules, pas de conseil en investissement.">
 <link rel="canonical" href="https://oracle.maxiaworld.app/">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="MAXIA Oracle">
-<meta property="og:title" content="MAXIA Oracle — Multi-source price feed for AI agents">
-<meta property="og:description" content="A drop-in price oracle for autonomous agents. Data feed only. No custody. No KYC.">
-<meta property="og:url" content="https://oracle.maxiaworld.app/">
-<meta property="og:image" content="https://oracle.maxiaworld.app/og.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="MAXIA Oracle — Multi-source price feed for AI agents">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="MAXIA Oracle — Multi-source price feed for AI agents">
-<meta name="twitter:description" content="A drop-in price oracle for autonomous agents. Data feed only. No custody. No KYC.">
-<meta name="twitter:image" content="https://oracle.maxiaworld.app/og.png">
-<meta name="twitter:image:alt" content="MAXIA Oracle — Multi-source price feed for AI agents">
-
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "Organization",
-      "@id": "https://oracle.maxiaworld.app/#org",
-      "name": "MAXIA",
-      "url": "https://oracle.maxiaworld.app/",
-      "email": "support@maxiaworld.app",
-      "sameAs": ["https://github.com/MAXIAWORLD"]
-    },
-    {
-      "@type": "SoftwareApplication",
-      "name": "MAXIA Oracle",
-      "applicationCategory": "DeveloperApplication",
-      "operatingSystem": "Any",
-      "description": "Multi-source price feed for AI agents. Aggregates six independent sources — Pyth Hermes, Chainlink (Base/Ethereum/Arbitrum), RedStone, Pyth Solana, Uniswap v3 TWAP, and Coinpaprika — into a single call with explicit divergence reporting. Data feed only — not investment advice, no custody, no KYC.",
-      "url": "https://oracle.maxiaworld.app/",
-      "softwareVersion": "0.1.9",
-      "license": "https://www.apache.org/licenses/LICENSE-2.0",
-      "image": "https://oracle.maxiaworld.app/og.png",
-      "provider": { "@id": "https://oracle.maxiaworld.app/#org" },
-      "offers": [
-        {
-          "@type": "Offer",
-          "name": "Free tier",
-          "description": "100 requests per day per API key, no signup.",
-          "price": "0",
-          "priceCurrency": "USD"
-        },
-        {
-          "@type": "Offer",
-          "name": "Pay-per-call (x402 on Base)",
-          "description": "0.001 USDC per single request via the x402 protocol on Base mainnet.",
-          "price": "0.001",
-          "priceCurrency": "USDC"
-        }
-      ]
-    },
-    {
-      "@type": "WebAPI",
-      "name": "MAXIA Oracle API",
-      "url": "https://oracle.maxiaworld.app/docs/",
-      "documentation": "https://oracle.maxiaworld.app/docs/",
-      "description": "REST and MCP surface exposing 17 tools for multi-source price aggregation, on-chain reads (Chainlink, Pyth Solana, Uniswap v3 TWAP), historical prices, price alerts, and agent intelligence (confidence scoring, anomaly detection)."
-    }
-  ]
-}
-</script>
-
-<style>
-  /* ────────────────────────────────────────────────────────────────
-     MAXIA Oracle — single-file landing
-     No build, no framework, no external assets.
-     ──────────────────────────────────────────────────────────────── */
-
-  :root {
-    --bg:              #0a0a0b;
-    --bg-raised:       #101013;
-    --bg-code:         #0d0d10;
-    --bg-code-strip:   #09090b;
-    --border:          #1f1f24;
-    --border-dim:      #15151a;
-    --border-accent:   #223734;
-    --text:            #ececf1;
-    --text-dim:        #8a8a93;
-    --text-faint:      #56565f;
-    --accent:          #5eead4;
-    --accent-dim:      #2dd4bf;
-    --accent-soft:     rgba(94, 234, 212, 0.08);
-    --danger:          #f87171;
-    --warn:            #fbbf24;
-
-    --grid-unit: 8px;
-    --content-max: 1120px;
-    --gutter-px: 2rem;
-
-    --font-sans:
-      -apple-system, BlinkMacSystemFont,
-      "Segoe UI Variable Display", "Segoe UI",
-      "Helvetica Neue", Helvetica, Arial, sans-serif;
-    --font-mono:
-      ui-monospace, SFMono-Regular, "SF Mono",
-      "Cascadia Mono", "Cascadia Code",
-      "JetBrains Mono", "Fira Code",
-      Menlo, Consolas, "Liberation Mono", monospace;
-    --font-serif:
-      ui-serif, "Iowan Old Style", "Apple Garamond",
-      Baskerville, "Times New Roman", serif;
-  }
-
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
-
-  html {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-sans);
-    font-size: 15px;
-    line-height: 1.55;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: "ss01", "cv11";
-    text-rendering: optimizeLegibility;
-  }
-
-  body {
-    background:
-      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(94, 234, 212, 0.06), transparent 60%),
-      var(--bg);
-    background-attachment: fixed;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Fine dotted grid overlay — atmosphere only */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background-image:
-      radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.025) 1px, transparent 0);
-    background-size: 32px 32px;
-    pointer-events: none;
-    z-index: 0;
-    mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
-  }
-
-  main, header, footer { position: relative; z-index: 1; }
-
-  a {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  ::selection {
-    background: var(--accent);
-    color: var(--bg);
-  }
-
-  /* ─── A11y: focus ring, globally (WCAG 2.4.11) ─────────────── */
-  :focus { outline: none; }
-  :focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 3px;
-    border-radius: 3px;
-  }
-  .btn:focus-visible,
-  .copy:focus-visible {
-    outline-offset: 2px;
-  }
-
-  /* ─── A11y: reduced motion — universal brake ───────────────── */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
-    }
-    .brand-dot { animation: none; }
-  }
-
-  /* ─── A11y: skip link ──────────────────────────────────────── */
-  .skip-link {
-    position: absolute;
-    top: 0; left: 0;
-    padding: 0.6rem 1rem;
-    background: var(--accent);
-    color: var(--bg);
-    font-family: var(--font-mono);
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: 0 0 4px 0;
-    transform: translateY(-120%);
-    transition: transform 160ms ease;
-    z-index: 100;
-  }
-  .skip-link:focus { transform: translateY(0); }
-
-  /* ─── Layout primitives ──────────────────────────────────────── */
-
-  .wrap {
-    max-width: var(--content-max);
-    margin: 0 auto;
-    padding: 0 var(--gutter-px);
-  }
-
-  .hairline {
-    border: none;
-    height: 1px;
-    background: var(--border-dim);
-    margin: 0;
-  }
-
-  .label {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-  }
-
-  .label--accent { color: var(--accent-dim); }
-
-  .section {
-    padding: clamp(4rem, 10vw, 7rem) 0;
-    position: relative;
-  }
-
-  .section-head {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 1.75rem;
-    align-items: baseline;
-    margin-bottom: 3.5rem;
-  }
-
-  .section-head .numeral {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--accent-dim);
-    letter-spacing: 0.12em;
-    padding-top: 0.35em;
-  }
-
-  .section-head h2 {
-    margin: 0;
-    font-size: clamp(1.65rem, 3.2vw, 2.15rem);
-    font-weight: 500;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-  }
-
-  .section-head p {
-    margin: 0.5rem 0 0;
-    color: var(--text-dim);
-    font-size: 15px;
-    max-width: 48ch;
-  }
-
-  /* ─── Nav ────────────────────────────────────────────────────── */
-
-  .nav {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    backdrop-filter: saturate(140%) blur(12px);
-    -webkit-backdrop-filter: saturate(140%) blur(12px);
-    background: color-mix(in oklab, var(--bg) 78%, transparent);
-    border-bottom: 1px solid var(--border-dim);
-  }
-
-  .nav-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 56px;
-  }
-
-  .brand {
-    font-family: var(--font-mono);
-    font-size: 13px;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.6rem;
-  }
-
-  .brand-logo {
-    width: 22px;
-    height: 22px;
-    border-radius: 4px;
-    object-fit: contain;
-    filter: drop-shadow(0 0 6px var(--accent));
-    animation: pulse 2.4s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1;   transform: scale(1); }
-    50%      { opacity: 0.55; transform: scale(0.88); }
-  }
-
-  .nav-links {
-    display: flex;
-    gap: 1.5rem;
-    align-items: center;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    color: var(--text-dim);
-  }
-
-  .nav-links a {
-    position: relative;
-    padding: 0.35rem 0;
-    transition: color 120ms ease;
-  }
-  .nav-links a:hover { color: var(--text); }
-  .nav-links a::after {
-    content: "";
-    position: absolute;
-    left: 0; right: 0; bottom: -2px;
-    height: 1px;
-    background: var(--accent);
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 180ms ease;
-  }
-  .nav-links a:hover::after { transform: scaleX(1); }
-
-  /* ─── Hero ───────────────────────────────────────────────────── */
-
-  .hero {
-    padding: clamp(5rem, 12vw, 8.5rem) 0 clamp(4rem, 9vw, 6.5rem);
-    position: relative;
-  }
-
-  .hero-grid {
-    display: grid;
-    grid-template-columns: 1.35fr 1fr;
-    gap: clamp(2.5rem, 5vw, 4.5rem);
-    align-items: end;
-  }
-
-  @media (max-width: 820px) {
-    .hero-grid { grid-template-columns: 1fr; }
-  }
-
-  .hero-kicker {
-    display: inline-flex;
-    gap: 0.75rem;
-    align-items: center;
-    padding: 0.3rem 0.75rem 0.3rem 0.55rem;
-    border: 1px solid var(--border-accent);
-    border-radius: 999px;
-    background: var(--accent-soft);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    color: var(--accent-dim);
-    margin-bottom: 2rem;
-  }
-  .hero-kicker::before {
-    content: "";
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
-  }
-
-  h1.hero-title {
-    margin: 0 0 1.75rem;
-    font-size: clamp(2.25rem, 6vw, 4.25rem);
-    font-weight: 500;
-    letter-spacing: -0.035em;
-    line-height: 0.98;
-    max-width: 14ch;
-  }
-
-  h1.hero-title em {
-    font-family: var(--font-serif);
-    font-style: italic;
-    font-weight: 400;
-    color: var(--accent-dim);
-    letter-spacing: -0.01em;
-  }
-
-  .hero-lede {
-    max-width: 44ch;
-    font-size: clamp(15px, 1.4vw, 17px);
-    line-height: 1.55;
-    color: var(--text-dim);
-    margin: 0 0 2.25rem;
-  }
-
-  .hero-cta {
-    display: inline-flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.78em 1.1em;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-family: var(--font-mono);
-    font-size: 12.5px;
-    letter-spacing: 0.04em;
-    color: var(--text);
-    background: var(--bg-raised);
-    cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
-  }
-  .btn:hover { border-color: var(--text-faint); transform: translateY(-1px); }
-
-  .btn--primary {
-    background: var(--accent);
-    color: var(--bg);
-    border-color: var(--accent);
-    font-weight: 600;
-  }
-  .btn--primary:hover {
-    background: var(--accent-dim);
-    border-color: var(--accent-dim);
-  }
-
-  .btn .arrow {
-    display: inline-block;
-    transition: transform 180ms ease;
-  }
-  .btn:hover .arrow { transform: translateX(3px); }
-
-  /* Live panel — the single "memorable" element of the hero ------ */
-
-  .panel {
-    border: 1px solid var(--border);
-    background:
-      linear-gradient(180deg, rgba(94, 234, 212, 0.02), transparent 40%),
-      var(--bg-raised);
-    border-radius: 10px;
-    padding: 1.5rem 1.5rem 1.25rem;
-    font-family: var(--font-mono);
-    font-size: 12.5px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .panel::before {
-    content: "";
-    position: absolute;
-    top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(90deg, transparent, var(--accent) 50%, transparent);
-    opacity: 0.35;
-  }
-
-  .panel-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 1rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px dashed var(--border);
-    color: var(--text-faint);
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-
-  .panel-head .example-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--accent-dim);
-  }
-  .panel-head .example-tag::before {
-    content: "";
-    width: 6px; height: 6px;
-    background: var(--accent);
-    opacity: 0.8;
-    /* static marker — this panel is a reference, not a live feed */
-  }
-
-  .price {
-    font-size: clamp(1.6rem, 3.5vw, 2.2rem);
-    color: var(--text);
-    letter-spacing: -0.02em;
-    font-weight: 500;
-    margin: 0.15rem 0 0.4rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .price .symbol { color: var(--text-faint); margin-right: 0.75rem; }
-  .price .cents  { color: var(--text-dim); }
-
-  .divergence {
-    display: inline-flex;
-    gap: 0.5rem;
-    align-items: center;
-    color: var(--accent-dim);
-    font-size: 11.5px;
-    letter-spacing: 0.06em;
-    margin-bottom: 1.25rem;
-  }
-
-  .panel-rows {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 0.35rem 1rem;
-    font-size: 11.5px;
-    color: var(--text-dim);
-  }
-  .panel-rows .src { color: var(--text); }
-  .panel-rows .age { color: var(--text-faint); font-size: 11px; }
-
-  .panel-foot {
-    margin-top: 1rem;
-    padding-top: 0.9rem;
-    border-top: 1px dashed var(--border);
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-  }
-  .panel-foot .k { color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; }
-  .panel-foot .v { color: var(--text); font-size: 14px; margin-top: 2px; font-variant-numeric: tabular-nums; }
-
-  /* ─── "How it works" / mechanism ─────────────────────────────── */
-
-  .mech {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1px;
-    background: var(--border-dim);
-    border: 1px solid var(--border-dim);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  @media (max-width: 720px) { .mech { grid-template-columns: 1fr; } }
-
-  .mech-cell {
-    padding: 2rem 1.75rem;
-    background: var(--bg);
-    transition: background 180ms ease;
-  }
-  .mech-cell:hover { background: var(--bg-raised); }
-
-  .mech-num {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--accent-dim);
-    letter-spacing: 0.14em;
-    margin-bottom: 0.85rem;
-  }
-  .mech h3 {
-    margin: 0 0 0.6rem;
-    font-size: 16px;
-    font-weight: 500;
-    letter-spacing: -0.01em;
-  }
-  .mech p {
-    margin: 0;
-    color: var(--text-dim);
-    font-size: 13.5px;
-    line-height: 1.55;
-  }
-
-  /* ─── Tool surface table ─────────────────────────────────────── */
-
-  .tool-table {
-    border: 1px solid var(--border-dim);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--bg-raised);
-  }
-  .tool-row {
-    display: grid;
-    grid-template-columns: 3rem 1fr 1.6fr;
-    gap: 1rem;
-    padding: 0.95rem 1.25rem;
-    border-bottom: 1px solid var(--border-dim);
-    align-items: baseline;
-    transition: background 140ms ease;
-  }
-  .tool-row:last-child { border-bottom: none; }
-  .tool-row:hover { background: var(--bg); }
-
-  .tool-row .idx {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--text-faint);
-    letter-spacing: 0.1em;
-  }
-  .tool-row .name {
-    font-family: var(--font-mono);
-    font-size: 13px;
-    color: var(--accent-dim);
-    letter-spacing: -0.01em;
-  }
-  .tool-row .desc {
-    font-size: 13.5px;
-    color: var(--text-dim);
-  }
-
-  @media (max-width: 640px) {
-    .tool-row { grid-template-columns: 2rem 1fr; }
-    .tool-row .desc { grid-column: 2; }
-  }
-
-  /* ─── Install tabs ───────────────────────────────────────────── */
-
-  .installs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-  }
-  @media (max-width: 720px) { .installs { grid-template-columns: 1fr; } }
-
-  .pkg {
-    border: 1px solid var(--border);
-    background: var(--bg-raised);
-    border-radius: 8px;
-    padding: 1.25rem 1.25rem 0.9rem;
-    transition: border-color 200ms ease, transform 200ms ease;
-  }
-  .pkg:hover { border-color: var(--border-accent); transform: translateY(-1px); }
-
-  .pkg-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 0.75rem;
-  }
-  .pkg-name {
-    font-family: var(--font-mono);
-    font-size: 13px;
-    color: var(--text);
-    letter-spacing: -0.005em;
-  }
-  .pkg-reg {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-  }
-
-  /* ─── Code blocks ────────────────────────────────────────────── */
-
-  .code {
-    position: relative;
-    background: var(--bg-code);
-    border: 1px solid var(--border-dim);
-    border-radius: 6px;
-    font-family: var(--font-mono);
-    font-size: 12.5px;
-    line-height: 1.55;
-    padding: 0.8rem 3rem 0.8rem 0.9rem;
-    color: var(--text);
-    overflow-x: auto;
-    white-space: pre;
-    tab-size: 2;
-  }
-
-  .code--lg {
-    font-size: 13px;
-    padding: 1.25rem 3rem 1.25rem 1.4rem;
-    background:
-      linear-gradient(90deg, var(--accent) 0, var(--accent) 2px, transparent 2px),
-      var(--bg-code);
-    background-repeat: no-repeat;
-    background-size: 2px 100%;
-  }
-
-  .code .token-cmt { color: var(--text-dim); font-style: italic; }
-  .code .token-str { color: var(--accent-dim); }
-  .code .token-fn  { color: var(--warn); }
-  .code .token-kw  { color: #f0abfc; }
-
-  .copy {
-    position: absolute;
-    top: 0.55rem;
-    right: 0.55rem;
-    padding: 0.35rem 0.55rem;
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    background: var(--bg-raised);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
-  }
-  .copy:hover { color: var(--text); border-color: var(--text-faint); }
-  .copy[data-state="copied"] { color: var(--accent-dim); border-color: var(--border-accent); }
-
-  /* ─── Pricing ─────────────────────────────────────────────── */
-
-  .price-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-  }
-  @media (max-width: 720px) { .price-grid { grid-template-columns: 1fr; } }
-
-  .plan {
-    border: 1px solid var(--border);
-    background: var(--bg-raised);
-    border-radius: 10px;
-    padding: 1.75rem 1.75rem 1.5rem;
-    position: relative;
-  }
-  .plan--featured {
-    border-color: var(--border-accent);
-    background:
-      linear-gradient(180deg, rgba(94, 234, 212, 0.04), transparent 30%),
-      var(--bg-raised);
-  }
-  .plan-tag {
-    position: absolute;
-    top: -10px;
-    right: 1.5rem;
-    padding: 0.15rem 0.55rem;
-    background: var(--bg);
-    border: 1px solid var(--border-accent);
-    border-radius: 999px;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--accent-dim);
-  }
-  .plan-name {
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 1rem;
-  }
-  .plan-price {
-    font-size: clamp(1.85rem, 3.5vw, 2.35rem);
-    font-weight: 500;
-    letter-spacing: -0.025em;
-    line-height: 1.1;
-    margin-bottom: 0.35rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .plan-price .cur { color: var(--text-dim); margin-right: 0.4rem; font-weight: 400; }
-  .plan-sub {
-    color: var(--text-dim);
-    font-size: 13.5px;
-    margin-bottom: 1.5rem;
-    min-height: 2.7em;
-  }
-  .plan ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    font-size: 13.5px;
-    color: var(--text);
-  }
-  .plan ul li {
-    padding: 0.45rem 0;
-    border-top: 1px dashed var(--border);
-    display: grid;
-    grid-template-columns: 1.25rem 1fr;
-    gap: 0.5rem;
-  }
-  .plan ul li:first-child { border-top: none; padding-top: 0; }
-  .plan ul li::before {
-    content: "+";
-    color: var(--accent-dim);
-    font-family: var(--font-mono);
-    font-size: 13px;
-  }
-
-  /* ─── Docs card ──────────────────────────────────────────── */
-
-  .docs-card {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 2.25rem;
-    background:
-      radial-gradient(ellipse at top right, rgba(94, 234, 212, 0.05), transparent 50%),
-      var(--bg-raised);
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 2rem;
-    align-items: center;
-  }
-  @media (max-width: 720px) {
-    .docs-card { grid-template-columns: 1fr; }
-  }
-  .docs-card h3 {
-    margin: 0 0 0.5rem;
-    font-size: 20px;
-    letter-spacing: -0.015em;
-    font-weight: 500;
-  }
-  .docs-card p {
-    margin: 0;
-    color: var(--text-dim);
-    font-size: 14px;
-    max-width: 48ch;
-  }
-
-  /* ─── Disclaimer block ───────────────────────────────────── */
-
-  .disc {
-    border: 1px solid var(--border);
-    border-left: 2px solid var(--warn);
-    background: var(--bg-raised);
-    padding: 1.25rem 1.5rem;
-    border-radius: 4px;
-    font-size: 13.5px;
-    color: var(--text-dim);
-    line-height: 1.6;
-  }
-  .disc strong {
-    color: var(--text);
-    font-weight: 500;
-    letter-spacing: 0.01em;
-    display: block;
-    margin-bottom: 0.4rem;
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-
-  /* ─── Footer ─────────────────────────────────────────────── */
-
-  footer {
-    border-top: 1px solid var(--border-dim);
-    padding: 2.5rem 0 3rem;
-    margin-top: 2rem;
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    color: var(--text-dim);
-    letter-spacing: 0.04em;
-  }
-  .foot-inner {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 1rem;
-    align-items: baseline;
-  }
-  @media (max-width: 640px) {
-    .foot-inner { grid-template-columns: 1fr; }
-  }
-  footer a { color: var(--text-dim); }
-  footer a:hover { color: var(--text); }
-
-  .foot-cols {
-    display: flex;
-    gap: 2rem;
-    flex-wrap: wrap;
-  }
-
-  /* ─── Small-viewport tightening (iPhone SE → 14, <480px) ── */
-
-  @media (max-width: 480px) {
-    :root { --gutter-px: 1.25rem; }
-
-    .nav-inner   { height: 52px; }
-    .brand       { font-size: 12px; letter-spacing: 0.14em; }
-    .nav-links   { gap: 0.9rem; font-size: 11px; letter-spacing: 0.06em; }
-    .nav-links a[href="/llms.txt"],
-    .nav-links a[href*="github"] { display: none; }
-
-    h1.hero-title { font-size: 2.2rem; letter-spacing: -0.03em; max-width: 100%; }
-    .hero-lede    { font-size: 14.5px; }
-    .hero-kicker  { font-size: 10.5px; padding: 0.3rem 0.65rem 0.3rem 0.5rem; }
-
-    .panel         { padding: 1.15rem; }
-    .panel-head    { flex-wrap: wrap; gap: 0.35rem; font-size: 10px; }
-    .panel-head > span:last-child { font-size: 10px; }
-    .price         { font-size: 1.65rem; }
-    .panel-rows    { grid-template-columns: 1fr auto auto; gap: 0.3rem 0.6rem; }
-    .panel-foot    { gap: 0.5rem; }
-
-    .section-head  { grid-template-columns: 1fr; gap: 0.6rem; }
-    .section-head h2 { font-size: 1.5rem; }
-
-    .tool-row      { grid-template-columns: 1.75rem 1fr; padding: 0.8rem 1rem; }
-    .tool-row .desc { grid-column: 2; font-size: 12.8px; }
-
-    .code          { font-size: 11.5px; padding: 0.7rem 2.5rem 0.7rem 0.7rem; }
-    .code--lg      { font-size: 11.5px; padding: 1rem 2.5rem 1rem 1rem; }
-    .copy          { top: 0.4rem; right: 0.4rem; padding: 0.25rem 0.45rem; font-size: 10px; }
-
-    .plan          { padding: 1.4rem 1.4rem 1.2rem; }
-    .plan-price    { font-size: 1.7rem; }
-
-    .docs-card     { padding: 1.75rem; }
-    .docs-card h3  { font-size: 18px; }
-
-    footer         { padding: 2rem 0 2.5rem; }
-    .foot-cols     { gap: 1.25rem; font-size: 11px; }
-  }
-
-  /* ─── Reveal-in animation ───────────────────────────────── */
-
-  @media (prefers-reduced-motion: no-preference) {
-    .reveal {
-      opacity: 0;
-      transform: translateY(8px);
-      animation: reveal 700ms cubic-bezier(.16,.84,.44,1) forwards;
-    }
-    .reveal:nth-child(1) { animation-delay:  60ms; }
-    .reveal:nth-child(2) { animation-delay: 140ms; }
-    .reveal:nth-child(3) { animation-delay: 220ms; }
-    .reveal:nth-child(4) { animation-delay: 300ms; }
-    @keyframes reveal {
-      to { opacity: 1; transform: translateY(0); }
-    }
-  }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <script async defer src="https://analytics.maxiaworld.app/script.js" data-website-id="0b8a4545-8330-415a-b6f3-fa586c3ec189"></script>
+<style>
+:root {
+  --blue: #0099cc; --blue-dark: #0077a8; --blue-deep: #004d6e;
+  --yellow: #FDE74C; --yellow-dark: #D4C000;
+  --dark: #060b14; --dark2: #0d1520; --dark3: #111d2e;
+  --card: rgba(255,255,255,0.04); --card-border: rgba(255,255,255,0.08);
+  --text: #e2e8f0; --text-muted: #7b8fa6; --white: #ffffff;
+  --teal: #5eead4;
+  --radius: 16px; --transition: 0.35s cubic-bezier(.25,.8,.25,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{font-family:'Inter',sans-serif;background:var(--dark);color:var(--text);line-height:1.7;overflow-x:hidden;}
+h1,h2,h3,h4{font-family:'Montserrat',sans-serif;}
+a{text-decoration:none;color:inherit;}
+
+#progress-bar{position:fixed;top:0;left:0;height:3px;width:0%;background:linear-gradient(90deg,var(--teal),var(--blue));z-index:2000;transition:width 0.1s linear;pointer-events:none;}
+#cursor-glow{position:fixed;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(94,234,212,0.08) 0%,transparent 70%);pointer-events:none;z-index:0;transform:translate(-50%,-50%);transition:left 0.2s ease,top 0.2s ease;}
+
+/* NAV */
+#nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 40px;height:72px;display:flex;align-items:center;justify-content:space-between;background:rgba(6,11,20,0.7);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.06);}
+.nav-logo{font-family:'Montserrat',sans-serif;font-weight:900;font-size:18px;letter-spacing:-0.5px;color:var(--white);display:flex;align-items:center;gap:10px;}
+.nav-logo .dot{color:var(--teal);}
+.nav-links{display:flex;align-items:center;gap:4px;list-style:none;}
+.nav-links a{padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--text-muted);transition:color var(--transition),background var(--transition);}
+.nav-links a:hover{color:var(--white);background:rgba(255,255,255,0.07);}
+.nav-right{display:flex;align-items:center;gap:12px;}
+.nav-cta{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;background:linear-gradient(135deg,var(--teal),#2dd4bf);color:#060b14;border-radius:50px;font-weight:700;font-size:14px;transition:transform var(--transition),box-shadow var(--transition);box-shadow:0 4px 16px rgba(94,234,212,0.25);}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(94,234,212,0.4);}
+.lang-btn{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);color:var(--text);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:1px;transition:background var(--transition);}
+.lang-btn:hover{background:rgba(94,234,212,0.15);}
+
+/* HERO */
+#hero{position:relative;min-height:100vh;display:flex;align-items:center;overflow:hidden;padding:120px 40px 80px;}
+.hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 60% 40%,rgba(94,234,212,0.12) 0%,transparent 70%),radial-gradient(ellipse 50% 40% at 20% 70%,rgba(0,153,204,0.08) 0%,transparent 60%),linear-gradient(160deg,#060b14 0%,#0d1829 50%,#060b14 100%);}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(94,234,212,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(94,234,212,0.04) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse at center,black 40%,transparent 80%);}
+.hero-inner{position:relative;z-index:2;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 420px;gap:60px;align-items:center;}
+@media(max-width:900px){.hero-inner{grid-template-columns:1fr;}}
+.hero-content{}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(94,234,212,0.1);border:1px solid rgba(94,234,212,0.3);border-radius:50px;font-size:13px;font-weight:600;color:var(--teal);margin-bottom:28px;letter-spacing:0.5px;}
+.hero-title{font-size:clamp(2.2rem,4.5vw,3.6rem);font-weight:900;line-height:1.1;letter-spacing:-1.5px;margin-bottom:24px;color:var(--white);}
+.hero-title .hl{background:linear-gradient(90deg,var(--teal),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero-subtitle{font-size:17px;color:var(--text-muted);line-height:1.75;max-width:520px;margin-bottom:40px;}
+.hero-actions{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:48px;}
+.btn-primary{display:inline-flex;align-items:center;gap:10px;padding:16px 32px;background:linear-gradient(135deg,var(--teal),#2dd4bf);color:#060b14;border-radius:50px;font-weight:700;font-size:15px;transition:transform var(--transition),box-shadow var(--transition);box-shadow:0 6px 24px rgba(94,234,212,0.3);}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 12px 36px rgba(94,234,212,0.5);}
+.btn-outline{display:inline-flex;align-items:center;gap:10px;padding:15px 30px;border:1.5px solid rgba(255,255,255,0.2);color:var(--text);border-radius:50px;font-weight:600;font-size:15px;transition:border-color var(--transition),background var(--transition);}
+.btn-outline:hover{border-color:var(--teal);background:rgba(94,234,212,0.08);color:var(--white);}
+.hero-stats{display:flex;gap:36px;flex-wrap:wrap;}
+.hero-stat{display:flex;flex-direction:column;}
+.hero-stat-num{font-family:'Montserrat',sans-serif;font-size:28px;font-weight:800;color:var(--white);letter-spacing:-0.5px;}
+.hero-stat-label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-weight:500;}
+
+/* HERO PANEL */
+.hero-panel{background:rgba(255,255,255,0.04);border:1px solid rgba(94,234,212,0.2);border-radius:var(--radius);padding:28px;backdrop-filter:blur(12px);}
+.panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+.panel-tag{font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:1px;}
+.panel-ver{font-size:11px;color:var(--text-muted);}
+.panel-price{font-family:'Montserrat',sans-serif;font-size:42px;font-weight:900;color:var(--white);letter-spacing:-2px;margin-bottom:8px;}
+.panel-symbol{color:var(--teal);font-size:20px;margin-right:4px;}
+.panel-diverg{font-size:12px;color:var(--teal);margin-bottom:20px;padding:6px 12px;background:rgba(94,234,212,0.08);border-radius:6px;display:inline-block;}
+.panel-sources{display:flex;flex-direction:column;gap:8px;margin-bottom:20px;}
+.panel-source-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;}
+.panel-source-name{color:var(--text-muted);font-family:monospace;}
+.panel-source-val{color:var(--white);font-weight:600;}
+.panel-source-age{color:var(--text-muted);font-size:11px;}
+.panel-footer{display:flex;justify-content:space-between;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);}
+.panel-foot-item{text-align:center;}
+.panel-foot-k{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;}
+.panel-foot-v{font-family:'Montserrat',sans-serif;font-size:18px;font-weight:800;color:var(--white);}
+
+/* SECTION HEADERS */
+.section-header{text-align:center;margin-bottom:72px;}
+.section-tag{display:inline-block;padding:5px 16px;background:rgba(94,234,212,0.1);border:1px solid rgba(94,234,212,0.25);border-radius:50px;font-size:12px;font-weight:700;color:var(--teal);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:20px;}
+.section-title{font-size:clamp(1.8rem,3vw,2.8rem);font-weight:800;color:var(--white);letter-spacing:-0.5px;margin-bottom:16px;line-height:1.2;}
+.section-desc{font-size:16px;color:var(--text-muted);max-width:520px;margin:0 auto;line-height:1.75;}
+
+/* SOURCES */
+#sources{padding:120px 40px;background:var(--dark2);border-top:1px solid rgba(255,255,255,0.04);}
+.sources-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1100px;margin:0 auto;}
+@media(max-width:900px){.sources-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:600px){.sources-grid{grid-template-columns:1fr;}}
+.source-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:32px 28px;transition:transform var(--transition),border-color var(--transition),box-shadow var(--transition);position:relative;}
+.source-card:hover{transform:translateY(-6px);border-color:rgba(94,234,212,0.25);box-shadow:0 16px 40px rgba(0,0,0,0.3);}
+.source-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--teal),var(--blue));opacity:0;border-radius:var(--radius) var(--radius) 0 0;transition:opacity var(--transition);}
+.source-card:hover::before{opacity:1;}
+.source-num{font-family:'Montserrat',sans-serif;font-weight:900;font-size:13px;color:var(--teal);letter-spacing:1px;margin-bottom:14px;}
+.source-name{font-family:'Montserrat',sans-serif;font-weight:800;font-size:18px;color:var(--white);margin-bottom:10px;}
+.source-desc{font-size:14px;color:var(--text-muted);line-height:1.7;}
+
+/* TOOLS TABLE */
+#tools{padding:120px 40px;border-top:1px solid rgba(255,255,255,0.04);}
+.tools-inner{max-width:1000px;margin:0 auto;}
+.tool-row{display:grid;grid-template-columns:50px 1fr auto;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.05);transition:background var(--transition);}
+.tool-row:hover{background:rgba(94,234,212,0.04);}
+.tool-idx{font-family:monospace;font-size:11px;color:var(--teal);letter-spacing:1px;}
+.tool-name-cell{font-family:monospace;font-weight:600;font-size:14px;color:var(--white);}
+.tool-desc-cell{font-size:13px;color:var(--text-muted);}
+@media(max-width:768px){.tool-row{grid-template-columns:40px 1fr;}.tool-desc-cell{grid-column:2;font-size:12px;}}
+
+/* INSTALL */
+#install{padding:120px 40px;background:var(--dark2);border-top:1px solid rgba(255,255,255,0.04);}
+.pkgs-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:900px;margin:0 auto;}
+@media(max-width:600px){.pkgs-grid{grid-template-columns:1fr;}}
+.pkg-card{background:var(--card);border:1px solid var(--card-border);border-radius:12px;padding:20px 24px;transition:border-color var(--transition);}
+.pkg-card:hover{border-color:rgba(94,234,212,0.2);}
+.pkg-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.pkg-name{font-family:monospace;font-weight:600;font-size:14px;color:var(--white);}
+.pkg-reg{font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:1px;padding:3px 8px;background:rgba(94,234,212,0.1);border-radius:4px;}
+pre{background:var(--dark3);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px 16px;font-size:13px;font-family:'JetBrains Mono','Fira Code',monospace;color:#a5f3fc;overflow-x:auto;}
+
+/* PRICING */
+#pricing{padding:120px 40px;border-top:1px solid rgba(255,255,255,0.04);}
+.price-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:900px;margin:0 auto;}
+@media(max-width:700px){.price-grid{grid-template-columns:1fr;}}
+.plan-card{background:var(--card);border:1px solid var(--card-border);border-radius:20px;padding:40px 36px;position:relative;transition:transform var(--transition),box-shadow var(--transition);}
+.plan-card:hover{transform:translateY(-8px);box-shadow:0 20px 48px rgba(0,0,0,0.35);}
+.plan-card.featured{border-color:rgba(94,234,212,0.35);background:linear-gradient(160deg,rgba(94,234,212,0.08) 0%,var(--card) 60%);}
+.plan-name-label{font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;}
+.plan-price-big{font-family:'Montserrat',sans-serif;font-weight:900;font-size:52px;color:var(--teal);line-height:1;letter-spacing:-2px;margin:8px 0 4px;}
+.plan-price-big sup{font-size:22px;vertical-align:top;margin-top:10px;}
+.plan-price-big .per{font-size:16px;color:var(--text-muted);font-weight:400;letter-spacing:0;}
+.plan-sub{font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:28px;}
+.plan-features{list-style:none;padding:0;margin:0 0 32px;}
+.plan-features li{display:flex;align-items:flex-start;gap:10px;font-size:14px;color:var(--text);padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+.plan-features li:last-child{border-bottom:none;}
+.plan-features li i{color:var(--teal);font-size:12px;margin-top:3px;flex-shrink:0;}
+.plan-cta{display:block;width:100%;padding:14px;border-radius:50px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:14px;text-align:center;transition:all var(--transition);}
+.plan-cta.teal{background:linear-gradient(135deg,var(--teal),#2dd4bf);color:#060b14;box-shadow:0 4px 16px rgba(94,234,212,0.3);}
+.plan-cta.teal:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(94,234,212,0.5);}
+.plan-cta.ghost{border:1.5px solid rgba(255,255,255,0.2);color:var(--text);}
+.plan-cta.ghost:hover{border-color:var(--teal);background:rgba(94,234,212,0.08);}
+
+/* DISCLAIMER */
+.disc{max-width:900px;margin:0 auto;background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.15);border-left:3px solid var(--yellow);border-radius:8px;padding:20px 24px;font-size:14px;color:var(--text-muted);line-height:1.7;}
+.disc strong{color:var(--text);display:block;margin-bottom:8px;font-size:12px;text-transform:uppercase;letter-spacing:1.2px;font-family:monospace;}
+
+/* FR/EN toggle */
+[lang="en"] [data-fr], [lang="fr"] [data-en] { display: none; }
+
+/* REVEAL + FOOTER */
+.reveal{opacity:0;transform:translateY(32px);transition:opacity 0.7s ease,transform 0.7s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+#footer{background:#030709;border-top:1px solid rgba(255,255,255,0.05);padding:48px 40px;}
+.footer-inner{max-width:1100px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;}
+.footer-brand{font-family:'Montserrat',sans-serif;font-weight:900;font-size:16px;color:var(--white);}
+.footer-brand span{color:var(--teal);}
+.footer-links{display:flex;gap:24px;}
+.footer-links a{font-size:13px;color:var(--text-muted);transition:color var(--transition);}
+.footer-links a:hover{color:var(--white);}
+.footer-copy{font-size:12px;color:rgba(255,255,255,0.2);text-align:center;padding-top:32px;max-width:1100px;margin:0 auto;}
+@media(max-width:768px){#nav{padding:0 24px;}.nav-links{display:none;}#hero{padding:100px 24px 60px;}#sources,#tools,#install,#pricing{padding:80px 24px;}#footer{padding:40px 24px;}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}.reveal{opacity:1;transform:none;}}
+</style>
 </head>
 <body>
-<a href="#main-content" class="skip-link">Skip to main content</a>
 
-<header class="nav">
-  <div class="wrap nav-inner">
-    <a class="brand" href="/" aria-label="MAXIA Oracle">
-      <img class="brand-logo" src="/logo.png" alt="" aria-hidden="true" width="22" height="22">
-      MAXIA&nbsp;·&nbsp;ORACLE
+<div id="progress-bar"></div>
+<div id="cursor-glow"></div>
+
+<!-- NAV -->
+<nav id="nav">
+  <a href="/" class="nav-logo">MAXIA<span class="dot">.</span>oracle</a>
+  <ul class="nav-links">
+    <li><a href="#install" data-fr>install</a><a href="#install" data-en>install</a></li>
+    <li><a href="#pricing" data-fr>tarifs</a><a href="#pricing" data-en>pricing</a></li>
+    <li><a href="/docs/" data-fr>référence API</a><a href="/docs/" data-en>api reference</a></li>
+    <li><a href="https://github.com/MAXIAWORLD/oracleforge" target="_blank" rel="noopener" data-fr>source</a><a href="https://github.com/MAXIAWORLD/oracleforge" target="_blank" rel="noopener" data-en>source</a></li>
+  </ul>
+  <div class="nav-right">
+    <button class="lang-btn" onclick="var l=document.documentElement;l.lang=l.lang==='fr'?'en':'fr';this.textContent=l.lang==='fr'?'EN':'FR';">EN</button>
+    <a href="#install" class="nav-cta">
+      <span data-fr><i class="fas fa-play"></i> Démarrer</span>
+      <span data-en><i class="fas fa-play"></i> Get started</span>
     </a>
-    <nav class="nav-links" aria-label="Primary">
-      <a href="#install">install</a>
-      <a href="#pricing">pricing</a>
-      <a href="/docs/">api reference</a>
-      <a href="https://github.com/MAXIAWORLD/oracleforge" rel="noreferrer">source</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="hero-content reveal">
+      <div class="hero-badge">
+        <i class="fas fa-chart-line"></i>
+        <span data-fr>ORACLE DE PRIX · v0.1.9</span>
+        <span data-en>PRICE ORACLE · v0.1.9</span>
+      </div>
+      <h1 class="hero-title">
+        <span data-fr>Empêchez votre agent IA<br>de trader sur un <span class="hl">prix erroné.</span></span>
+        <span data-en>Stop your AI agent<br>from trading on a <span class="hl">wrong price.</span></span>
+      </h1>
+      <p class="hero-subtitle">
+        <span data-fr>Six oracles croisés. Un seul appel API. Si ils divergent, vous le savez — avant que votre agent ne bouge des fonds.<br><br>1 000 req/mois gratuites · aucune carte requise.</span>
+        <span data-en>Six oracles cross-checked. One API call. If they disagree, you know — before your agent moves money.<br><br>Free 1k requests/month · no card required.</span>
+      </p>
+      <div class="hero-actions">
+        <a href="#install" class="btn-primary">
+          <span data-fr><i class="fas fa-terminal"></i> Démarrer</span>
+          <span data-en><i class="fas fa-terminal"></i> Get started</span>
+        </a>
+        <a href="/docs/" class="btn-outline">
+          <span data-fr>Référence API</span>
+          <span data-en>API reference</span>
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <span class="hero-stat-num">91</span>
+          <span class="hero-stat-label"><span data-fr>symboles</span><span data-en>symbols</span></span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-num">6</span>
+          <span class="hero-stat-label"><span data-fr>sources</span><span data-en>sources</span></span>
+        </div>
+        <div class="hero-stat">
+          <span class="hero-stat-num">100%</span>
+          <span class="hero-stat-label">uptime</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-panel reveal">
+      <div class="panel-head">
+        <span class="panel-tag">live · GET /api/price/BTC</span>
+        <span class="panel-ver">v0.1.9</span>
+      </div>
+      <div id="panel-price-display" class="panel-price"><span class="panel-symbol">BTC</span><span style="color:var(--text-muted);font-size:20px;">chargement…</span></div>
+      <div id="panel-diverg-display" class="panel-diverg">◆ connexion en cours…</div>
+      <div id="panel-sources-display" class="panel-sources">
+        <div class="panel-source-row"><span class="panel-source-name" style="color:var(--text-muted)">—</span><span class="panel-source-val" style="color:var(--text-muted)">—</span><span class="panel-source-age">—</span></div>
+      </div>
+      <div class="panel-footer">
+        <div class="panel-foot-item"><div class="panel-foot-k">symbols</div><div class="panel-foot-v">91</div></div>
+        <div class="panel-foot-item"><div class="panel-foot-k">sources</div><div class="panel-foot-v">6</div></div>
+        <div class="panel-foot-item"><div class="panel-foot-k">uptime</div><div class="panel-foot-v">100%</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SOURCES -->
+<section id="sources">
+  <div class="section-header reveal">
+    <span class="section-tag"><span data-fr>SOURCES DE DONNÉES</span><span data-en>DATA SOURCES</span></span>
+    <h2 class="section-title">
+      <span data-fr>Six feeds. Une réponse. Un audit complet.</span>
+      <span data-en>Six feeds. One answer. An audit trail.</span>
+    </h2>
+    <p class="section-desc">
+      <span data-fr>Pas de pondération secrète. Chaque source est retournée avec son âge et sa divergence.</span>
+      <span data-en>No secret weighting. Every source is returned with its age and divergence.</span>
+    </p>
+  </div>
+  <div class="sources-grid">
+    <div class="source-card reveal">
+      <div class="source-num">01</div>
+      <div class="source-name">Pyth Hermes</div>
+      <div class="source-desc">
+        <span data-fr>Éditeurs décentralisés de première main. Staleness sub-seconde, intervalles de confiance intégrés.</span>
+        <span data-en>Decentralized first-party publishers. Sub-second staleness, confidence intervals built-in.</span>
+      </div>
+    </div>
+    <div class="source-card reveal">
+      <div class="source-num">02</div>
+      <div class="source-name">Chainlink On-chain</div>
+      <div class="source-desc">
+        <span data-fr>Lecture directe des contrats aggregator sur Base, Ethereum et Arbitrum.</span>
+        <span data-en>Direct reads from aggregator contracts on Base, Ethereum, and Arbitrum.</span>
+      </div>
+    </div>
+    <div class="source-card reveal">
+      <div class="source-num">03</div>
+      <div class="source-name">Coinpaprika</div>
+      <div class="source-desc">
+        <span data-fr>Agrégateur spot comme référence de prix indépendante.</span>
+        <span data-en>Spot market aggregator as independent price reference.</span>
+      </div>
+    </div>
+    <div class="source-card reveal">
+      <div class="source-num">04</div>
+      <div class="source-name">RedStone</div>
+      <div class="source-desc">
+        <span data-fr>Quatrième oracle indépendant avec 400+ actifs. Crypto, forex et actions.</span>
+        <span data-en>Fourth independent oracle with 400+ assets. Crypto, forex, and equities.</span>
+      </div>
+    </div>
+    <div class="source-card reveal">
+      <div class="source-num">05</div>
+      <div class="source-name">Pyth Solana On-chain</div>
+      <div class="source-desc">
+        <span data-fr>Lecture native Solana depuis les comptes Pyth Push Oracle. Données on-chain vérifiées.</span>
+        <span data-en>Native Solana reads from Pyth Push Oracle accounts. Fully verified on-chain data.</span>
+      </div>
+    </div>
+    <div class="source-card reveal">
+      <div class="source-num">06</div>
+      <div class="source-name">Uniswap v3 TWAP</div>
+      <div class="source-desc">
+        <span data-fr>Prix pondérés dans le temps depuis les pools Uniswap v3. DEX-native, résistant à la manipulation.</span>
+        <span data-en>Time-weighted average prices from high-liquidity Uniswap v3 pools. DEX-native, manipulation-resistant.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TOOLS -->
+<section id="tools">
+  <div class="section-header reveal">
+    <span class="section-tag"><span data-fr>17 OUTILS MCP + REST</span><span data-en>17 MCP + REST TOOLS</span></span>
+    <h2 class="section-title">
+      <span data-fr>Dix-sept outils. Tous les frameworks d'agents les parlent.</span>
+      <span data-en>Seventeen tools. Every agent framework speaks them.</span>
+    </h2>
+    <p class="section-desc">
+      <span data-fr>La même interface en REST, MCP et méthodes typées dans les SDKs. Changez de framework sans rien réapprendre.</span>
+      <span data-en>The same surface as REST endpoints, MCP tools, and typed methods in SDKs. Swap frameworks without relearning anything.</span>
+    </p>
+  </div>
+  <div class="tools-inner">
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.01</span>
+      <span class="tool-name-cell">get_price</span>
+      <span class="tool-desc-cell"><span data-fr>Prix agrégé pour un symbole sur toutes les sources actives.</span><span data-en>Aggregated price for one symbol across every live source.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.02</span>
+      <span class="tool-name-cell">get_prices_batch</span>
+      <span class="tool-desc-cell"><span data-fr>Jusqu'à 50 symboles en un seul appel.</span><span data-en>Up to 50 symbols in one call.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.03</span>
+      <span class="tool-name-cell">get_sources_status</span>
+      <span class="tool-desc-cell"><span data-fr>Quelles sources ont répondu, leurs feeds, leur dernier heartbeat.</span><span data-en>Which upstreams answered, which feeds they expose, their last heartbeat.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.04</span>
+      <span class="tool-name-cell">get_cache_stats</span>
+      <span class="tool-desc-cell"><span data-fr>Ratio de cache, âge médian, détail par source.</span><span data-en>Hit ratio, median age, per-source breakdown.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.05</span>
+      <span class="tool-name-cell">get_confidence</span>
+      <span class="tool-desc-cell"><span data-fr>La divergence séparée, pour les politiques qui rejettent sur dérive.</span><span data-en>The divergence figure split out, for policies that reject on drift.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.06</span>
+      <span class="tool-name-cell">list_supported_symbols</span>
+      <span class="tool-desc-cell"><span data-fr>Tous les symboles couverts — crypto majeurs, actions, forex, stablecoins.</span><span data-en>All symbols currently covered — crypto majors, equities, forex, stablecoins.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.07</span>
+      <span class="tool-name-cell">get_chainlink_onchain</span>
+      <span class="tool-desc-cell"><span data-fr>Lecture on-chain directe sur Base, Ethereum ou Arbitrum.</span><span data-en>Direct on-chain read from Base, Ethereum, or Arbitrum.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.08</span>
+      <span class="tool-name-cell">health_check</span>
+      <span class="tool-desc-cell"><span data-fr>Liveness + env. Un appel, sans auth.</span><span data-en>Liveness + env. One call, no auth required.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.09</span>
+      <span class="tool-name-cell">get_redstone_price</span>
+      <span class="tool-desc-cell"><span data-fr>Oracle RedStone source unique. 400+ actifs.</span><span data-en>Single-source RedStone oracle. 400+ assets.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.10</span>
+      <span class="tool-name-cell">get_pyth_solana_onchain</span>
+      <span class="tool-desc-cell"><span data-fr>Lecture Pyth Solana on-chain native.</span><span data-en>Native Pyth Solana on-chain read.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.11</span>
+      <span class="tool-name-cell">get_twap_onchain</span>
+      <span class="tool-desc-cell"><span data-fr>Uniswap v3 TWAP depuis pools on-chain sur Base et Ethereum.</span><span data-en>Uniswap v3 TWAP from on-chain pools on Base and Ethereum.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.12</span>
+      <span class="tool-name-cell">get_price_context</span>
+      <span class="tool-desc-cell"><span data-fr>Score de confiance, flag anomalie, accord sources — un appel pour décisions agent.</span><span data-en>Confidence score, anomaly flag, sources agreement — one call for agent decisions.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.13</span>
+      <span class="tool-name-cell">get_asset_metadata</span>
+      <span class="tool-desc-cell"><span data-fr>Market cap, volume 24h, offre, ATH/ATL depuis CoinGecko.</span><span data-en>Market cap, 24h volume, supply, ATH/ATL from CoinGecko.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.14</span>
+      <span class="tool-name-cell">get_price_history</span>
+      <span class="tool-desc-cell"><span data-fr>Snapshots historiques. Echantillonnage 5min, 30 jours.</span><span data-en>Historical price snapshots. 5-minute sampling, 30-day retention.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.15</span>
+      <span class="tool-name-cell">create_price_alert</span>
+      <span class="tool-desc-cell"><span data-fr>Alerte webhook one-shot quand un prix franchit un seuil.</span><span data-en>One-shot webhook alert when a price crosses a threshold.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.16</span>
+      <span class="tool-name-cell">list_price_alerts</span>
+      <span class="tool-desc-cell"><span data-fr>Toutes les alertes actives pour la clé authentifiée.</span><span data-en>All active alerts for the authenticated key.</span></span>
+    </div>
+    <div class="tool-row reveal">
+      <span class="tool-idx">T.17</span>
+      <span class="tool-name-cell">delete_price_alert</span>
+      <span class="tool-desc-cell"><span data-fr>Supprime une alerte par ID.</span><span data-en>Delete an alert by ID.</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section id="install">
+  <div class="section-header reveal">
+    <span class="section-tag">INSTALLATION</span>
+    <h2 class="section-title">
+      <span data-fr>7 packages. Tous les écosystèmes.</span>
+      <span data-en>7 packages. All ecosystems.</span>
+    </h2>
+    <p class="section-desc">
+      <span data-fr>Python, TypeScript, LangChain, CrewAI, AutoGen, LlamaIndex, Eliza.</span>
+      <span data-en>Python, TypeScript, LangChain, CrewAI, AutoGen, LlamaIndex, Eliza.</span>
+    </p>
+  </div>
+  <div class="pkgs-grid" style="margin-bottom:40px;">
+    <div class="pkg-card reveal">
+      <div class="pkg-head">
+        <span class="pkg-name">maxia-oracle</span>
+        <span class="pkg-reg">pypi</span>
+      </div>
+      <pre>pip install maxia-oracle</pre>
+    </div>
+    <div class="pkg-card reveal">
+      <div class="pkg-head">
+        <span class="pkg-name">@maxia-marketplace/oracle</span>
+        <span class="pkg-reg">npm</span>
+      </div>
+      <pre>npm install @maxia-marketplace/oracle</pre>
+    </div>
+    <div class="pkg-card reveal">
+      <div class="pkg-head">
+        <span class="pkg-name">langchain-maxia-oracle</span>
+        <span class="pkg-reg">pypi · langchain</span>
+      </div>
+      <pre>pip install langchain-maxia-oracle</pre>
+    </div>
+    <div class="pkg-card reveal">
+      <div class="pkg-head">
+        <span class="pkg-name">crewai-tools-maxia-oracle</span>
+        <span class="pkg-reg">pypi · crewai</span>
+      </div>
+      <pre>pip install crewai-tools-maxia-oracle</pre>
+    </div>
+    <div class="pkg-card reveal">
+      <div class="pkg-head">
+        <span class="pkg-name">autogen-maxia-oracle</span>
+        <span class="pkg-reg">pypi · autogen</span>
+      </div>
+      <pre>pip install autogen-maxia-oracle</pre>
+    </div>
+    <div class="pkg-card reveal">
+      <div class="pkg-head">
+        <span class="pkg-name">llama-index-tools-maxia-oracle</span>
+        <span class="pkg-reg">pypi · llamaindex</span>
+      </div>
+      <pre>pip install llama-index-tools-maxia-oracle</pre>
+    </div>
+    <div class="pkg-card reveal">
+      <div class="pkg-head">
+        <span class="pkg-name">eliza-plugin-maxia-oracle</span>
+        <span class="pkg-reg">npm · eliza</span>
+      </div>
+      <pre>npm install eliza-plugin-maxia-oracle</pre>
+    </div>
+  </div>
+  <div style="max-width:900px;margin:0 auto;" class="reveal">
+    <pre style="font-size:13px;line-height:1.8;"># 1. <span data-fr>Clé gratuite (100 req/jour) — sans email, sans dashboard</span><span data-en>Free key (100 req/day) — no email, no dashboard</span>
+KEY=$(curl -s -X POST https://oracle.maxiaworld.app/api/register \
+  | python -c "import sys,json;print(json.load(sys.stdin)['data']['api_key'])")
+
+# 2. <span data-fr>Prix</span><span data-en>Price</span>
+curl -s -H "X-API-Key: $KEY" https://oracle.maxiaworld.app/api/price/BTC \
+  | python -m json.tool</pre>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="section-header reveal">
+    <span class="section-tag"><span data-fr>TARIFS</span><span data-en>PRICING</span></span>
+    <h2 class="section-title">
+      <span data-fr>Deux façons de payer. Aucune n'est un abonnement.</span>
+      <span data-en>Two ways to pay. Neither of them is a subscription.</span>
+    </h2>
+    <p class="section-desc">
+      <span data-fr>Un tier gratuit assez large pour prototyper, et un pay-per-call sur Base pour que votre agent se règle lui-même.</span>
+      <span data-en>A free tier big enough to prototype with, and a pay-per-call path on Base so your agent can settle autonomously.</span>
+    </p>
+  </div>
+  <div class="price-grid" style="margin-bottom:48px;">
+    <div class="plan-card reveal">
+      <div class="plan-name-label"><span data-fr>Free tier</span><span data-en>Free tier</span></div>
+      <div class="plan-price-big"><sup>$</sup>0<span class="per"><span data-fr>/jour</span><span data-en>/day</span></span></div>
+      <p class="plan-sub">
+        <span data-fr>Une clé API avec 100 requêtes/jour. Reset à minuit UTC. Aucune carte, aucun onboarding.</span>
+        <span data-en>An API key with a 100-request daily cap. Resets at midnight UTC. No card, no onboarding.</span>
+      </p>
+      <ul class="plan-features">
+        <li><i class="fas fa-check"></i><span data-fr>100 req / jour</span><span data-en>100 req / day</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Tous les endpoints</span><span data-en>All endpoints</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Émise via POST /api/register</span><span data-en>Issued via POST /api/register</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Sans auth côté client</span><span data-en>No client-side auth setup</span></li>
+      </ul>
+      <a href="#install" class="plan-cta ghost">
+        <span data-fr>Commencer gratuitement →</span>
+        <span data-en>Start for free →</span>
+      </a>
+    </div>
+    <div class="plan-card featured reveal">
+      <span style="position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--teal),#2dd4bf);color:#060b14;font-size:11px;font-weight:800;letter-spacing:1.5px;padding:5px 18px;border-radius:50px;white-space:nowrap;font-family:'Montserrat',sans-serif;">ON BASE</span>
+      <div class="plan-name-label">Pay-per-call · x402</div>
+      <div class="plan-price-big"><sup>$</sup>0.001<span class="per"><span data-fr>/requête</span><span data-en>/request</span></span></div>
+      <p class="plan-sub">
+        <span data-fr>USDC sur Base mainnet via le protocole x402. Vente directe — pas d'intermédiation, pas d'escrow.</span>
+        <span data-en>USDC on Base mainnet via the x402 protocol. Direct sale — no intermediation, no escrow.</span>
+      </p>
+      <ul class="plan-features">
+        <li><i class="fas fa-check"></i><span data-fr>0.001 USDC par requête</span><span data-en>0.001 USDC per single request</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>0.005 USDC par batch (50)</span><span data-en>0.005 USDC per batch (up to 50)</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Facilitateur Coinbase x402</span><span data-en>Coinbase x402 facilitator</span></li>
+        <li><i class="fas fa-check"></i><span data-fr>Anonyme — pas de clé requise</span><span data-en>Anonymous — no key required</span></li>
+      </ul>
+      <a href="/docs/" class="plan-cta teal">
+        <span data-fr>Lire la doc x402 →</span>
+        <span data-en>Read x402 docs →</span>
+      </a>
+    </div>
+  </div>
+  <div class="disc reveal">
+    <span data-fr>
+      <strong>Ce qu'est MAXIA Oracle — et ce qu'il n'est pas</strong>
+      MAXIA Oracle lit des données de prix publiques depuis des oracles amont, les réconcilie et les retourne. Il ne passe pas d'ordres. Il ne détient pas de fonds. Il ne route pas de transactions. Rien dans une réponse ne constitue un conseil en investissement, une sollicitation d'achat ou de vente, ou une recommandation quelconque. Chaque intégrateur est seul responsable de l'utilisation des données retournées.
+    </span>
+    <span data-en>
+      <strong>What MAXIA Oracle is, and is not</strong>
+      MAXIA Oracle reads public price data from upstream oracles, reconciles it, and returns it. It does not place orders. It does not hold funds. It does not route trades. Nothing in a response constitutes investment advice, a solicitation to buy or sell any asset, or a recommendation of any kind. Every integrator is solely responsible for how the returned numbers are used.
+    </span>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">MAXIA<span>.</span>oracle</div>
+    <nav class="footer-links">
+      <a href="/"><span data-fr>Forge Suite</span><span data-en>Forge Suite</span></a>
+      <a href="/docs/"><span data-fr>Référence API</span><span data-en>API reference</span></a>
+      <a href="https://github.com/MAXIAWORLD/oracleforge" target="_blank" rel="noopener">GitHub</a>
+      <a href="mailto:support@maxiaworld.app">Contact</a>
     </nav>
   </div>
-</header>
-
-<main id="main-content">
-
-  <!-- ── Hero ─────────────────────────────────────────────── -->
-  <section class="hero" aria-labelledby="hero-heading">
-    <div class="wrap">
-      <div class="hero-grid">
-        <div>
-          <span class="hero-kicker reveal">Beta · 50% lifetime for first 50 users</span>
-          <h1 id="hero-heading" class="hero-title reveal">
-            Stop your AI agent<br>
-            <em>from trading on a wrong&nbsp;price.</em>
-          </h1>
-          <p class="hero-lede reveal">
-            Six oracles cross-checked. One API call. If they disagree, you know —
-            before your agent moves money.
-            <br><br>
-            Free 1k requests/month · no card required.
-          </p>
-          <div class="hero-cta reveal">
-            <a class="btn btn--primary" href="#install">
-              get started <span class="arrow" aria-hidden="true">→</span>
-            </a>
-            <a class="btn" href="/docs/">
-              api reference
-            </a>
-          </div>
-        </div>
-
-        <aside class="panel reveal" aria-label="Live response from /api/price/BTC">
-          <div class="panel-head">
-            <span class="example-tag" id="hero-tag">live · GET /api/price/BTC</span>
-            <span>v0.1.9</span>
-          </div>
-          <div class="price">
-            <span class="symbol">BTC</span><span id="hero-price-int">$74,757</span><span class="cents" id="hero-price-cents">.58</span>
-          </div>
-          <div class="divergence" id="hero-divergence">
-            ◆ divergence 0.16% across 3 sources
-          </div>
-          <div class="panel-rows" id="hero-sources">
-            <span class="src">pyth</span>
-            <span>$74,781.31</span>
-            <span class="age">1s</span>
-
-            <span class="src">chainlink_base</span>
-            <span>$74,663.19</span>
-            <span class="age">421s</span>
-
-            <span class="src">coinpaprika</span>
-            <span>$74,757.58</span>
-            <span class="age">—</span>
-          </div>
-          <div class="panel-foot">
-            <div><div class="k">symbols</div><div class="v">91</div></div>
-            <div><div class="k">sources</div><div class="v" id="hero-src-count">6</div></div>
-            <div><div class="k">uptime</div><div class="v">100%</div></div>
-          </div>
-        </aside>
-      </div>
-    </div>
-  </section>
-
-  <hr class="hairline">
-
-  <!-- ── How it works ─────────────────────────────────────── -->
-  <section class="section" id="mechanism" aria-labelledby="mechanism-heading">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="numeral" aria-hidden="true">01 / 06</span>
-        <div>
-          <h2 id="mechanism-heading">Six feeds. One answer. An audit trail either way.</h2>
-          <p>No statistical magic, no secret weighting. The request returns every source that spoke, every age, and the divergence between them. You decide what to do with outliers.</p>
-        </div>
-      </div>
-
-      <div class="mech">
-        <div class="mech-cell">
-          <div class="mech-num">01</div>
-          <h3>Pyth Hermes</h3>
-          <p>Decentralized first-party publishers. Sub-second staleness, confidence intervals built-in, wide symbol coverage including equities.</p>
-        </div>
-        <div class="mech-cell">
-          <div class="mech-num">02</div>
-          <h3>Chainlink on-chain</h3>
-          <p>Direct reads from aggregator contracts on Base, Ethereum, and Arbitrum. What on-chain contracts see is what you see.</p>
-        </div>
-        <div class="mech-cell">
-          <div class="mech-num">03</div>
-          <h3>Coinpaprika</h3>
-          <p>Spot market aggregator as independent price reference. If the two oracles disagree, you know it — before your agent commits.</p>
-        </div>
-        <div class="mech-cell">
-          <div class="mech-num">04</div>
-          <h3>RedStone</h3>
-          <p>Fourth independent oracle with 400+ assets. Dynamic coverage across crypto, forex, and equities.</p>
-        </div>
-        <div class="mech-cell">
-          <div class="mech-num">05</div>
-          <h3>Pyth Solana on-chain</h3>
-          <p>Native Solana reads from Pyth Push Oracle accounts. Fully verified on-chain data, no intermediary.</p>
-        </div>
-        <div class="mech-cell">
-          <div class="mech-num">06</div>
-          <h3>Uniswap v3 TWAP</h3>
-          <p>Time-weighted average prices from high-liquidity Uniswap v3 pools on Base and Ethereum. DEX-native, manipulation-resistant.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Tool surface ─────────────────────────────────────── -->
-  <section class="section" id="tools" aria-labelledby="tools-heading">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="numeral" aria-hidden="true">02 / 06</span>
-        <div>
-          <h2 id="tools-heading">Seventeen tools. Every agent framework speaks them.</h2>
-          <p>The same surface is available as REST endpoints, MCP tools, and typed methods in our SDKs. Swap frameworks without teaching your agent anything new.</p>
-        </div>
-      </div>
-
-      <div class="tool-table">
-        <div class="tool-row"><span class="idx">T.01</span><span class="name">get_price</span><span class="desc">Aggregated price for one symbol across every live source.</span></div>
-        <div class="tool-row"><span class="idx">T.02</span><span class="name">get_prices_batch</span><span class="desc">Up to 50 symbols in one call. Same shape, same disclaimer.</span></div>
-        <div class="tool-row"><span class="idx">T.03</span><span class="name">get_sources_status</span><span class="desc">Which upstreams answered, which feeds they expose, their last heartbeat.</span></div>
-        <div class="tool-row"><span class="idx">T.04</span><span class="name">get_cache_stats</span><span class="desc">Hit ratio, median age, per-source breakdown — useful in observability pipelines.</span></div>
-        <div class="tool-row"><span class="idx">T.05</span><span class="name">get_confidence</span><span class="desc">The divergence figure split out, for policies that reject on drift.</span></div>
-        <div class="tool-row"><span class="idx">T.06</span><span class="name">list_supported_symbols</span><span class="desc">All symbols currently covered — crypto majors, select equities, forex, stablecoins.</span></div>
-        <div class="tool-row"><span class="idx">T.07</span><span class="name">get_chainlink_onchain</span><span class="desc">Direct on-chain read from Base, Ethereum, or Arbitrum. Round ID, contract, age.</span></div>
-        <div class="tool-row"><span class="idx">T.08</span><span class="name">health_check</span><span class="desc">Liveness + env. One call, no auth required.</span></div>
-        <div class="tool-row"><span class="idx">T.09</span><span class="name">get_redstone_price</span><span class="desc">Single-source RedStone oracle. 400+ assets including forex and equities.</span></div>
-        <div class="tool-row"><span class="idx">T.10</span><span class="name">get_pyth_solana_onchain</span><span class="desc">Native Pyth Solana on-chain read. Fully verified, no intermediary.</span></div>
-        <div class="tool-row"><span class="idx">T.11</span><span class="name">get_twap_onchain</span><span class="desc">Uniswap v3 TWAP from on-chain pools on Base and Ethereum.</span></div>
-        <div class="tool-row"><span class="idx">T.12</span><span class="name">get_price_context</span><span class="desc">Confidence score, anomaly flag, sources agreement — one call for agent decisions.</span></div>
-        <div class="tool-row"><span class="idx">T.13</span><span class="name">get_asset_metadata</span><span class="desc">Market cap, 24h volume, supply, ATH/ATL from CoinGecko.</span></div>
-        <div class="tool-row"><span class="idx">T.14</span><span class="name">get_price_history</span><span class="desc">Historical price snapshots. 5-minute sampling, 30-day retention.</span></div>
-        <div class="tool-row"><span class="idx">T.15</span><span class="name">create_price_alert</span><span class="desc">One-shot webhook alert when a price crosses a threshold.</span></div>
-        <div class="tool-row"><span class="idx">T.16</span><span class="name">list_price_alerts</span><span class="desc">List all active alerts for the authenticated key.</span></div>
-        <div class="tool-row"><span class="idx">T.17</span><span class="name">delete_price_alert</span><span class="desc">Delete an alert by ID.</span></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Install ──────────────────────────────────────────── -->
-  <section class="section" id="install" aria-labelledby="install-heading">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="numeral" aria-hidden="true">03 / 06</span>
-        <div>
-          <h2 id="install-heading">Install, or wire the MCP server. Pick any surface.</h2>
-          <p>Seven first-party packages covering the Python and TypeScript ecosystems that actually ship agents. Each one is a thin adapter over the same HTTP API.</p>
-        </div>
-      </div>
-
-      <div class="installs">
-        <div class="pkg">
-          <div class="pkg-head">
-            <span class="pkg-name">maxia-oracle</span>
-            <span class="pkg-reg">pypi</span>
-          </div>
-          <pre class="code"><button class="copy" type="button" data-copy="pip install maxia-oracle" aria-label="Copy command: pip install maxia-oracle">copy</button>pip install maxia-oracle</pre>
-        </div>
-
-        <div class="pkg">
-          <div class="pkg-head">
-            <span class="pkg-name">@maxia-marketplace/oracle</span>
-            <span class="pkg-reg">npm</span>
-          </div>
-          <pre class="code"><button class="copy" type="button" data-copy="npm install @maxia-marketplace/oracle" aria-label="Copy command: npm install @maxia-marketplace/oracle">copy</button>npm install @maxia-marketplace/oracle</pre>
-        </div>
-
-        <div class="pkg">
-          <div class="pkg-head">
-            <span class="pkg-name">langchain-maxia-oracle</span>
-            <span class="pkg-reg">pypi · langchain</span>
-          </div>
-          <pre class="code"><button class="copy" type="button" data-copy="pip install langchain-maxia-oracle" aria-label="Copy command: pip install langchain-maxia-oracle">copy</button>pip install langchain-maxia-oracle</pre>
-        </div>
-
-        <div class="pkg">
-          <div class="pkg-head">
-            <span class="pkg-name">crewai-tools-maxia-oracle</span>
-            <span class="pkg-reg">pypi · crewai</span>
-          </div>
-          <pre class="code"><button class="copy" type="button" data-copy="pip install crewai-tools-maxia-oracle" aria-label="Copy command: pip install crewai-tools-maxia-oracle">copy</button>pip install crewai-tools-maxia-oracle</pre>
-        </div>
-
-        <div class="pkg">
-          <div class="pkg-head">
-            <span class="pkg-name">autogen-maxia-oracle</span>
-            <span class="pkg-reg">pypi · autogen</span>
-          </div>
-          <pre class="code"><button class="copy" type="button" data-copy="pip install autogen-maxia-oracle" aria-label="Copy command: pip install autogen-maxia-oracle">copy</button>pip install autogen-maxia-oracle</pre>
-        </div>
-
-        <div class="pkg">
-          <div class="pkg-head">
-            <span class="pkg-name">llama-index-tools-maxia-oracle</span>
-            <span class="pkg-reg">pypi · llamaindex</span>
-          </div>
-          <pre class="code"><button class="copy" type="button" data-copy="pip install llama-index-tools-maxia-oracle" aria-label="Copy command: pip install llama-index-tools-maxia-oracle">copy</button>pip install llama-index-tools-maxia-oracle</pre>
-        </div>
-
-        <div class="pkg">
-          <div class="pkg-head">
-            <span class="pkg-name">eliza-plugin-maxia-oracle</span>
-            <span class="pkg-reg">npm · eliza</span>
-          </div>
-          <pre class="code"><button class="copy" type="button" data-copy="npm install eliza-plugin-maxia-oracle" aria-label="Copy command: npm install eliza-plugin-maxia-oracle">copy</button>npm install eliza-plugin-maxia-oracle</pre>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Try it now ───────────────────────────────────────── -->
-  <section class="section" id="quickstart" aria-labelledby="quickstart-heading">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="numeral" aria-hidden="true">04 / 06</span>
-        <div>
-          <h2 id="quickstart-heading">Live in two commands.</h2>
-          <p>No signup, no dashboard, no email link. Register, get a key, price something. It's that flat.</p>
-        </div>
-      </div>
-
-      <pre class="code code--lg"><button class="copy" type="button" aria-label="Copy two-step quick-start: register an API key then fetch BTC price" data-copy='KEY=$(curl -s -X POST https://oracle.maxiaworld.app/api/register | python -c "import sys,json;print(json.load(sys.stdin)[&apos;data&apos;][&apos;api_key&apos;])")
-
-curl -s -H "X-API-Key: $KEY" https://oracle.maxiaworld.app/api/price/BTC | python -m json.tool'>copy</button><span class="token-cmt"># 1. claim a free daily quota (100 req/day) — no email, no dashboard</span>
-KEY=$(curl -s -X POST https://oracle.maxiaworld.app/api/register \
-  | python -c <span class="token-str">"import sys,json;print(json.load(sys.stdin)['data']['api_key'])"</span>)
-
-<span class="token-cmt"># 2. ask a price</span>
-curl -s -H <span class="token-str">"X-API-Key: $KEY"</span> https://oracle.maxiaworld.app/api/price/BTC \
-  | python -m json.tool</pre>
-    </div>
-  </section>
-
-  <!-- ── Pricing ──────────────────────────────────────────── -->
-  <section class="section" id="pricing" aria-labelledby="pricing-heading">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="numeral" aria-hidden="true">05 / 06</span>
-        <div>
-          <h2 id="pricing-heading">Two ways to pay. Neither of them is a subscription.</h2>
-          <p>A free tier big enough to prototype with, and a pay-per-call path on Base so your agent can settle autonomously.</p>
-        </div>
-      </div>
-
-      <div class="price-grid">
-        <div class="plan">
-          <div class="plan-name">Free tier</div>
-          <div class="plan-price"><span class="cur">$</span>0<span style="color:var(--text-dim);font-size:0.45em;font-weight:400;letter-spacing:0;"> / day</span></div>
-          <p class="plan-sub">An API key with a 100-request daily cap. Resets at midnight UTC. No card, no onboarding.</p>
-          <ul>
-            <li>100 requests / day / key</li>
-            <li>Every endpoint, no feature gating</li>
-            <li>Issued on-demand by <code style="font-family:var(--font-mono);font-size:12px;color:var(--accent-dim);">POST /api/register</code></li>
-            <li>Keyed by header, nothing client-side</li>
-          </ul>
-        </div>
-
-        <div class="plan plan--featured">
-          <span class="plan-tag">on Base</span>
-          <div class="plan-name">Pay-per-call · x402</div>
-          <div class="plan-price"><span class="cur">$</span>0.001<span style="color:var(--text-dim);font-size:0.45em;font-weight:400;letter-spacing:0;"> / request</span></div>
-          <p class="plan-sub">USDC on Base mainnet via the x402 protocol. Direct sale — no intermediation, no escrow, no holding.</p>
-          <ul>
-            <li>0.001 USDC per single request</li>
-            <li>0.005 USDC per batch (up to 50)</li>
-            <li>Coinbase x402 facilitator, with on-chain fallback</li>
-            <li>Anonymous — no key required</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Docs ─────────────────────────────────────────────── -->
-  <section class="section" id="docs" aria-labelledby="docs-heading">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="numeral" aria-hidden="true">06 / 06</span>
-        <div>
-          <h2 id="docs-heading">A reference. Not a tour.</h2>
-          <p>The full API contract — every route, every parameter, every response shape — rendered as a single static page.</p>
-        </div>
-      </div>
-
-      <a href="/docs/" class="docs-card" aria-label="Open API reference">
-        <div>
-          <h3>MAXIA Oracle — API reference</h3>
-          <p>Full REST surface, OpenAPI 3.1, rendered with Scalar. Built from the prod schema, served as a frozen artefact — not the live backend.</p>
-        </div>
-        <div class="btn btn--primary" aria-hidden="true">
-          open reference <span class="arrow" aria-hidden="true">→</span>
-        </div>
-      </a>
-    </div>
-  </section>
-
-  <!-- ── Disclaimers ──────────────────────────────────────── -->
-  <!-- ── Waitlist ─────────────────────────────────────────── -->
-  <section class="section" id="waitlist" aria-labelledby="waitlist-heading">
-    <div class="wrap">
-      <div class="section-head">
-        <span class="numeral" aria-hidden="true">07 / 07</span>
-        <div>
-          <h2 id="waitlist-heading">Not ready yet? Get notified when v0.2 ships.</h2>
-          <p>One email when we ship the next batch of features. No spam, no drip sequence, no marketing tricks. Unsubscribe in one click.</p>
-        </div>
-      </div>
-      <form id="waitlist-form" style="max-width:520px;display:flex;gap:12px;flex-wrap:wrap;">
-        <input
-          type="email"
-          name="email"
-          required
-          placeholder="your@email.com"
-          aria-label="Email address"
-          style="flex:1 1 240px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-2);color:var(--text);font:inherit;"
-        >
-        <button type="submit" class="btn btn--primary" style="white-space:nowrap;">
-          Get notified <span class="arrow" aria-hidden="true">→</span>
-        </button>
-      </form>
-      <p id="waitlist-msg" role="status" aria-live="polite" style="margin-top:12px;font-size:14px;color:var(--text-faint);min-height:1.4em;"></p>
-    </div>
-  </section>
-
-  <section class="section" style="padding-top:0;" id="disclaimers">
-    <div class="wrap">
-      <div class="disc">
-        <strong>What MAXIA Oracle is, and is not</strong>
-        <strong style="color:var(--text-faint); text-transform:uppercase; font-size:10.5px; letter-spacing:0.14em; margin-top:0;">Data feed only. Not investment advice. No custody. No KYC.</strong>
-        MAXIA Oracle reads public price data from upstream oracles and spot aggregators, reconciles it, and returns it. It does not place orders. It does not hold funds. It does not route trades. It does not onboard users. Nothing in a response constitutes investment advice, a solicitation to buy or sell any asset, or a recommendation of any kind. Every integrator is solely responsible for how the returned numbers are used, by whom, and under which regulatory regime.
-      </div>
-    </div>
-  </section>
-
-</main>
-
-<footer>
-  <div class="wrap foot-inner">
-    <div class="foot-cols">
-      <span>© 2026 MAXIA</span>
-      <a href="mailto:support@maxiaworld.app">support@maxiaworld.app</a>
-      <a href="/docs/">/docs</a>
-      <a href="/llms.txt">/llms.txt</a>
-      <a href="https://github.com/MAXIAWORLD/oracleforge" rel="noreferrer">github</a>
-      <a href="https://glama.ai/mcp/servers/MAXIAWORLD/oracleforge" rel="noreferrer">
-        <img src="https://glama.ai/mcp/servers/badge/MAXIAWORLD/oracleforge" alt="Glama MCP" height="20" style="vertical-align:middle">
-      </a>
-    </div>
-    <div>Apache-2.0 · v0.1.9</div>
-  </div>
+  <div class="footer-copy">© 2026 MAXIA · Apache 2.0</div>
 </footer>
 
 <script>
-  (function () {
-    "use strict";
-
-    // ── copy-to-clipboard on every .copy button ───────────────────
-    document.querySelectorAll('.copy').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var txt = btn.getAttribute('data-copy') || '';
-        (navigator.clipboard && navigator.clipboard.writeText
-          ? navigator.clipboard.writeText(txt)
-          : Promise.reject()
-        ).then(function () {
-          btn.textContent = 'copied';
-          btn.setAttribute('data-state', 'copied');
-          setTimeout(function () {
-            btn.textContent = 'copy';
-            btn.removeAttribute('data-state');
-          }, 1200);
-        }).catch(function () {
-          // fallback for non-secure contexts
-          try {
-            var ta = document.createElement('textarea');
-            ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
-            document.body.appendChild(ta);
-            ta.select(); document.execCommand('copy');
-            document.body.removeChild(ta);
-            btn.textContent = 'copied';
-            btn.setAttribute('data-state', 'copied');
-            setTimeout(function () {
-              btn.textContent = 'copy';
-              btn.removeAttribute('data-state');
-            }, 1200);
-          } catch (_) {}
-        });
-      });
-    });
-
-    // ── very gentle scroll-reveal for non-hero sections ──────────
-    if (!('IntersectionObserver' in window)
-        || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (e.isIntersecting) {
-          e.target.style.opacity = '1';
-          e.target.style.transform = 'translateY(0)';
-          io.unobserve(e.target);
-        }
-      });
-    }, { rootMargin: '0px 0px -8%' });
-
-    document.querySelectorAll('.section .section-head, .section .mech, .section .tool-table, .section .installs, .section .code--lg, .section .price-grid, .section .docs-card').forEach(function (el) {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(10px)';
-      el.style.transition = 'opacity 600ms ease, transform 600ms cubic-bezier(.16,.84,.44,1)';
-      io.observe(el);
-    });
-  })();
-
-  // ── Waitlist form ─────────────────────────────────────────────
-  (function () {
-    var form = document.getElementById('waitlist-form');
-    var msg = document.getElementById('waitlist-msg');
-    if (!form || !msg) return;
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var input = form.querySelector('input[name="email"]');
-      var btn = form.querySelector('button[type="submit"]');
-      var email = (input.value || '').trim();
-      if (!email) return;
-      btn.disabled = true;
-      msg.style.color = 'var(--text-faint)';
-      msg.textContent = 'Sending…';
-      fetch('/api/waitlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email })
-      }).then(function (r) {
-        if (r.status === 200) {
-          msg.style.color = '#7BD389';
-          msg.textContent = 'You are on the list. We will email you when v0.2 ships.';
-          input.value = '';
-        } else if (r.status === 429) {
-          msg.style.color = '#E9B872';
-          msg.textContent = 'Slow down — try again in a minute.';
-        } else if (r.status === 422) {
-          msg.style.color = '#E9967A';
-          msg.textContent = 'That email looks invalid.';
-        } else {
-          msg.style.color = '#E9967A';
-          msg.textContent = 'Something went wrong — please try again.';
-        }
-      }).catch(function () {
-        msg.style.color = '#E9967A';
-        msg.textContent = 'Network error — please try again.';
-      }).finally(function () { btn.disabled = false; });
-    });
-  })();
-
-  // ── Live BTC price widget ─────────────────────────────────────
-  (function () {
-    var elInt   = document.getElementById('hero-price-int');
-    var elCents = document.getElementById('hero-price-cents');
-    var elDiv   = document.getElementById('hero-divergence');
-    var elSrcs  = document.getElementById('hero-sources');
-    var elCnt   = document.getElementById('hero-src-count');
-    if (!elInt) return;
-
-    function fmt(n) {
-      var s = n.toFixed(2);
-      var parts = s.split('.');
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      return parts;
+// Live BTC price widget
+(async function(){
+  try {
+    let key = sessionStorage.getItem('oracle_key');
+    if (!key) {
+      const r = await fetch('https://oracle.maxiaworld.app/api/register', {method:'POST'});
+      const j = await r.json();
+      key = j?.data?.api_key;
+      if (key) sessionStorage.setItem('oracle_key', key);
     }
-
-    function renderSources(sources) {
-      var html = '';
-      sources.forEach(function (s) {
-        var age = s.age_s != null ? s.age_s + 's' : '—';
-        var p = fmt(s.price);
-        html += '<span class="src">' + s.name.replace('_crypto','').replace('price_oracle','coinpaprika') + '</span>'
-              + '<span>$' + p[0] + '.' + p[1] + '</span>'
-              + '<span class="age">' + age + '</span>\n';
-      });
-      elSrcs.innerHTML = html;
+    if (!key) return;
+    async function fetchBTC() {
+      try {
+        const r = await fetch('https://oracle.maxiaworld.app/api/price/BTC', {headers:{'X-API-Key':key}});
+        const j = await r.json();
+        const d = j?.data;
+        if (!d) return;
+        const whole = Math.floor(d.price).toLocaleString('en-US');
+        const dec = '.' + d.price.toFixed(2).split('.')[1];
+        document.getElementById('panel-price-display').innerHTML =
+          `<span class="panel-symbol">BTC</span>$${whole}<span style="font-size:24px;color:var(--text-muted)">${dec}</span>`;
+        document.getElementById('panel-diverg-display').textContent =
+          `◆ divergence ${d.divergence_pct.toFixed(2)}% across ${d.source_count} sources`;
+        const srcs = (d.sources||[]).slice(0,3);
+        document.getElementById('panel-sources-display').innerHTML = srcs.map(s=>{
+          const age = s.age_s!=null ? (s.age_s<60 ? s.age_s+'s' : Math.floor(s.age_s/60)+'m') : '—';
+          return `<div class="panel-source-row"><span class="panel-source-name">${s.name}</span><span class="panel-source-val">$${Math.round(s.price).toLocaleString('en-US')}</span><span class="panel-source-age">${age}</span></div>`;
+        }).join('');
+      } catch(e) {}
     }
+    fetchBTC();
+    setInterval(fetchBTC, 30000);
+  } catch(e) {}
+})();
 
-    function update() {
-      fetch('/api/public/price')
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) {
-          if (!j || !j.data) return;
-          var d = j.data;
-          var p = fmt(d.price);
-          elInt.textContent   = '$' + p[0];
-          elCents.textContent = '.' + p[1];
-          elDiv.textContent   = '\u25C6 divergence ' + d.divergence_pct.toFixed(2) + '% across ' + d.source_count + ' sources';
-          if (elCnt) elCnt.textContent = d.source_count;
-          renderSources(d.sources);
-        })
-        .catch(function () {});
-    }
-
-    update();
-    setInterval(update, 30000);
-  })();
+window.addEventListener('scroll',()=>{const s=document.documentElement,b=document.body;const p=(s.scrollTop||b.scrollTop)/((s.scrollHeight||b.scrollHeight)-s.clientHeight)*100;document.getElementById('progress-bar').style.width=p+'%';});
+document.addEventListener('mousemove',e=>{const g=document.getElementById('cursor-glow');g.style.left=e.clientX+'px';g.style.top=e.clientY+'px';});
+const observer=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target);}});},{threshold:0.12});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+document.querySelectorAll('.source-card,.plan-card,.pkg-card').forEach(card=>{card.addEventListener('mousemove',e=>{const r=card.getBoundingClientRect();card.style.setProperty('--mx',((e.clientX-r.left)/r.width*100).toFixed(1)+'%');card.style.setProperty('--my',((e.clientY-r.top)/r.height*100).toFixed(1)+'%');});});
 </script>
-
 </body>
 </html>
