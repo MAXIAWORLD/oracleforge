@@ -71,8 +71,6 @@ async def create_checkout_session(request: Request, plan: str):
 @router.post("/webhook/stripe")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     payload = await request.body()
-    if len(payload) > 100_000:
-        raise HTTPException(status_code=413, detail="Payload too large")
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
@@ -113,24 +111,14 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
 
 async def _handle_checkout_completed(session: dict, db: Session) -> None:
-    raw_email = (session.get("customer_details") or {}).get("email") or session.get(
+    email = (session.get("customer_details") or {}).get("email") or session.get(
         "customer_email"
     )
-    if not raw_email or not _EMAIL_RE.match(str(raw_email)):
+    if not email or not _EMAIL_RE.match(str(email)):
         logger.warning(
             "Invalid or missing email in checkout — customer=%s session=%s",
             session.get("customer"),
             session.get("id"),
-        )
-        return
-    # Normalize like signup_free and portal_request (lowercase + strip +tag)
-    _local, _domain = str(raw_email).strip().lower().split("@", 1)
-    email = _local.split("+")[0] + "@" + _domain
-    if not _EMAIL_RE.match(email):
-        logger.warning(
-            "Normalized email invalid — raw=%s customer=%s",
-            raw_email,
-            session.get("customer"),
         )
         return
 
@@ -216,39 +204,19 @@ async def reconcile_stripe_session(
 
 def _handle_subscription_deleted(subscription: dict, db: Session) -> None:
     subscription_id = subscription.get("id")
-    customer_id = subscription.get("customer")
     if not subscription_id:
         return
-
-    # Downgrade ALL projects of the customer (not just the one matching the sub)
-    projects = (
-        db.query(Project).filter(Project.stripe_customer_id == customer_id).all()
-        if customer_id
-        else []
+    project = (
+        db.query(Project)
+        .filter(Project.stripe_subscription_id == subscription_id)
+        .first()
     )
-
-    # Fallback: match by subscription_id if no customer_id
-    if not projects:
-        project = (
-            db.query(Project)
-            .filter(Project.stripe_subscription_id == subscription_id)
-            .first()
-        )
-        if project:
-            projects = [project]
-
-    if not projects:
-        return
-
-    for project in projects:
+    if project:
         project.plan = "free"
-        project.stripe_subscription_id = None
-    db.commit()
-
-    logger.info(
-        "%d project(s) downgraded to free (customer=%s subscription=%s)",
-        len(projects),
-        customer_id,
-        subscription_id,
-    )
-    send_downgrade_email(projects[0].name)
+        db.commit()
+        logger.info(
+            "Project %s downgraded to free (subscription %s cancelled)",
+            project.id,
+            subscription_id,
+        )
+        send_downgrade_email(project.name)

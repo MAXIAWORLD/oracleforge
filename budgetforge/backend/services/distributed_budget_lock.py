@@ -101,17 +101,12 @@ async def distributed_budget_lock(
 # Fallback: implémentation mémoire pour compatibilité
 _memory_locks: dict[int, asyncio.Lock] = {}
 _memory_registry_lock = asyncio.Lock()
-_MEMORY_LOCKS_MAX_SIZE = 1000
 
 
 async def _get_memory_lock(project_id: int) -> asyncio.Lock:
     """Fallback mémoire pour quand Redis n'est pas disponible."""
     async with _memory_registry_lock:
         if project_id not in _memory_locks:
-            if len(_memory_locks) >= _MEMORY_LOCKS_MAX_SIZE:
-                # FIFO eviction: remove oldest entry
-                oldest = next(iter(_memory_locks))
-                del _memory_locks[oldest]
             _memory_locks[project_id] = asyncio.Lock()
         return _memory_locks[project_id]
 

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import {
   AreaChart,
@@ -133,6 +134,9 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function PortalContent() {
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -141,13 +145,7 @@ function PortalContent() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    // Read token from hash fragment (#token=xxx) — never sent in Referer header
-    const hash = typeof window !== "undefined" ? window.location.hash : "";
-    const token = hash.startsWith("#token=") ? hash.slice(7) : null;
-
     if (token) {
-      // Clean hash immediately so it's not visible in history
-      window.history.replaceState(null, "", window.location.pathname);
       // magic link → verify + pose le cookie session 90j
       fetch(`/api/portal/verify?token=${token}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
@@ -173,7 +171,7 @@ function PortalContent() {
         .catch(() => {})
         .finally(() => setChecking(false));
     }
-  }, []);
+  }, [token]);
 
   async function handleRequest(e: FormEvent) {
     e.preventDefault();

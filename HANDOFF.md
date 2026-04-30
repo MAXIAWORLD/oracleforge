@@ -1,4 +1,156 @@
-# HANDOFF — Session 27 avril 2026 (Phase 0 distribution + V12 kill)
+# HANDOFF — Session 30 avril 2026 — GuardForge OSS + landing + audit-ia
+
+## Ce qui a été fait
+
+- **GuardForge OSS** : Apache 2.0 + docker-compose (backend + dashboard) + 5 fixes critiques (CORS, Swagger prod, vault key, webhook timeout, streaming NotImplementedError) + README local-first. Pusché sur `github.com/MAXIAWORLD/guardforge`
+- **Fix CORS** : `localhost:3003` ajouté dans les defaults `config.py` + `.env.example`
+- **Dashboard local** : testé et fonctionnel sur `localhost:3003` (backend `localhost:8004`)
+- **maxiaworld.app/guardforge** : landing complète créée et déployée (stats, quick start, features, limitations)
+- **maxiaworld.app/** : card GuardForge ajoutée (4ème card), lede mis à jour
+- **maxiaworld.app/audit/** : section GuardForge ajoutée (explication RGPD client, 3 étapes, cards techniques, bandeau inclus dans rapport) + ligne dans tarifs Pro/Complet
+- **Mémoires** : GuardForge ajouté dans `mon-setup` et `automatisation-locale`
+- **Reddit J3** : 5 commentaires préparés (3 generiques + 2 sur threads trouvés)
+- **Cold emails** : 5 cibles Apollo identifiées (Kintsugy, ALCOM, COGIGROUP, IA Drones, Made In Tracker) — emails rédigés, manque crédits pour 2 derniers
+
+## ⚠️ Actions Alexis restantes
+
+- Poster les commentaires Reddit préparés aujourd'hui
+- Poster les 2 posts LinkedIn BudgetForge + Audit IA (en retard depuis J2)
+- Récupérer emails Apollo + envoyer les cold emails (5 cibles prêtes)
+- Lister BudgetForge sur MicroAcquire + Flippa (en retard depuis J2)
+- Recharger crédits Apollo si besoin pour IA Drones + Made In Tracker
+
+## Prochaine session J4 (1er mai)
+
+1. Reddit J4 : 3 nouveaux commentaires
+2. Surveiller réponses cold emails (10 envoyés depuis J1)
+3. Surveiller thread HN Token Counter
+4. FAQ acheteurs BudgetForge (10 Q/R) — en retard depuis J2
+5. MicroAcquire + Flippa si pas fait
+
+---
+
+# HANDOFF — Session 29 avril 2026 — Stripe + cold emails + Reddit J2
+
+## Ce qui a été fait
+
+- **5 cold emails rédigés** (Richard Dorard/BEWAI, Teo Hivart/Altexence, Joel Baude/INQU-AI, Fabrice Foiry/WAIABE, Erwan Desvergnes/digiCONTACTS) — à envoyer dès que les emails Apollo sont récupérés
+- **Signature email fixée** : "Cordialement, Majorel Alexis / Expert IA & Systèmes LLM / maxiaworld.app/audit"
+- **Stripe configuré** : 3 Payment Links créés (Essentiel €299 / Pro €499 / Complet €749) — sauvegardés en mémoire
+- **Template réponse "comment facturer"** rédigé avec les 3 liens
+- **audit-ia.html** : boutons Commander → Stripe, renommage Simple→Essentiel/Complet→Pro/Urgent→Complet, fix footer Forge Suite → maxiaworld.app
+- **Déployé sur VPS** + commit `2e06b94`
+- **Reddit J2** : 3 commentaires prêts à poster (AskReddit, learnpython, NoStupidQuestions)
+
+## ⚠️ Actions Alexis non faites (restent pour J3)
+
+- Poster les 2 posts LinkedIn (BudgetForge + Audit IA)
+- Récupérer les 5 emails Apollo → envoyer les cold emails
+- Lister BudgetForge sur MicroAcquire + Flippa (prévu J2, pas fait)
+- Poster les 3 commentaires Reddit ci-dessus
+
+## Prochaine session J3 (30 avril)
+
+1. Reddit J3 : 3 nouveaux commentaires (je cherche les threads au début de session)
+2. Surveiller réponses cold emails
+3. Surveiller thread HN Token Counter → répondre
+4. MicroAcquire + Flippa listings BudgetForge
+5. FAQ acheteurs BudgetForge (10 Q/R) — prévu J2, pas fait
+
+---
+
+# HANDOFF — Session 28 avril 2026 (soir) — Audit IA + cold emails + LinkedIn
+
+## Ce qui a été fait (session soir)
+
+- **Nouvelle offre : Audit IA Express** — conseil IA async, rapport PDF 48-72h, €299/€499/€749
+- **Site live** : `maxiaworld.app/audit` (design AM Tech, 4 étapes, 3 cas clients, pricing -30%)
+- **Apollo.io configuré** : 193 prospects FR (founder/president, 11-50 emp, LLM/AI keywords)
+- **5 cold emails envoyés** : Kheops.ai, Custom IA, SPOT'IA, A.I.Mergence, Heysmart
+- **BudgetForge dashboard réparé** : nginx `/api/auth` rerouté vers Next.js (3011), clé admin = `dev-admin-key` dans localStorage
+- **2 posts LinkedIn rédigés** : BudgetForge + Audit IA (à poster demain matin)
+
+## Prochaine session J2 (29 avril matin)
+
+1. Poster les 2 posts LinkedIn (BudgetForge + Audit IA)
+2. 5 nouveaux cold emails Apollo (70 crédits restants)
+3. Surveiller réponses aux 5 premiers emails
+4. Reddit karma J2 : 3 commentaires (routine incubation)
+5. Surveiller thread HN Token Counter
+
+---
+
+# HANDOFF — Session 28 avril 2026 (API #1 Token Counter LIVE + Track A préparé)
+
+## Ce qui a été fait aujourd'hui
+
+- **C1.1→C1.7 DONE** : Token Counter API complète en une session
+  - Repo `maxia-apis` créé + pushé sur `MAXIAWORLD/maxia-apis`
+  - Service tiktoken multi-provider : exact (OpenAI/Mistral) + estimated (Anthropic/Google/Cohere)
+  - 36 tests TDD verts
+  - Deploy Railway : `https://maxia-apis-production.up.railway.app`
+  - Listing RapidAPI live : BASIC $0 / PRO $9 / ULTRA $29
+  - Show HN posté : https://news.ycombinator.com/item?id=47931942
+- **Phase 1 Reddit J1** : 3 commentaires postés (r/learnpython, r/AskReddit, r/NoStupidQuestions)
+- **BudgetForge** : skip listing Acquire (0 MRR = invendable sérieusement). Archive dans 60j.
+
+## Track A — Cold email freelance (préparé fin J1, AWAITING ALEXIS VALIDATION)
+
+Décidé dans `PLAN_SESSIONS_API.md` (Decisions #6, #9, #10) mais jamais opérationnalisé. Préparé en fin de session J1 :
+
+- **Profil cible** validé : mix AI/LLM US + DeFi + agences FR, EN+FR, TJM €550 / $700/jour, async-only
+- **Source leads** recommandée : YC Directory (gratuit) + Apollo free (50/mois) + Hunter free (25 vérifs/mois) + Free-Work + DefiLlama + TechBehemoths FR
+- **3 templates rédigés** : A (AI/LLM US, EN), B (DeFi, EN), C (Agence FR, FR)
+- **5 prospects identifiés** pour J2 : RamAIn (YC W26), E2B, PeakLab (Paris), LightOn (Paris), RedStone
+- **5 emails personnalisés draftés** — variables `[email]` à remplir via Apollo demain matin
+
+**⚠️ Action Alexis avant J2 matin** : valider les 5 emails (corrections OK) ET dire si Track A est ajouté à `PLAN_SESSIONS_API.md` (je ne l'ai pas édité — pas de "go" reçu).
+
+Contenu détaillé (templates + prospects + emails) dans le transcript de session J1 (chercher "Track A — livrables pour J2").
+
+## Prochaine session J2 (29 avril)
+
+1. **Track A** : Alexis valide les 5 emails → Apollo pour récup emails → envoi 5/jour 9-11h
+2. Surveiller thread HN → répondre aux commentaires
+3. Reddit J2 : 3 nouveaux commentaires (donner threads au début de session)
+4. Évaluer signal HN avant de démarrer C2 (API #2 Cost Estimator)
+
+---
+
+# HANDOFF — Session 28 avril 2026 (PIVOT vers APIs RapidAPI)
+
+## ⚠️ DERNIER PIVOT — 28 avril 2026
+
+**BudgetForge et stratégie team/entreprise = abandonnés.**
+
+Nouveau plan : **5 APIs sur RapidAPI** extraites du code existant (BudgetForge + OracleForge + LLMForge + AuthForge).
+
+➡️ **Première action chaque session : lire `PLAN_SESSIONS_API.md` à la racine.** Tout y est planifié par jour.
+
+### Pourquoi ce pivot
+- BudgetForge = marché LLM cost saturé (LiteLLM, Portkey, Helicone, etc.) — vendable à tort confirmé
+- Team/entreprise demande vente humaine — Alexis refuse contact direct
+- API marketplace = 0 vente directe, paiement automatique, distribution organique
+- Code déjà à 80% écrit dans les forges existantes
+
+### Règles dures décidées 28 avril
+1. ❌ Twitter banni (Alexis banned)
+2. ❌ 0 call / 0 visio / 0 démo live
+3. ✅ Reddit + HN + GitHub + IndieHackers + Hashnode = canaux principaux
+4. ✅ Validation publique AVANT code (vs erreur BudgetForge)
+5. ✅ WebSearch obligatoire avant toute affirmation marché
+6. **BudgetForge mis en vente sur Acquire/MicroAcquire/Flippa** — période 60j puis archive
+
+### Top 5 APIs à valider/build (ordre)
+1. Token Counter Multi-Model (depuis `budgetforge/services/token_estimator.py`)
+2. LLM Cost Estimator Multi-Provider (depuis `cost_calculator.py` + `dynamic_pricing.py`)
+3. Pyth Network REST (depuis `oracleforge/services/oracle/pyth_solana_oracle.py`)
+4. Semantic LLM Cache (depuis `llmforge/services/cache.py`)
+5. Oracle Anomaly Detection (depuis `oracleforge/services/oracle/intelligence.py`)
+
+---
+
+# (ANCIEN) HANDOFF — Session 27 avril 2026 (Phase 0 distribution + V12 kill)
 
 ## État global
 

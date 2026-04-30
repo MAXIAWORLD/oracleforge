@@ -1,4 +1,3 @@
-import asyncio
 import hmac
 import hashlib
 import logging
@@ -90,7 +89,7 @@ def send_portal_email(email: str, token: str) -> bool:
         )
         return False
 
-    link = f"{settings.app_url}/portal#token={token}"
+    link = f"{settings.app_url}/portal?token={token}"
     body = f"""\
 Access your BudgetForge projects
 
@@ -123,38 +122,27 @@ https://llmbudget.maxiaworld.app
         return False
 
 
-def _get_projects_for_email(email: str, db: Session) -> list:
-    return db.query(Project).filter(Project.name == email).all()
-
-
 @router.post("/api/portal/request")
 @limiter.limit("5/hour")
-async def portal_request(
+def portal_request(
     request: Request, body: PortalRequestBody, db: Session = Depends(get_db)
 ):
-    _MIN_RESPONSE_S = 0.1  # constant-time floor prevents email enumeration by timing
-    _start = time.monotonic()
-
     cleanup_expired_tokens(db)
     email = body.email.strip().lower()
-    if "\r" in email or "\n" in email:
-        raise HTTPException(status_code=400, detail="Invalid email")
-    projects = _get_projects_for_email(email, db)
-    if projects:
-        token = PortalToken(
-            email=email,
-            expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
-            + timedelta(hours=_TOKEN_TTL_HOURS),
-        )
-        db.add(token)
-        db.commit()
-        db.refresh(token)
-        await asyncio.to_thread(send_portal_email, email, token.token)
+    projects = db.query(Project).filter(Project.name == email).all()
+    if not projects:
+        return {"ok": True}
 
-    elapsed = time.monotonic() - _start
-    if elapsed < _MIN_RESPONSE_S:
-        await asyncio.sleep(_MIN_RESPONSE_S - elapsed)
+    token = PortalToken(
+        email=email,
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None)
+        + timedelta(hours=_TOKEN_TTL_HOURS),
+    )
+    db.add(token)
+    db.commit()
+    db.refresh(token)
 
+    send_portal_email(email, token.token)
     return {"ok": True}
 
 

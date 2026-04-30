@@ -74,9 +74,6 @@ async def lifespan(app: FastAPI):
                 "(fail-closed anti-bot). Configurer sur https://dash.cloudflare.com/?to=/:account/turnstile"
             )
     yield
-    from services.dynamic_pricing import shutdown_pricing_manager
-
-    shutdown_pricing_manager()
 
 
 app = FastAPI(

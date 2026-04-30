@@ -6,11 +6,6 @@ function generateSessionToken(secret: string): string {
   return `${iat}.${sig}`;
 }
 
-function sessionCookie(value: string, maxAge: number): string {
-  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `bf_session=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
-}
-
 export async function POST(req: Request): Promise<Response> {
   const dashboardPassword = process.env.DASHBOARD_PASSWORD ?? "";
   const sessionSecret = process.env.SESSION_SECRET ?? "default-secret";
@@ -29,7 +24,7 @@ export async function POST(req: Request): Promise<Response> {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Set-Cookie": sessionCookie(token, 86400),
+        "Set-Cookie": `bf_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
       },
     });
   }
@@ -59,7 +54,7 @@ export async function POST(req: Request): Promise<Response> {
     status: 200,
     headers: {
       "Content-Type": "application/json",
-      "Set-Cookie": sessionCookie(token, 86400),
+      "Set-Cookie": `bf_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`,
     },
   });
 }
@@ -69,7 +64,7 @@ export async function DELETE(_req: Request): Promise<Response> {
     status: 200,
     headers: {
       "Content-Type": "application/json",
-      "Set-Cookie": sessionCookie("", 0),
+      "Set-Cookie": `bf_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
     },
   });
 }
