@@ -32,7 +32,9 @@ _RISK_ORDER: dict[str, int] = {
     "critical": 4,
 }
 
-_HTTP_TIMEOUT = httpx.Timeout(connect=3.0, read=5.0, write=3.0, pool=3.0)
+# Strict 1-second timeout on all webhook calls.
+# Dead URLs must not block the scan endpoint.
+_HTTP_TIMEOUT = httpx.Timeout(timeout=1.0)
 
 
 def _meets_threshold(actual: str, minimum: str) -> bool:
@@ -66,7 +68,13 @@ async def _post_one(
             if res.status_code >= 400:
                 return False, f"HTTP {res.status_code}"
             return True, f"HTTP {res.status_code}"
+    except (httpx.TimeoutException, httpx.ConnectError) as exc:
+        logger.warning(
+            "[webhook] timeout/connection error for %s: %s", url, type(exc).__name__
+        )
+        return False, f"connection error: {type(exc).__name__}"
     except httpx.HTTPError as exc:
+        logger.warning("[webhook] http error for %s: %s", url, type(exc).__name__)
         return False, f"transport error: {type(exc).__name__}"
 
 
@@ -95,21 +103,25 @@ async def dispatch_event(
     }
 
     matching = [
-        w for w in webhooks
-        if w.get("enabled") and _meets_threshold(risk_level, w.get("min_risk_level", "critical"))
+        w
+        for w in webhooks
+        if w.get("enabled")
+        and _meets_threshold(risk_level, w.get("min_risk_level", "critical"))
     ]
     if not matching:
         return []
 
-    tasks = [
-        _post_one(w["url"], w.get("secret", ""), body, w["id"])
-        for w in matching
-    ]
+    tasks = [_post_one(w["url"], w.get("secret", ""), body, w["id"]) for w in matching]
     results = await asyncio.gather(*tasks, return_exceptions=False)
 
     out = []
     for w, (ok, msg) in zip(matching, results):
         if not ok:
-            logger.warning("[webhook] dispatch failed for %s (id=%d): %s", w.get("name"), w["id"], msg)
+            logger.warning(
+                "[webhook] dispatch failed for %s (id=%d): %s",
+                w.get("name"),
+                w["id"],
+                msg,
+            )
         out.append({"webhook_id": w["id"], "ok": ok, "message": msg})
     return out

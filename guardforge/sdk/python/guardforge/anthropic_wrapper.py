@@ -93,9 +93,12 @@ class _MessagesProxy:
             session_id = result.session_id
             kwargs["system"] = result.tokenized_text
 
-        # Streaming not yet supported with detokenization
+        # Streaming not yet supported — raise explicitly instead of silently skipping detokenization.
         if kwargs.get("stream"):
-            return self._real.create(**kwargs)
+            raise NotImplementedError(
+                "stream=True is not yet supported by GuardForge. "
+                "See LIMITATIONS.md for the roadmap."
+            )
 
         response = self._real.create(**kwargs)
 

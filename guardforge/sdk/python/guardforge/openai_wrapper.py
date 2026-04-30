@@ -63,7 +63,9 @@ def _tokenize_messages(
     return new_messages, session_id
 
 
-def _detokenize_response_text(text: str | None, session_id: str, gf: GuardForgeClient) -> str | None:
+def _detokenize_response_text(
+    text: str | None, session_id: str, gf: GuardForgeClient
+) -> str | None:
     """Detokenize a response text. Returns None if input is None."""
     if not text:
         return text
@@ -93,9 +95,12 @@ class _CompletionsProxy:
         new_messages, session_id = _tokenize_messages(messages, self._gf)
         kwargs["messages"] = new_messages
 
-        # Streaming not yet supported with detokenization
+        # Streaming not yet supported — raise explicitly instead of silently skipping detokenization.
         if kwargs.get("stream"):
-            return self._real.create(**kwargs)
+            raise NotImplementedError(
+                "stream=True is not yet supported by GuardForge. "
+                "See LIMITATIONS.md for the roadmap."
+            )
 
         response = self._real.create(**kwargs)
 
@@ -112,7 +117,9 @@ class _CompletionsProxy:
                         continue
                     original = getattr(msg, "content", None)
                     if isinstance(original, str):
-                        restored = _detokenize_response_text(original, session_id, self._gf)
+                        restored = _detokenize_response_text(
+                            original, session_id, self._gf
+                        )
                         try:
                             msg.content = restored
                         except (AttributeError, TypeError):

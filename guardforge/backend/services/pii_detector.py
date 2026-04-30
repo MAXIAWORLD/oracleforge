@@ -48,7 +48,13 @@ RISK_LEVELS: dict[str, str] = {
 }
 
 # Risk level ordering for computing overall risk
-_RISK_ORDER: dict[str, int] = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+_RISK_ORDER: dict[str, int] = {
+    "none": 0,
+    "low": 1,
+    "medium": 2,
+    "high": 3,
+    "critical": 4,
+}
 
 
 def compute_overall_risk(risk_levels: list[str]) -> str:
@@ -66,12 +72,21 @@ def compute_risk_distribution(risk_levels: list[str]) -> dict[str, int]:
     return distribution
 
 
+# ── Patterns disabled by default (high false-positive rate) ─────
+# These can be re-enabled via custom policy / custom patterns.
+# siren_fr: any 9-digit number matches (e.g. phone suffixes, zip+4, invoice IDs)
+_DISABLED_PATTERNS: frozenset[str] = frozenset({"siren_fr"})
+
 # ── Pre-compiled patterns ────────────────────────────────────────
 
 _PATTERNS: dict[str, re.Pattern[str]] = {
     # Existing entities
-    "email": re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", re.IGNORECASE),
-    "phone_international": re.compile(r"\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,4}){1,5}"),
+    "email": re.compile(
+        r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", re.IGNORECASE
+    ),
+    "phone_international": re.compile(
+        r"\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,4}){1,5}"
+    ),
     "credit_card": re.compile(r"\b(?:\d[ -]*?){13,16}\b"),
     "ssn_us": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
     "ssn_fr": re.compile(r"\b[12]\s?\d{2}\s?\d{2}\s?\d{2}\s?\d{3}\s?\d{3}\s?\d{2}\b"),
@@ -156,9 +171,7 @@ def _deduplicate_overlapping(entities: list[PIIEntity]) -> list[PIIEntity]:
     )
     kept: list[PIIEntity] = []
     for entity in sorted_entities:
-        overlaps = any(
-            entity.start < k.end and entity.end > k.start for k in kept
-        )
+        overlaps = any(entity.start < k.end and entity.end > k.start for k in kept)
         if not overlaps:
             kept.append(entity)
     kept.sort(key=lambda e: e.start)
@@ -168,6 +181,7 @@ def _deduplicate_overlapping(entities: list[PIIEntity]) -> list[PIIEntity]:
 @dataclass(frozen=True)
 class CustomPattern:
     """User-defined PII pattern with metadata."""
+
     name: str
     regex: re.Pattern[str]
     risk_level: str = "medium"
@@ -181,9 +195,16 @@ class PIIDetector:
     patterns added at runtime via add_custom_pattern() / set_custom_patterns().
     """
 
-    def __init__(self, confidence_threshold: float = 0.7) -> None:
+    def __init__(
+        self,
+        confidence_threshold: float = 0.7,
+        enabled_patterns: set[str] | None = None,
+    ) -> None:
         self._threshold = confidence_threshold
         self._custom: list[CustomPattern] = []
+        # Patterns explicitly enabled even if in _DISABLED_PATTERNS.
+        # Pass e.g. enabled_patterns={"siren_fr"} to re-enable.
+        self._enabled_patterns: set[str] = enabled_patterns or set()
 
     def set_custom_patterns(self, patterns: list[CustomPattern]) -> None:
         """Replace all custom patterns. Used at startup to load from DB."""
@@ -207,6 +228,12 @@ class PIIDetector:
         """Scan text and return all PII entities above confidence threshold."""
         entities: list[PIIEntity] = []
         for pii_type, pattern in _PATTERNS.items():
+            # Skip patterns disabled by default unless explicitly re-enabled
+            if (
+                pii_type in _DISABLED_PATTERNS
+                and pii_type not in self._enabled_patterns
+            ):
+                continue
             confidence = _CONFIDENCE.get(pii_type, 0.8)
             if confidence < self._threshold:
                 continue
@@ -217,28 +244,32 @@ class PIIDetector:
                     if not _luhn_check(clean):
                         continue
                 risk_level = RISK_LEVELS.get(pii_type, "medium")
-                entities.append(PIIEntity(
-                    type=pii_type,
-                    value=value,
-                    start=match.start(),
-                    end=match.end(),
-                    confidence=confidence,
-                    risk_level=risk_level,
-                ))
+                entities.append(
+                    PIIEntity(
+                        type=pii_type,
+                        value=value,
+                        start=match.start(),
+                        end=match.end(),
+                        confidence=confidence,
+                        risk_level=risk_level,
+                    )
+                )
 
         # Custom user-defined patterns
         for cp in self._custom:
             if cp.confidence < self._threshold:
                 continue
             for match in cp.regex.finditer(text):
-                entities.append(PIIEntity(
-                    type=cp.name,
-                    value=match.group(),
-                    start=match.start(),
-                    end=match.end(),
-                    confidence=cp.confidence,
-                    risk_level=cp.risk_level,
-                ))
+                entities.append(
+                    PIIEntity(
+                        type=cp.name,
+                        value=match.group(),
+                        start=match.start(),
+                        end=match.end(),
+                        confidence=cp.confidence,
+                        risk_level=cp.risk_level,
+                    )
+                )
 
         return _deduplicate_overlapping(entities)
 
@@ -272,7 +303,7 @@ class PIIDetector:
                 replacement = f"[hash:{h}]"
             else:
                 replacement = f"[{entity.type.upper()}]"
-            result = result[:entity.start] + replacement + result[entity.end:]
+            result = result[: entity.start] + replacement + result[entity.end :]
         return result
 
     def scan_and_anonymize(self, text: str, strategy: str = "redact") -> dict:

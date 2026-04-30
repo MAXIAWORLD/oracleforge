@@ -1,18 +1,32 @@
 # GuardForge
 
-> **PII & AI Safety Kit for the LLM era.**
-> Detect, redact, and tokenize sensitive data before it ever reaches OpenAI, Anthropic, or any other LLM provider. Built for compliance with GDPR, EU AI Act, HIPAA, CCPA, LGPD, and 8 more jurisdictions.
+> Local PII redaction & tokenization for LLM pipelines — GDPR/HIPAA/PCI-DSS, 17 entity types, self-hosted, no signup
 
 [![Status](https://img.shields.io/badge/status-production_ready-green)]()
 [![Languages](https://img.shields.io/badge/UI-15_languages-blue)]()
 [![Tests](https://img.shields.io/badge/tests-79_passing-brightgreen)]()
-[![License](https://img.shields.io/badge/license-Proprietary-red)]()
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)]()
 
 ---
 
-## Why GuardForge
+## Quick Start (3 commands)
 
-Every SaaS company shipping AI features has a compliance time bomb: **user data going to OpenAI/Anthropic without redaction**. GDPR fines reach 4% of revenue. The EU AI Act adds new criminal liability in 2025-2026. HIPAA fines reach $50k per incident.
+```bash
+git clone https://github.com/MAXIAWORLD/guardforge.git
+cd guardforge
+cp backend/.env.example backend/.env
+docker compose up
+```
+
+→ Dashboard: http://localhost:3003
+→ API: http://localhost:8004
+→ API docs: http://localhost:8004/docs (dev mode only — requires `DEBUG=true`)
+
+---
+
+## What it does
+
+Every team shipping AI features has a compliance time bomb: **user data going to OpenAI/Anthropic without redaction**. GDPR fines reach 4% of revenue. HIPAA fines reach $50k per incident.
 
 **GuardForge solves it in one drop-in line of code.**
 
@@ -26,9 +40,7 @@ from guardforge import OpenAI    # Same API, automatic PII redaction + restorati
 
 PII never leaves your infrastructure. Real values are restored after the LLM responds, so your chatbot still says "Hi John" — but OpenAI never sees "John".
 
----
-
-## Key features
+### Key features
 
 | Feature | Status |
 |---|---|
@@ -40,96 +52,37 @@ PII never leaves your infrastructure. Real values are restored after the LLM res
 | **Compliance reports** — JSON + PDF export by date range, top entities, action distribution | ✅ |
 | **Persistent audit log** — every scan logged in DB, exportable for auditors | ✅ |
 | **15-language dashboard** — EN, FR, DE, ES, IT, PT, NL, PL, RU, TR, AR, HI, JA, KO, ZH | ✅ |
-| **Vault** — AES-256 (Fernet) encrypted secrets, **survives restarts** | ✅ |
+| **Vault** — AES-256 (Fernet) encrypted secrets, survives restarts | ✅ |
 | **Custom entities** — define your own regex patterns | 🟡 in progress |
 | **Webhook alerts** for high-risk scans | 🟡 in progress |
 | **Drop-in Python SDK** for OpenAI/Anthropic | 🟡 in progress |
 
 ---
 
-## Quick start (5 minutes)
-
-### Prerequisites
-- Python 3.12+
-- Node.js 20+ (for the dashboard)
-
-### 1. Clone
-```bash
-git clone https://github.com/your-org/guardforge.git
-cd guardforge
-```
-
-### 2. Backend
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate           # macOS / Linux
-venv\Scripts\activate              # Windows
-
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env — set SECRET_KEY and VAULT_ENCRYPTION_KEY (see Configuration below)
-
-python -m uvicorn main:app --host 0.0.0.0 --port 8004
-```
-
-The API is now live at `http://localhost:8004` and Swagger docs at `http://localhost:8004/docs`.
-
-### 3. Dashboard
-```bash
-cd ../dashboard
-npm install
-cp .env.local.example .env.local
-# Edit .env.local — set NEXT_PUBLIC_API_KEY to match SECRET_KEY in backend
-
-npm run dev -- --port 3003
-```
-
-The dashboard is now live at `http://localhost:3003`.
-
-### 4. First scan
-```bash
-curl -X POST http://localhost:8004/api/scan \
-  -H "X-API-Key: your-secret-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Hi, my name is John Doe and my email is john@example.com",
-    "strategy": "redact"
-  }'
-```
-
-You should see PII detected and redacted as `[PERSON_NAME]` and `[EMAIL]`.
-
----
-
 ## Configuration
 
-### Backend `.env`
+### Backend `backend/.env`
 
 | Variable | Default | Description |
 |---|---|---|
 | `SECRET_KEY` | _(required)_ | Used as `X-API-Key` for authenticated endpoints. Must be ≥16 chars. |
-| `DEBUG` | `false` | Enables verbose logs. Disable in production. |
-| `DATABASE_URL` | `sqlite+aiosqlite:///./guardforge.db` | SQLite for dev. PostgreSQL supported via `postgresql+asyncpg://...` (vault persistence falls back to in-memory only). |
-| `CORS_ORIGINS` | `["http://localhost:3000"]` | JSON array of allowed origins for the dashboard. |
-| `VAULT_ENCRYPTION_KEY` | _(empty → auto-generated)_ | **CRITICAL**: Fernet base64 key. If empty, a new key is generated each restart and old vault data becomes unreadable. **Always set in production.** Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Comma-separated for key rotation. |
-| `PII_CONFIDENCE_THRESHOLD` | `0.7` | Minimum confidence to report an entity. Lower = more recall, more false positives. |
+| `DEBUG` | `false` | Enables verbose logs and `/docs`. **Disable in production.** |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./data/guardforge.db` | SQLite for local. PostgreSQL: `postgresql+asyncpg://...` (vault falls back to in-memory). |
+| `CORS_ORIGINS` | `["http://localhost:3003"]` | JSON array of allowed origins for the dashboard. |
+| `VAULT_ENCRYPTION_KEY` | _(empty → **error in prod**)_ | **CRITICAL**: Fernet base64 key. Required when `DEBUG=false`. Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Comma-separated for key rotation. |
+| `PII_CONFIDENCE_THRESHOLD` | `0.7` | Minimum confidence to report an entity. |
 | `PII_LANGUAGES` | `["en","fr"]` | Languages to apply heuristic detection. |
 | `DEFAULT_POLICY` | `strict` | Default policy when none specified per scan. |
 
-### Dashboard `.env.local`
+### Dashboard environment
 
-| Variable | Default | Description |
-|---|---|---|
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8004` | Backend URL. |
-| `NEXT_PUBLIC_API_KEY` | _(required)_ | Must match backend `SECRET_KEY`. |
-| `NEXT_PUBLIC_SECRET_KEY` | _(required for vault page)_ | Same as `NEXT_PUBLIC_API_KEY` — used as Bearer token for vault endpoints. |
+The dashboard reads `NEXT_PUBLIC_API_URL` from docker-compose (`http://localhost:8004` by default). For custom setups, edit the `environment` section in `docker-compose.yml`.
 
 ---
 
 ## API reference
 
-Swagger UI at `http://localhost:8004/docs` lists every endpoint with examples.
+Swagger UI at `http://localhost:8004/docs` (requires `DEBUG=true` in `.env`).
 
 ### Core endpoints
 
@@ -168,14 +121,12 @@ SAFE_TEXT=$(echo $RESPONSE | jq -r '.tokenized_text')
 
 # 2. Send the safe text to OpenAI (no PII leaks)
 LLM_REPLY=$(call_openai "$SAFE_TEXT")
-# LLM_REPLY = "Hello [PERSON_NAME_a3f2], your IBAN [IBAN_b491] is now confirmed."
 
 # 3. Restore real values for your user
 curl -s -X POST http://localhost:8004/api/detokenize \
   -H "X-API-Key: your-secret-key" \
   -H "Content-Type: application/json" \
   -d "{\"text\": \"$LLM_REPLY\", \"session_id\": \"$SESSION\"}"
-# Returns: "Hello Jean Dupont, your IBAN FR7630006000011234567890189 is now confirmed."
 ```
 
 ---
@@ -186,38 +137,26 @@ curl -s -X POST http://localhost:8004/api/detokenize \
 
 | Page | URL | Purpose |
 |---|---|---|
-| **Tableau de bord** | `/` | Stats overview, risk distribution, quick navigation |
+| **Overview** | `/` | Stats overview, risk distribution, quick navigation |
 | **Scanner** | `/scanner` | Live PII scanner with strategy selector and risk badges |
-| **Politiques** | `/policies` | Browse and inspect compliance policies |
-| **Journal d'audit** | `/audit` | Persistent scan history with filters and pagination |
-| **Coffre-fort** | `/vault` | Encrypted secret store management |
-| **Playground** | `/playground` | Live tokenize → restore demo (the "wow" page) |
-| **Rapports** | `/reports` | Compliance reports with date range, charts, JSON export |
+| **Policies** | `/policies` | Browse and inspect compliance policies |
+| **Audit log** | `/audit` | Persistent scan history with filters and pagination |
+| **Vault** | `/vault` | Encrypted secret store management |
+| **Playground** | `/playground` | Live tokenize → restore demo |
+| **Reports** | `/reports` | Compliance reports with date range, charts, JSON export |
 
 ---
 
 ## Compliance support
 
-GuardForge ships with built-in policy presets for major data protection regulations:
-
 | Region | Regulation | Status |
 |---|---|---|
-| 🇪🇺 EU | **GDPR** (RGPD) | ✅ Full preset |
-| 🇪🇺 EU | **EU AI Act** (2025-2026) | 🟡 Coming in next release |
-| 🇺🇸 US Federal | **HIPAA** | ✅ Full preset |
-| 🌍 Worldwide | **PCI-DSS v4** | ✅ Full preset |
-| 🇺🇸 California | **CCPA / CPRA** | 🟡 Coming in next release |
-| 🇧🇷 Brazil | **LGPD** | 🟡 Coming in next release |
-| 🇨🇦 Canada | **PIPEDA** | 🟡 Coming in next release |
-| 🇯🇵 Japan | **APPI** | 🟡 Coming in next release |
-| 🇸🇬 Singapore | **PDPA** | 🟡 Coming in next release |
-| 🇿🇦 South Africa | **POPIA** | 🟡 Coming in next release |
-| 🇮🇳 India | **DPDP Act 2023** | 🟡 Coming in next release |
-| 🇨🇳 China | **PIPL** | 🟡 Coming in next release |
-| 🇦🇺 Australia | **Privacy Act 1988** | 🟡 Coming in next release |
-| 🇬🇧 UK | **UK GDPR + DPA 2018** | ✅ via GDPR preset |
-
-For full compliance documentation including DPA templates, security whitepaper, and sub-processor list, see `docs/legal/`.
+| EU | **GDPR** | ✅ Full preset |
+| EU | **EU AI Act** | 🟡 Coming |
+| US | **HIPAA** | ✅ Full preset |
+| Worldwide | **PCI-DSS v4** | ✅ Full preset |
+| California | **CCPA / CPRA** | 🟡 Coming |
+| Brazil | **LGPD** | 🟡 Coming |
 
 ---
 
@@ -233,101 +172,42 @@ guardforge/
 │   └── tests/            # 79 pytest tests
 ├── dashboard/            # Next.js 16 + Tailwind 4 + shadcn/ui + next-intl
 │   ├── src/app/          # 7 pages, App Router
-│   ├── src/components/   # Shared UI (DashboardShell, ThemeToggle, etc.)
-│   ├── src/messages/     # 15 locale files
-│   └── scripts/          # Maintenance scripts
-└── docs/                 # User documentation
+│   ├── src/components/   # Shared UI
+│   └── src/messages/     # 15 locale files
+├── sdk/python/           # Drop-in OpenAI/Anthropic wrappers
+└── docker-compose.yml
 ```
 
-### Tech stack
-
-- **Backend**: Python 3.12 · FastAPI · Pydantic V2 · SQLAlchemy 2 (async) · aiosqlite · cryptography (Fernet) · pytest
-- **Frontend**: Next.js 16 (Turbopack) · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · next-intl · Framer Motion · Lucide icons
-
----
-
-## Self-hosted vs Cloud
-
-| | Self-hosted | Cloud SaaS |
-|---|---|---|
-| **Data residency** | ✅ Wherever you deploy | ✅ EU only (Frankfurt/Paris) day-1; US/APAC on demand |
-| **Setup** | ~10 min (Docker compose) | Instant |
-| **Updates** | Manual `git pull` | Automatic |
-| **Backups** | Your responsibility | Daily snapshots |
-| **Support** | Forum / email / priority depending on tier | Email / Slack / dedicated CSM depending on tier |
-| **License** | One-time payment, perpetual use | Monthly subscription |
-| **Best for** | Sensitive data, strict residency, on-prem requirements | Quick start, no infra burden |
+**Tech stack**: Python 3.12 · FastAPI · Pydantic V2 · SQLAlchemy 2 async · aiosqlite · cryptography (Fernet) · Next.js 16 · React 19 · TypeScript strict · Tailwind 4 · shadcn/ui · next-intl
 
 ---
 
 ## Troubleshooting
 
-### Backend won't start: `pydantic.errors.PydanticUserError: Field "secret_key" is required`
-Set `SECRET_KEY` in your `.env` file. Minimum 16 characters.
+**`pydantic.errors.PydanticUserError: Field "secret_key" is required`**
+Set `SECRET_KEY` in `backend/.env` (min 16 chars).
 
-### Dashboard shows "Failed to fetch policies: Unauthorized"
-`NEXT_PUBLIC_API_KEY` in `dashboard/.env.local` does not match `SECRET_KEY` in `backend/.env`. They MUST be identical. Restart `npm run dev` after changing — Next.js does NOT hot-reload env vars.
+**`RuntimeError: VAULT_ENCRYPTION_KEY must be set in production`**
+Set `DEBUG=true` for local dev, or generate a key: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
 
-### Vault page shows "Indisponible" + "Set NEXT_PUBLIC_SECRET_KEY"
-Same fix: set `NEXT_PUBLIC_SECRET_KEY` in `dashboard/.env.local` to match backend `SECRET_KEY`. Restart dashboard.
+**Dashboard shows "Unauthorized"**
+`NEXT_PUBLIC_API_KEY` in `dashboard/.env.local` must match `SECRET_KEY` in `backend/.env`. Restart containers after change.
 
-### Tokenize works, but Detokenize returns 404 after restart
-Your `VAULT_ENCRYPTION_KEY` is empty (auto-generated each restart). Set a fixed Fernet key in your `.env`:
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-Copy the output into `VAULT_ENCRYPTION_KEY=...`. Restart backend.
+**Detokenize returns 404 after restart**
+`VAULT_ENCRYPTION_KEY` is empty (auto-generated each restart in dev mode). Set a fixed key in `backend/.env`.
 
-### CORS errors in browser console
-Add your dashboard origin to `CORS_ORIGINS` in `backend/.env`:
-```
-CORS_ORIGINS=["http://localhost:3000","http://localhost:3003","https://your-prod-domain.com"]
-```
+**CORS errors in browser**
+Add your origin to `CORS_ORIGINS` in `backend/.env`: `CORS_ORIGINS=["http://localhost:3003"]`.
 
-### Tests fail with `httpx.ConnectError`
-Run `pip install httpx>=0.27` in your venv. The test client requires httpx as a dev dependency.
-
-### High false positives on SIREN (9-digit numbers)
-SIREN regex matches any 9-digit sequence. Either raise `PII_CONFIDENCE_THRESHOLD` to 0.8+, or disable the SIREN entity by setting custom policy `blocked_types`.
+**High false positives on SIREN (9-digit numbers)**
+SIREN is disabled by default. It can be re-enabled via `enabled_patterns={"siren_fr"}` in the PIIDetector constructor or by raising `PII_CONFIDENCE_THRESHOLD` to 0.8+.
 
 ---
 
 ## License
 
-GuardForge is **proprietary software**. See `LICENSE` file for full terms.
-
-- ✅ **Permitted**: internal business use, integration with your products
-- ❌ **Forbidden**: redistribution, reselling, removing branding, reverse-engineering for competitive products
-
-For commercial licensing inquiries: `sales@guardforge.io` _(coming soon)_.
+Apache 2.0 — see [LICENSE](LICENSE)
 
 ---
 
-## Support
-
-- **Documentation**: `docs/`
-- **API reference**: `http://localhost:8004/docs` (Swagger UI)
-- **Issues**: GitHub Issues (cloud subscribers get priority on email)
-- **Email**: `support@guardforge.io` _(coming soon)_
-
----
-
-## Roadmap
-
-- [x] Core PII detection (17 entities, 4 EU languages)
-- [x] Reversible tokenization with encrypted vault
-- [x] Persistent audit log + compliance reports
-- [x] 15-language dashboard
-- [x] Vault DB persistence (survives restarts)
-- [ ] 12 compliance presets (CCPA, LGPD, PIPEDA, APPI, etc.)
-- [ ] Drop-in Python SDK (`from guardforge import OpenAI`)
-- [ ] PDF export for compliance reports
-- [ ] Custom entities CRUD UI
-- [ ] Webhook alerts for high-risk scans
-- [ ] PostgreSQL vault adapter (for production scale)
-- [ ] Multi-tenant isolation (Enterprise tier)
-- [ ] Real-time SIEM integration (Splunk, Datadog)
-
----
-
-**Built with care by MAXIA Lab.** Part of the [Forge Suite](https://maxia.lab/forge) — 6 developer tools for AI-era startups.
+**Built by [MAXIA Lab](https://maxiaworld.app).** Part of the [Forge Suite](https://maxiaworld.app) — developer tools for AI-era teams.

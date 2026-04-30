@@ -1,225 +1,182 @@
-GUARDFORGE PROPRIETARY LICENSE AGREEMENT
-
-Version 1.0 — Effective 2026
-
-Copyright (c) 2026 MAXIA Lab. All rights reserved.
-
-GuardForge is proprietary software. By installing, accessing, or using
-GuardForge ("the Software"), you ("Licensee") agree to be bound by this
-License Agreement. If you do not agree, you must not use the Software.
-
-================================================================================
-1. DEFINITIONS
-================================================================================
-
-"Software" means the GuardForge backend, dashboard, SDKs, scripts, documentation,
-and any updates or upgrades thereof, as distributed by MAXIA Lab.
-
-"License Key" means the unique identifier issued by MAXIA Lab upon purchase
-that authorizes use of a specific tier of the Software.
-
-"Cloud Edition" means the version of the Software hosted by MAXIA Lab and
-accessed via subscription.
-
-"Self-Hosted Edition" means the version of the Software that Licensee installs
-and runs on infrastructure under Licensee's control.
-
-"Production Use" means use of the Software in any environment that processes
-data of real users, customers, or in any commercial capacity.
-
-"Internal Business Use" means use of the Software by Licensee's employees,
-contractors, or subsidiaries solely for Licensee's own business operations.
-
-================================================================================
-2. GRANT OF LICENSE
-================================================================================
-
-Subject to payment of the applicable fees and compliance with this Agreement,
-MAXIA Lab grants Licensee a non-exclusive, non-transferable, non-sublicensable,
-revocable license to:
-
-(a) Install and run the Software for Internal Business Use.
-
-(b) Integrate the Software's APIs and SDKs into Licensee's own products and
-    services, provided that the Software itself is not redistributed.
-
-(c) Modify configuration files, environment variables, and policies as
-    documented to suit Licensee's deployment.
-
-(d) Make backup copies for disaster recovery purposes.
-
-The number of installations, users, scans per month, and other quotas are
-determined by the License Key tier purchased.
-
-================================================================================
-3. RESTRICTIONS
-================================================================================
-
-Licensee shall NOT, and shall not permit any third party to:
-
-(a) Redistribute, resell, sublicense, lease, rent, or otherwise transfer the
-    Software, in whole or in part, to any third party.
-
-(b) Provide the Software as a service to third parties (Software-as-a-Service,
-    Platform-as-a-Service, or any equivalent), where doing so would compete
-    with MAXIA Lab's Cloud Edition.
-
-(c) Reverse-engineer, decompile, disassemble, or attempt to derive the source
-    code of the Software, except as expressly permitted by applicable law that
-    cannot be waived by contract.
-
-(d) Remove, alter, or obscure any copyright notice, trademark, "GuardForge"
-    branding, "Powered by GuardForge" mention, or other proprietary notices.
-
-(e) Use the Software to develop a competing product or service.
-
-(f) Bypass, disable, or tamper with license validation, phone-home telemetry,
-    quota enforcement, or any other control mechanism in the Software.
-
-(g) Use the Software for any unlawful purpose or in violation of any applicable
-    data protection regulation (including GDPR, CCPA, HIPAA, etc.).
-
-(h) Use the Software beyond the quotas, user limits, or instance counts of the
-    purchased License Key tier.
-
-================================================================================
-4. CLOUD EDITION SPECIFIC TERMS
-================================================================================
-
-(a) The Cloud Edition is provided as a subscription service. Subscription fees
-    are billed monthly or annually as selected at purchase.
-
-(b) Subscription may be cancelled at any time. Upon cancellation, access to the
-    Cloud Edition ends at the end of the current billing period.
-
-(c) Refunds are governed by the separate Refund Policy available on MAXIA Lab's
-    website.
-
-(d) MAXIA Lab targets 99.9% uptime for paid Cloud Edition tiers but does not
-    guarantee uninterrupted service.
-
-(e) Licensee data processed via the Cloud Edition is retained according to the
-    Data Retention Policy in the Data Processing Agreement (DPA).
-
-================================================================================
-5. SELF-HOSTED EDITION SPECIFIC TERMS
-================================================================================
-
-(a) The Self-Hosted Edition is licensed by one-time payment for perpetual use,
-    limited to the number of instances specified by the purchased tier.
-
-(b) Updates and upgrades are included for the period specified at purchase
-    (typically 6, 12, or 24 months). After expiration, Licensee may continue
-    using the version installed but is not entitled to new releases.
-
-(c) The Software contains a phone-home telemetry component that periodically
-    contacts MAXIA Lab license servers to validate the License Key. This
-    telemetry transmits only license metadata (key hash, version, instance ID)
-    and does NOT transmit any user data, scan content, or PII.
-
-(d) Disabling or blocking the phone-home component is a material breach of
-    this Agreement and immediately terminates Licensee's rights.
-
-(e) Source code is NOT provided with the standard Self-Hosted Edition. Partial
-    source code access may be granted with the Enterprise Self-Hosted tier
-    under a separate Source Code Addendum.
-
-================================================================================
-6. INTELLECTUAL PROPERTY
-================================================================================
-
-The Software and all intellectual property rights therein, including but not
-limited to copyrights, patents, trademarks, trade secrets, and know-how, are
-and shall remain the exclusive property of MAXIA Lab.
-
-This Agreement does not grant Licensee any rights in MAXIA Lab's trademarks,
-service marks, or trade dress, except as necessary to comply with the branding
-attribution requirements in Section 3(d).
-
-================================================================================
-7. DATA PROTECTION AND PRIVACY
-================================================================================
-
-(a) For Cloud Edition users, data processing is governed by the Data Processing
-    Agreement (DPA) which forms part of this Agreement and is available
-    separately.
-
-(b) For Self-Hosted Edition users, Licensee is the sole data controller and
-    processor of any data processed through the Software. MAXIA Lab has no
-    access to Licensee's processed data.
-
-(c) Licensee is responsible for ensuring that its use of the Software complies
-    with all applicable data protection laws in the jurisdictions in which it
-    operates.
-
-================================================================================
-8. WARRANTY DISCLAIMER
-================================================================================
-
-THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
-KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, OR
-ACCURACY OF DATA.
-
-MAXIA LAB DOES NOT WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE, BUG-FREE,
-UNINTERRUPTED, OR THAT IT WILL DETECT ALL PERSONALLY IDENTIFIABLE INFORMATION
-IN ALL CASES. PII DETECTION IS A BEST-EFFORT FEATURE BASED ON HEURISTICS AND
-PATTERN MATCHING; LICENSEE REMAINS RESPONSIBLE FOR ITS OWN COMPLIANCE.
-
-================================================================================
-9. LIMITATION OF LIABILITY
-================================================================================
-
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL MAXIA LAB
-BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE
-DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, DATA, USE, GOODWILL, OR
-OTHER INTANGIBLE LOSSES, RESULTING FROM:
-
-(a) LICENSEE'S USE OR INABILITY TO USE THE SOFTWARE;
-(b) ANY UNAUTHORIZED ACCESS TO OR ALTERATION OF LICENSEE'S DATA;
-(c) ANY THIRD-PARTY CONDUCT OR CONTENT ON THE SOFTWARE;
-(d) ANY REGULATORY FINES OR PENALTIES INCURRED BY LICENSEE.
-
-MAXIA LAB'S TOTAL CUMULATIVE LIABILITY UNDER THIS AGREEMENT SHALL NOT EXCEED
-THE FEES PAID BY LICENSEE TO MAXIA LAB IN THE TWELVE (12) MONTHS PRECEDING THE
-EVENT GIVING RISE TO THE CLAIM.
-
-================================================================================
-10. TERMINATION
-================================================================================
-
-(a) This Agreement is effective until terminated.
-
-(b) MAXIA Lab may terminate this Agreement immediately upon any material breach
-    by Licensee, including but not limited to violation of Section 3
-    (Restrictions) or non-payment of fees.
-
-(c) Upon termination, Licensee must immediately cease all use of the Software,
-    destroy all copies in its possession, and certify such destruction in
-    writing if requested.
-
-(d) Sections 3, 6, 7, 8, 9, 10, and 11 survive termination.
-
-================================================================================
-11. GOVERNING LAW AND DISPUTE RESOLUTION
-================================================================================
-
-This Agreement is governed by the laws of France, without regard to conflict
-of laws principles. Any dispute arising out of or in connection with this
-Agreement shall be subject to the exclusive jurisdiction of the courts of
-Paris, France.
-
-================================================================================
-12. ENTIRE AGREEMENT
-================================================================================
-
-This Agreement, together with any applicable DPA, Order Form, or Source Code
-Addendum, constitutes the entire agreement between Licensee and MAXIA Lab
-regarding the Software and supersedes all prior agreements or understandings.
-
-================================================================================
-
-For licensing inquiries, enterprise pricing, or to report a license violation:
-contact@maxialab.com
-
-GuardForge is part of the Forge Suite by MAXIA Lab.
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship made available under
+      the License, as indicated by a copyright notice that is included in
+      or attached to the work (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean, as submitted to the Licensor for inclusion
+      in the Work by the copyright owner or by an individual or Legal Entity
+      authorized to submit on behalf of the copyright owner. For the purposes
+      of this definition, "submission" includes any form of electronic, verbal,
+      or written communication sent to the Licensor or its representatives,
+      including but not limited to communication on electronic mailing lists,
+      source code control systems, and issue tracking systems that are managed
+      by, or on behalf of, the Licensor for the purpose of discussing and
+      improving the Work, but excluding communication that is conspicuously
+      marked or designated in writing by the copyright owner as "Not a
+      Contribution."
+
+      "Contributor" shall mean Licensor and any Legal Entity on behalf of
+      whom a Contribution has been received by the Licensor and incorporated
+      within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by the combined contribution of their
+      Contribution(s) with the Work to which such Contribution(s)
+      was submitted. If You institute patent litigation against any
+      entity (including a cross-claim or counterclaim in a lawsuit)
+      alleging that the Work or any Contribution embodied within the Work
+      constitutes direct or contributory patent infringement, then any
+      patent licenses granted to You under this License for that Work
+      shall terminate as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or Derivative
+          Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, You must include a readable copy of the
+          attribution notices contained within such NOTICE file, in
+          at least one of the following places: within a NOTICE text
+          file distributed as part of the Derivative Works; within
+          the Source form or documentation, if provided along with the
+          Derivative Works; or, within a display generated by the
+          Derivative Works, if and wherever such third-party notices
+          normally appear. The contents of the NOTICE file are for
+          informational purposes only and do not modify the License.
+          You may add Your own attribution notices within Derivative
+          Works that You distribute, alongside or as an addendum to
+          the NOTICE text from the Work, provided that such additional
+          attribution notices cannot be construed as modifying the License.
+
+      You may add Your own license statement for Your modifications and
+      may provide additional grant of rights to use, reproduce, modify,
+      display, perform, sublicense and distribute those modifications, as
+      separate terms and conditions for use, reproduction, or distribution
+      of Your modifications, or for such Derivative Works as a whole,
+      provided Your use, reproduction, and distribution of the Work
+      otherwise complies with the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or exemplary damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or all other
+      commercial damages or losses), even if such Contributor has been
+      advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may offer only
+      conditions consistent with this License.
+
+   END OF TERMS AND CONDITIONS
+
+   Copyright 2026 MAXIA Lab
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.

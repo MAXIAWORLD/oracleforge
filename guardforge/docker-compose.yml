@@ -1,8 +1,25 @@
-version: "3.8"
+version: '3.8'
+
 services:
   backend:
     build: ./backend
     ports:
       - "8004:8004"
-    env_file: ./backend/.env
+    env_file:
+      - backend/.env
+    volumes:
+      - guardforge_data:/app/data
     restart: unless-stopped
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "3003:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8004
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  guardforge_data:

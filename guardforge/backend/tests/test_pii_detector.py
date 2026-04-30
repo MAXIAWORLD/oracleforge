@@ -1,6 +1,11 @@
 """TDD tests for services/pii_detector.py."""
 
-from services.pii_detector import PIIDetector, RISK_LEVELS, compute_overall_risk, compute_risk_distribution
+from services.pii_detector import (
+    PIIDetector,
+    RISK_LEVELS,
+    compute_overall_risk,
+    compute_risk_distribution,
+)
 
 
 class TestDetect:
@@ -106,9 +111,18 @@ class TestNewEUEntities:
         assert any(e.type == "siret_fr" for e in entities)
 
     def test_detects_siren_fr(self) -> None:
-        d = PIIDetector(confidence_threshold=0.7)
+        # siren_fr is disabled by default (high false-positive rate).
+        # Must be explicitly enabled via enabled_patterns.
+        d = PIIDetector(confidence_threshold=0.7, enabled_patterns={"siren_fr"})
         entities = d.detect("SIREN 123456789")
         assert any(e.type == "siren_fr" for e in entities)
+
+    def test_siren_fr_off_by_default(self) -> None:
+        d = PIIDetector(confidence_threshold=0.7)
+        entities = d.detect("SIREN 123456789")
+        assert not any(e.type == "siren_fr" for e in entities), (
+            "siren_fr must be disabled by default"
+        )
 
     def test_detects_dni_es(self) -> None:
         d = PIIDetector()
@@ -172,10 +186,23 @@ class TestRiskHelpers:
 
     def test_risk_levels_dict_has_all_entities(self) -> None:
         expected = {
-            "credit_card", "ssn_us", "ssn_fr", "iban", "rib_fr",
-            "codice_fiscale_it", "passport_generic", "dni_es", "nie_es",
-            "steuer_id_de", "siret_fr", "siren_fr", "person_name",
-            "email", "phone_international", "date_of_birth", "ipv4",
+            "credit_card",
+            "ssn_us",
+            "ssn_fr",
+            "iban",
+            "rib_fr",
+            "codice_fiscale_it",
+            "passport_generic",
+            "dni_es",
+            "nie_es",
+            "steuer_id_de",
+            "siret_fr",
+            "siren_fr",
+            "person_name",
+            "email",
+            "phone_international",
+            "date_of_birth",
+            "ipv4",
         }
         assert expected.issubset(RISK_LEVELS.keys())
 

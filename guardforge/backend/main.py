@@ -33,13 +33,23 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
+
+    # Production safety check: refuse silent key generation in production.
+    if not settings.debug and not settings.vault_encryption_key:
+        raise RuntimeError(
+            "VAULT_ENCRYPTION_KEY must be set in production. See .env.example. "
+            'Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
+        )
+
     await init_db(settings.database_url)
 
     from services.pii_detector import PIIDetector
     from services.vault import Vault
     from services.policy_engine import PolicyEngine
 
-    app.state.pii_detector = PIIDetector(confidence_threshold=settings.pii_confidence_threshold)
+    app.state.pii_detector = PIIDetector(
+        confidence_threshold=settings.pii_confidence_threshold
+    )
     app.state.vault = Vault(
         encryption_key=settings.vault_encryption_key,
         database_url=settings.vault_database_url or settings.database_url,
@@ -57,32 +67,44 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from services.pii_detector import CustomPattern as _CustomPattern
 
         async for db_session in _get_db():
-            rows = (await db_session.execute(
-                _select(_CustomEntity).where(_CustomEntity.enabled == 1)
-            )).scalars().all()
+            rows = (
+                (
+                    await db_session.execute(
+                        _select(_CustomEntity).where(_CustomEntity.enabled == 1)
+                    )
+                )
+                .scalars()
+                .all()
+            )
             patterns = []
             for row in rows:
                 try:
                     compiled = _re.compile(row.pattern)
                 except _re.error as exc:
-                    logger.warning("[startup] skipping invalid custom regex %s: %s", row.name, exc)
+                    logger.warning(
+                        "[startup] skipping invalid custom regex %s: %s", row.name, exc
+                    )
                     continue
-                patterns.append(_CustomPattern(
-                    name=row.name,
-                    regex=compiled,
-                    risk_level=row.risk_level,
-                    confidence=row.confidence,
-                ))
+                patterns.append(
+                    _CustomPattern(
+                        name=row.name,
+                        regex=compiled,
+                        risk_level=row.risk_level,
+                        confidence=row.confidence,
+                    )
+                )
             app.state.pii_detector.set_custom_patterns(patterns)
             custom_count = len(patterns)
             break
     except Exception as exc:
         logger.warning("[startup] failed to load custom entities: %s", exc)
 
-    logger.info("[startup] GuardForge ready — vault=%s, policies=%d, custom_entities=%d",
-                "on" if app.state.vault.is_available else "off",
-                len(app.state.policy_engine.list_policies()),
-                custom_count)
+    logger.info(
+        "[startup] GuardForge ready — vault=%s, policies=%d, custom_entities=%d",
+        "on" if app.state.vault.is_available else "off",
+        len(app.state.policy_engine.list_policies()),
+        custom_count,
+    )
     yield
     await close_db()
 
@@ -140,6 +162,9 @@ OPENAPI_TAGS = [
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # /docs and /redoc are only available when DEBUG=true.
+    # In production (DEBUG=false), they return 404 automatically when set to None.
+    docs_enabled = settings.debug or settings.docs_enabled
     app = FastAPI(
         title=settings.app_name,
         version=settings.version,
@@ -152,16 +177,17 @@ def create_app() -> FastAPI:
             "email": "contact@maxialab.com",
         },
         license_info={
-            "name": "GuardForge Proprietary License",
-            "url": "https://github.com/maxia-lab/guardforge/blob/main/LICENSE",
+            "name": "Apache 2.0",
+            "url": "https://github.com/MAXIAWORLD/guardforge/blob/main/LICENSE",
         },
         terms_of_service="https://maxialab.com/terms",
-        docs_url="/docs" if settings.docs_enabled else None,
-        redoc_url="/redoc" if settings.docs_enabled else None,
-        openapi_url="/openapi.json" if settings.docs_enabled else None,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
     )
     # Security middleware (auth + rate limit + size limit + headers)
     from core.middleware import add_security_middleware
+
     add_security_middleware(
         app,
         settings.secret_key,
@@ -171,8 +197,13 @@ def create_app() -> FastAPI:
         enable_hsts=settings.enable_hsts,
     )
 
-    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
-                       allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.include_router(scanner_router)
     app.include_router(reports_router)
     app.include_router(entities_router)
@@ -197,6 +228,7 @@ def create_app() -> FastAPI:
             vault_entries=len(vault.list_keys()) if vault else 0,
             policies_loaded=len(pe.list_policies()) if pe else 0,
         )
+
     return app
 
 
