@@ -25,6 +25,7 @@ Register-endpoint gating (IP-based):
     `register_limit` uses the same algorithm with a smaller window (1 min)
     and limit (1 per minute per IP).
 """
+
 from __future__ import annotations
 
 import logging
@@ -32,17 +33,23 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Final
 
+from core.billing_tiers import FREE_TIER, quota_for_tier
 from core.db import now_unix
 
 logger = logging.getLogger("maxia_oracle.rate_limit")
 
-# Daily free tier: 100 req / 24h per api key
+# Default daily limit (free tier). Paid tiers (dev, pro) are looked up
+# from `core.billing_tiers.TIER_DAILY_LIMITS` via `_quota_for_key` below.
 DAILY_LIMIT: Final[int] = 100
 DAILY_WINDOW_S: Final[int] = 86400
 
 # Register throttle: 1 registration / 60s per IP
 REGISTER_LIMIT: Final[int] = 1
 REGISTER_WINDOW_S: Final[int] = 60
+
+# Anonymous MCP public bucket: 20 tool calls / 24h shared across all keyless sessions
+PUBLIC_MCP_BUCKET: Final[str] = "__mcp_anon__"
+PUBLIC_MCP_LIMIT: Final[int] = 20
 
 # How many days of historical counters to keep at startup purge
 _KEEP_DAYS: Final[int] = 7
@@ -75,6 +82,24 @@ class RateLimitDecision:
 
 def _compute_window_start(now: int, window_s: int) -> int:
     return (now // window_s) * window_s
+
+
+# Public alias for callers outside this module (V2.3 routes_stripe).
+compute_window_start = _compute_window_start
+
+
+def _quota_for_key(db: sqlite3.Connection, key_hash: str) -> int:
+    """Return the daily quota for `key_hash` based on its tier.
+
+    Falls back to the free-tier quota for unknown / missing rows so the
+    rate limiter never silently grants more than it should.
+    """
+    row = db.execute(
+        "SELECT tier FROM api_keys WHERE key_hash = ?",
+        (key_hash,),
+    ).fetchone()
+    tier = row["tier"] if row is not None else FREE_TIER
+    return quota_for_tier(tier)
 
 
 def _check_and_increment(
@@ -130,13 +155,84 @@ def _check_and_increment(
 
 
 def check_daily(db: sqlite3.Connection, key_hash: str) -> RateLimitDecision:
-    """Per-api-key daily quota. Called on every authenticated request."""
+    """Per-api-key daily quota. Called on every authenticated request.
+
+    Quota is resolved per-tier from `core.billing_tiers`:
+        free → 100 / day  (default)
+        dev  → 10 000 / day
+        pro  → 100 000 / day
+    """
     return _check_and_increment(
         db,
         table="rate_limit",
         key_col="key_hash",
         key_value=key_hash,
-        limit=DAILY_LIMIT,
+        limit=_quota_for_key(db, key_hash),
+        window_s=DAILY_WINDOW_S,
+    )
+
+
+def check_public_mcp(db: sqlite3.Connection) -> RateLimitDecision:
+    """Shared bucket for anonymous MCP sessions (no X-API-Key). 20 tool calls/day total."""
+    return _check_and_increment(
+        db,
+        table="rate_limit",
+        key_col="key_hash",
+        key_value=PUBLIC_MCP_BUCKET,
+        limit=PUBLIC_MCP_LIMIT,
+        window_s=DAILY_WINDOW_S,
+    )
+
+
+def check_batch(db: sqlite3.Connection, key_hash: str, cost: int) -> RateLimitDecision:
+    """Atomic batch quota check: increment by `cost` only if the full cost fits.
+
+    Unlike calling check_daily N times, this never partially drains the quota:
+    the UPDATE fires only when count + cost <= DAILY_LIMIT, so a rejected
+    batch leaves the counter unchanged.
+    """
+    now = now_unix()
+    window_start = _compute_window_start(now, DAILY_WINDOW_S)
+    limit = _quota_for_key(db, key_hash)
+
+    db.execute(
+        "INSERT OR IGNORE INTO rate_limit (key_hash, window_start, count) "
+        "VALUES (?, ?, 0)",
+        (key_hash, window_start),
+    )
+    cursor = db.execute(
+        "UPDATE rate_limit SET count = count + ? "
+        "WHERE key_hash = ? AND window_start = ? AND count + ? <= ? "
+        "RETURNING count",
+        (cost, key_hash, window_start, cost, limit),
+    )
+    row = cursor.fetchone()
+    if row is not None:
+        return RateLimitDecision(
+            allowed=True,
+            count=row[0],
+            limit=limit,
+            window_start=window_start,
+            window_s=DAILY_WINDOW_S,
+        )
+
+    current = db.execute(
+        "SELECT count FROM rate_limit WHERE key_hash = ? AND window_start = ?",
+        (key_hash, window_start),
+    ).fetchone()
+    count = current[0] if current else 0
+    logger.info(
+        "Batch rate limit exceeded: key=%s count=%d cost=%d limit=%d",
+        key_hash[:16] + "…",
+        count,
+        cost,
+        limit,
+    )
+    return RateLimitDecision(
+        allowed=False,
+        count=count,
+        limit=limit,
+        window_start=window_start,
         window_s=DAILY_WINDOW_S,
     )
 
@@ -161,8 +257,12 @@ def purge_old_windows(db: sqlite3.Connection) -> int:
     the WHERE clause.
     """
     now = now_unix()
-    rate_cutoff = _compute_window_start(now, DAILY_WINDOW_S) - _KEEP_DAYS * DAILY_WINDOW_S
-    register_cutoff = _compute_window_start(now, REGISTER_WINDOW_S) - _KEEP_DAYS * DAILY_WINDOW_S
+    rate_cutoff = (
+        _compute_window_start(now, DAILY_WINDOW_S) - _KEEP_DAYS * DAILY_WINDOW_S
+    )
+    register_cutoff = (
+        _compute_window_start(now, REGISTER_WINDOW_S) - _KEEP_DAYS * DAILY_WINDOW_S
+    )
 
     cursor1 = db.execute(
         "DELETE FROM rate_limit WHERE window_start < ?",

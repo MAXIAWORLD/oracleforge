@@ -80,6 +80,15 @@ _EXPECTED_TOOL_NAMES = {
     "get_confidence",
     "list_supported_symbols",
     "get_chainlink_onchain",
+    "get_redstone_price",
+    "get_pyth_solana_onchain",
+    "get_twap_onchain",
+    "get_price_context",
+    "get_asset_metadata",
+    "get_price_history",
+    "create_price_alert",
+    "list_price_alerts",
+    "delete_price_alert",
     "health_check",
 }
 
@@ -100,10 +109,14 @@ async def _call_handler(
 # ── Discovery ───────────────────────────────────────────────────────────────
 
 
-def test_tool_definitions_has_exactly_8_tools(session_app) -> None:
+def test_tool_definitions_has_expected_tools(session_app) -> None:
+    """V1.0 shipped 8. V1.3 added get_redstone_price (9). V1.4 added
+    get_pyth_solana_onchain (10). V1.5 adds get_twap_onchain (11).
+    See docs/v1.5_uniswap_twap.md.
+    """
     from mcp_server.server import _TOOL_DEFINITIONS  # noqa: PLC0415
 
-    assert len(_TOOL_DEFINITIONS) == 8
+    assert len(_TOOL_DEFINITIONS) == 17
     assert {t.name for t in _TOOL_DEFINITIONS} == _EXPECTED_TOOL_NAMES
 
 
@@ -131,7 +144,7 @@ def test_tool_schemas_are_strict_objects(session_app) -> None:
         # Tools that take a symbol must expose a pattern-constrained schema
         if "symbol" in schema["properties"]:
             assert schema["properties"]["symbol"]["pattern"] == "^[A-Z0-9]{1,10}$"
-            assert schema.get("required") == ["symbol"]
+            assert "symbol" in (schema.get("required") or [])
 
 
 def test_server_instructions_include_disclaimer(session_app) -> None:
@@ -148,7 +161,7 @@ def test_build_server_registers_handlers(session_app) -> None:
 
     server = build_server()
     assert server.name == "maxia-oracle"
-    assert server.version == "0.1.0"
+    assert server.version == "0.1.9"
     assert mt.ListToolsRequest in server.request_handlers
     assert mt.CallToolRequest in server.request_handlers
 
@@ -278,6 +291,37 @@ async def test_rate_limit_ticks_on_tools_call(client: TestClient) -> None:
     ).fetchone()
     assert row is not None
     assert row["count"] == 3
+
+
+@pytest.mark.asyncio
+async def test_type_error_in_handler_does_not_leak_exception_detail(session_app) -> None:
+    """A TypeError from a tool handler must NOT expose str(exc) to the client.
+
+    Regression test for H12: mcp_server/server.py previously returned
+    {"error": "invalid arguments", "detail": str(exc)} which could leak
+    internal Python exception messages (file paths, internal symbols, etc.)
+    to authenticated MCP clients.
+    """
+    from unittest.mock import patch  # noqa: PLC0415
+
+    from mcp_server import server as srv_module  # noqa: PLC0415
+    from mcp_server.server import build_server  # noqa: PLC0415
+
+    internal_secret = "INTERNAL_SYMBOL_/var/lib/maxia/db.sqlite"
+
+    async def _raises_type_error(**_kwargs):
+        raise TypeError(internal_secret)
+
+    server = build_server()
+    with patch.dict(srv_module._TOOL_DISPATCH, {"health_check": _raises_type_error}):
+        result = await _call_handler(server, "health_check", {})
+
+    assert result.isError is True
+    raw_text = result.content[0].text
+    assert internal_secret not in raw_text, "TypeError detail must NOT be leaked to client"
+    payload = json.loads(raw_text)
+    assert "invalid arguments" in payload["error"]
+    assert "detail" not in payload
 
 
 @pytest.mark.asyncio

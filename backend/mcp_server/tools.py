@@ -31,11 +31,23 @@ import re
 from typing import Any, Final
 
 from core.disclaimer import wrap_error, wrap_with_disclaimer
-from services.oracle import chainlink_oracle, price_oracle, pyth_oracle
+from services.oracle import (
+    chainlink_oracle,
+    history,
+    metadata,
+    price_cascade,
+    price_oracle,
+    pyth_oracle,
+    pyth_solana_oracle,
+    redstone_oracle,
+    uniswap_v3_oracle,
+)
+from services.oracle.intelligence import build_price_context
 from services.oracle.multi_source import collect_sources, compute_divergence
 
 _SYMBOL_REGEX: Final[re.Pattern[str]] = re.compile(r"^[A-Z0-9]{1,10}$")
 _MAX_BATCH_SYMBOLS: Final[int] = 50
+_FOREX_SYMBOLS: Final[frozenset[str]] = frozenset({"EUR", "GBP"})
 
 
 def _is_valid_symbol(symbol: str) -> bool:
@@ -59,6 +71,17 @@ async def get_price(symbol: str) -> dict[str, Any]:
     if not _is_valid_symbol(symbol):
         return wrap_error("invalid symbol format", symbol=symbol)
 
+    # V1.7 — Forex symbols dispatch directly to Pyth Solana.
+    if symbol in _FOREX_SYMBOLS:
+        result = await pyth_solana_oracle.get_pyth_solana_price(symbol)
+        if not isinstance(result, dict) or result.get("error"):
+            return wrap_error(
+                "forex price fetch failed",
+                symbol=symbol,
+                detail=result.get("error") if isinstance(result, dict) else "unexpected",
+            )
+        return wrap_with_disclaimer({**result, "asset_class": "forex"})
+
     sources = await collect_sources(symbol)
     if not sources:
         return wrap_error("no live price available", symbol=symbol)
@@ -71,6 +94,7 @@ async def get_price(symbol: str) -> dict[str, Any]:
         {
             "symbol": symbol,
             "price": round(median_price, 6),
+            "asset_class": "crypto",
             "sources": sources,
             "source_count": len(sources),
             "divergence_pct": divergence_pct,
@@ -109,7 +133,7 @@ async def get_prices_batch(symbols: list[str]) -> dict[str, Any]:
         if sym not in cleaned:
             cleaned.append(sym)
 
-    results = await pyth_oracle.get_batch_prices(cleaned)
+    results = await price_cascade.get_batch_prices(cleaned)
     return wrap_with_disclaimer(
         {
             "requested": len(cleaned),
@@ -132,7 +156,7 @@ async def get_sources_status() -> dict[str, Any]:
     """
     probe_symbol = "BTC"
     pyth_feed = pyth_oracle.CRYPTO_FEEDS.get(probe_symbol)
-    chainlink_probe = probe_symbol if probe_symbol in chainlink_oracle.CHAINLINK_FEEDS else None
+    chainlink_probe = probe_symbol if chainlink_oracle.has_feed(probe_symbol, "base") else None
 
     tasks: list[tuple[str, Any]] = []
     if pyth_feed:
@@ -243,20 +267,33 @@ def _interpret_divergence(div: float) -> str:
 async def list_supported_symbols() -> dict[str, Any]:
     """Return the union of supported symbols across Pyth, Chainlink, price_oracle.
 
-    The result groups symbols by source so the caller can see which
-    tickers will go through a multi-source cross-validation versus
-    single-source only.
+    V1.1: Chainlink is reported per chain (base, ethereum, arbitrum) so
+    callers can see which chains can answer a given symbol. The
+    `all_symbols` union folds every source and every chain into one
+    flat deduplicated list.
     """
     pyth_crypto = sorted(pyth_oracle.CRYPTO_FEEDS.keys())
     pyth_equity = sorted(pyth_oracle.EQUITY_FEEDS.keys())
-    chainlink_base = sorted(chainlink_oracle.CHAINLINK_FEEDS.keys())
+    chainlink_by_chain = chainlink_oracle.all_supported_symbols()
     price_oracle_mints = sorted(price_oracle.TOKEN_MINTS.keys())
+
+    chainlink_union: set[str] = set()
+    for syms in chainlink_by_chain.values():
+        chainlink_union.update(syms)
+
+    pyth_solana_syms = pyth_solana_oracle.list_supported_symbols()
+    uniswap_by_chain = uniswap_v3_oracle.all_supported_symbols()
+    uniswap_union: set[str] = set()
+    for syms in uniswap_by_chain.values():
+        uniswap_union.update(syms)
 
     all_symbols = sorted(
         set(pyth_crypto)
         | set(pyth_equity)
-        | set(chainlink_base)
+        | chainlink_union
         | set(price_oracle_mints)
+        | set(pyth_solana_syms)
+        | uniswap_union
     )
 
     return wrap_with_disclaimer(
@@ -266,8 +303,13 @@ async def list_supported_symbols() -> dict[str, Any]:
             "by_source": {
                 "pyth_crypto": pyth_crypto,
                 "pyth_equity": pyth_equity,
-                "chainlink_base": chainlink_base,
+                "chainlink_base": chainlink_by_chain.get("base", []),
+                "chainlink_ethereum": chainlink_by_chain.get("ethereum", []),
+                "chainlink_arbitrum": chainlink_by_chain.get("arbitrum", []),
                 "price_oracle": price_oracle_mints,
+                "pyth_solana": pyth_solana_syms,
+                "uniswap_v3_base": uniswap_by_chain.get("base", []),
+                "uniswap_v3_ethereum": uniswap_by_chain.get("ethereum", []),
             },
         }
     )
@@ -276,37 +318,351 @@ async def list_supported_symbols() -> dict[str, Any]:
 # ── 7. get_chainlink_onchain ─────────────────────────────────────────────────
 
 
-async def get_chainlink_onchain(symbol: str) -> dict[str, Any]:
-    """Fetch a price directly from the Chainlink on-chain Base feed.
+async def get_chainlink_onchain(
+    symbol: str, chain: str = "base"
+) -> dict[str, Any]:
+    """Fetch a price directly from a Chainlink on-chain feed.
 
-    Forces Chainlink (bypassing Pyth and the aggregator sources) so the
-    caller gets a quote that is independently verifiable on-chain via
-    the Base mainnet RPC. Useful for audit or for cross-checking the
-    median returned by `get_price`.
+    V1.1: accepts `chain` = base (default), ethereum, or arbitrum. Forces
+    Chainlink (bypassing Pyth and the aggregator sources) so the caller
+    gets a quote that is independently verifiable on-chain via the
+    corresponding EVM RPC. Useful for audit or cross-checking the median
+    returned by `get_price`.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    if not isinstance(chain, str):
+        return wrap_error("chain must be a string")
+    symbol = symbol.strip().upper()
+    chain = chain.strip().lower()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if chain not in chainlink_oracle.SUPPORTED_CHAINS:
+        return wrap_error(
+            "unsupported chain",
+            chain=chain,
+            supported=list(chainlink_oracle.SUPPORTED_CHAINS),
+        )
+    if not chainlink_oracle.has_feed(symbol, chain):
+        return wrap_error(
+            "symbol has no Chainlink feed on requested chain",
+            symbol=symbol,
+            chain=chain,
+            supported=chainlink_oracle.symbols_for(chain),
+        )
+
+    result = await chainlink_oracle.get_chainlink_price(symbol, chain=chain)
+    if not isinstance(result, dict) or result.get("error"):
+        return wrap_error(
+            "chainlink fetch failed",
+            symbol=symbol,
+            chain=chain,
+            detail=result.get("error") if isinstance(result, dict) else "unexpected",
+        )
+    return wrap_with_disclaimer(result)
+
+
+# ── 9. get_redstone_price (V1.3) ─────────────────────────────────────────────
+
+
+async def get_redstone_price(symbol: str) -> dict[str, Any]:
+    """Fetch a single-source price directly from the RedStone public REST API.
+
+    V1.3: RedStone is the 4th independent upstream. Coverage is dynamic
+    (400+ assets: crypto majors + long-tail + forex + equities). Unknown
+    symbols return an error rather than being pre-rejected on a hardcoded
+    allow-list. Useful to cross-check the median returned by `get_price`.
     """
     if not isinstance(symbol, str):
         return wrap_error("symbol must be a string")
     symbol = symbol.strip().upper()
     if not _is_valid_symbol(symbol):
         return wrap_error("invalid symbol format", symbol=symbol)
-    if symbol not in chainlink_oracle.CHAINLINK_FEEDS:
-        return wrap_error(
-            "symbol has no Chainlink feed on Base",
-            symbol=symbol,
-            supported=sorted(chainlink_oracle.CHAINLINK_FEEDS.keys()),
-        )
 
-    result = await chainlink_oracle.get_chainlink_price(symbol)
+    result = await redstone_oracle.get_redstone_price(symbol)
     if not isinstance(result, dict) or result.get("error"):
         return wrap_error(
-            "chainlink fetch failed",
+            "redstone fetch failed",
             symbol=symbol,
             detail=result.get("error") if isinstance(result, dict) else "unexpected",
         )
     return wrap_with_disclaimer(result)
 
 
-# ── 8. health_check ──────────────────────────────────────────────────────────
+# ── 10. get_pyth_solana_onchain (V1.4) ───────────────────────────────────────
+
+
+async def get_pyth_solana_onchain(symbol: str) -> dict[str, Any]:
+    """Fetch an on-chain Pyth price directly from Solana mainnet (V1.4).
+
+    Reads the Price Feed Account for `symbol` on shard 0 of the Pyth Push
+    Oracle program (`pythWSns...`) and decodes the Anchor `PriceUpdateV2`
+    layout inline. Coverage is restricted to the majors sponsored by the
+    Pyth Data Association on shard 0 -- see
+    `pyth_solana_oracle.PYTH_SOLANA_FEEDS`. Unknown symbols are rejected
+    with `symbol not supported on Pyth Solana shard 0`.
+
+    The reader rejects updates with verification_level other than Full,
+    protecting callers from partial-Wormhole-signature attacks.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if not pyth_solana_oracle.has_feed(symbol):
+        return wrap_error(
+            "symbol not supported on Pyth Solana shard 0",
+            symbol=symbol,
+            supported=pyth_solana_oracle.list_supported_symbols(),
+        )
+
+    result = await pyth_solana_oracle.get_pyth_solana_price(symbol)
+    if not isinstance(result, dict) or result.get("error"):
+        return wrap_error(
+            "pyth_solana fetch failed",
+            symbol=symbol,
+            detail=result.get("error") if isinstance(result, dict) else "unexpected",
+        )
+    return wrap_with_disclaimer(result)
+
+
+# ── 11. get_twap_onchain (V1.5) ──────────────────────────────────────────────
+
+
+async def get_twap_onchain(
+    symbol: str,
+    chain: str = uniswap_v3_oracle.DEFAULT_CHAIN,
+    window_s: int = uniswap_v3_oracle.DEFAULT_WINDOW_S,
+) -> dict[str, Any]:
+    """Fetch a Uniswap v3 time-weighted average price (TWAP) on-chain (V1.5).
+
+    Reads `observe(uint32[])` on a curated, high-liquidity pool and
+    returns the TWAP computed from the slope of tickCumulatives over
+    `window_s` seconds. Coverage: ETH on Base/Ethereum + BTC on
+    Ethereum (see `uniswap_v3_oracle.UNISWAP_V3_POOLS`).
+
+    The underlying math is deterministic and independently verifiable:
+    any caller can replay the same observe() call on any Ethereum or
+    Base RPC and compute the same number.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    if not isinstance(chain, str):
+        return wrap_error("chain must be a string")
+    if not isinstance(window_s, int) or isinstance(window_s, bool):
+        return wrap_error("window_s must be an integer")
+
+    symbol = symbol.strip().upper()
+    chain = chain.strip().lower()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if chain not in uniswap_v3_oracle.SUPPORTED_CHAINS:
+        return wrap_error(
+            "unsupported chain",
+            chain=chain,
+            supported=list(uniswap_v3_oracle.SUPPORTED_CHAINS),
+        )
+    if window_s < uniswap_v3_oracle.MIN_WINDOW_S or window_s > uniswap_v3_oracle.MAX_WINDOW_S:
+        return wrap_error(
+            "window_s out of range",
+            window_s=window_s,
+            min_window_s=uniswap_v3_oracle.MIN_WINDOW_S,
+            max_window_s=uniswap_v3_oracle.MAX_WINDOW_S,
+        )
+    if not uniswap_v3_oracle.has_pool(symbol, chain):
+        supported = uniswap_v3_oracle.all_supported_symbols().get(chain, [])
+        return wrap_error(
+            "no Uniswap v3 pool configured for this symbol on this chain",
+            symbol=symbol,
+            chain=chain,
+            supported=supported,
+        )
+
+    result = await uniswap_v3_oracle.get_twap_price(symbol, chain=chain, window_s=window_s)
+    if not isinstance(result, dict) or result.get("error"):
+        return wrap_error(
+            "uniswap_v3 fetch failed",
+            symbol=symbol,
+            chain=chain,
+            detail=result.get("error") if isinstance(result, dict) else "unexpected",
+        )
+    return wrap_with_disclaimer(result)
+
+
+# ── 12. get_price_context (V1.6) ────────────────────────────────────────────
+
+
+async def get_price_context(symbol: str) -> dict[str, Any]:
+    """Return price + confidence score + anomaly flag + sources agreement (V1.6).
+
+    Agent-native one-call: everything an LLM agent needs to decide
+    whether to act on a price. Includes confidence_score (0-100),
+    anomaly flag with reasons, TWAP deviation, and source outliers.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+
+    ctx = await build_price_context(symbol)
+    if ctx is None:
+        return wrap_error("no live price available", symbol=symbol)
+
+    return wrap_with_disclaimer(ctx)
+
+
+# ── 13. get_asset_metadata (V1.7) ───────────────────────────────────────────
+
+
+async def get_asset_metadata(symbol: str) -> dict[str, Any]:
+    """Fetch asset metadata from CoinGecko (market cap, volume, supply) (V1.7).
+
+    Coverage: ~80 crypto assets with a CoinGecko ID mapping. Forex and
+    equity symbols are not covered. Unknown symbols return an error dict.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if not metadata.has_metadata(symbol):
+        return wrap_error(
+            "no metadata available for this symbol",
+            symbol=symbol,
+            supported_count=len(metadata.supported_symbols()),
+        )
+
+    result = await metadata.get_metadata(symbol)
+    if not isinstance(result, dict) or result.get("error"):
+        return wrap_error(
+            "metadata fetch failed",
+            symbol=symbol,
+            detail=result.get("error") if isinstance(result, dict) else "unexpected",
+        )
+    return wrap_with_disclaimer(result)
+
+
+# ── 14. get_price_history (V1.8) ────────────────────────────────────────────
+
+
+async def get_price_history(
+    symbol: str,
+    range: str = "24h",
+    interval: str | None = None,
+) -> dict[str, Any]:
+    """Return historical price snapshots for a symbol (V1.8).
+
+    The background sampler captures batch prices every 5 minutes.
+    Data is downsampled to the requested interval via averaging.
+    Retention is 30 days.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if range not in history.VALID_RANGES:
+        return wrap_error(
+            "invalid range",
+            range=range,
+            valid=sorted(history.VALID_RANGES),
+        )
+    if interval is not None and interval not in history.VALID_INTERVALS:
+        return wrap_error(
+            "invalid interval",
+            interval=interval,
+            valid=sorted(history.VALID_INTERVALS),
+        )
+
+    result = history.get_history(symbol, range_key=range, interval_key=interval)
+    if result is None:
+        return wrap_error("invalid range or interval combination")
+    return wrap_with_disclaimer(result)
+
+
+# ── 15. create_price_alert (V1.9) ──────────────────────────────────────────
+
+
+async def create_price_alert(
+    symbol: str,
+    condition: str,
+    threshold: float,
+    callback_url: str,
+) -> dict[str, Any]:
+    """Create a one-shot price alert with a webhook callback (V1.9).
+
+    The alert fires once when the condition is met (checked every ~5 min
+    in the background sampler), POSTs to callback_url, then deactivates.
+    """
+    if not isinstance(symbol, str):
+        return wrap_error("symbol must be a string")
+    symbol = symbol.strip().upper()
+    if not _is_valid_symbol(symbol):
+        return wrap_error("invalid symbol format", symbol=symbol)
+    if condition not in ("above", "below"):
+        return wrap_error("condition must be 'above' or 'below'", condition=condition)
+    if not isinstance(threshold, (int, float)) or threshold <= 0:
+        return wrap_error("threshold must be a positive number")
+    if not isinstance(callback_url, str) or not callback_url:
+        return wrap_error("callback_url is required")
+
+    from services.oracle.alerts import validate_callback_url
+    url_err = validate_callback_url(callback_url)
+    if url_err is not None:
+        return wrap_error(url_err)
+
+    from core.db import create_alert, get_db
+
+    db = get_db()
+    alert_id = create_alert(
+        db,
+        key_hash="__mcp_local__",
+        symbol=symbol,
+        condition=condition,
+        threshold=threshold,
+        callback_url=callback_url,
+    )
+    return wrap_with_disclaimer({
+        "id": alert_id,
+        "symbol": symbol,
+        "condition": condition,
+        "threshold": threshold,
+        "active": True,
+    })
+
+
+# ── 16. list_price_alerts (V1.9) ──────────────────────────────────────────
+
+
+async def list_price_alerts() -> dict[str, Any]:
+    """List all price alerts for the current MCP session (V1.9)."""
+    from core.db import get_db, list_alerts
+
+    db = get_db()
+    alerts = list_alerts(db, "__mcp_local__", active_only=False)
+    return wrap_with_disclaimer({"alerts": alerts, "count": len(alerts)})
+
+
+# ── 17. delete_price_alert (V1.9) ─────────────────────────────────────────
+
+
+async def delete_price_alert(alert_id: int) -> dict[str, Any]:
+    """Delete a price alert by id (V1.9)."""
+    if not isinstance(alert_id, int) or isinstance(alert_id, bool):
+        return wrap_error("alert_id must be an integer")
+
+    from core.db import delete_alert, get_db
+
+    db = get_db()
+    deleted = delete_alert(db, alert_id, "__mcp_local__")
+    if not deleted:
+        return wrap_error("alert not found", alert_id=alert_id)
+    return wrap_with_disclaimer({"deleted": True, "id": alert_id})
+
+
+# ── 18. health_check ─────────────────────────────────────────────────────────
 
 
 async def health_check() -> dict[str, Any]:

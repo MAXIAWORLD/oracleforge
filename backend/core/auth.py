@@ -23,6 +23,7 @@ Key format:
     token_urlsafe(32) returns ~43 chars of base64url (URL-safe chars A-Z a-z
     0-9 - _), giving ~192 bits of entropy. Total length ~47 chars.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -39,7 +40,8 @@ from core.db import get_db, now_unix
 
 logger = logging.getLogger("maxia_oracle.auth")
 
-_KEY_PREFIX: Final[str] = "mxo_"
+KEY_PREFIX: Final[str] = "mxo_"
+_KEY_PREFIX: Final[str] = KEY_PREFIX  # backward-compat alias
 _TOKEN_BYTES: Final[int] = 32  # -> ~43 chars of base64url
 
 # Sentinel returned by `require_access` when the request was paid via x402.

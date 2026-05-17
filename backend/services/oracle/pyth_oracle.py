@@ -1,37 +1,19 @@
-"""MAXIA Oracle — Pyth Network price oracle (Hermes API + SSE streaming).
+"""MAXIA Oracle — Pyth Network Hermes price layer.
 
-Real-time prices via Pyth Network Hermes (free, no API key).
+Pure Pyth Hermes integration: feed definitions, single-price fetch, cache,
+staleness/confidence checks, TWAP, and on-chain verification.
+
+Cascade functions (get_stock_price, get_crypto_price, get_batch_prices,
+get_stock_price_finnhub) live in price_cascade.py to avoid a circular
+import with price_oracle.py (audit H1/H2 fix).
 
 Extracted from MAXIA V12/backend/trading/pyth_oracle.py on 2026-04-14.
-
-Surgeries applied vs the V12 original (validated by Alexis 2026-04-14):
-    B. All 6 lazy imports of `FALLBACK_PRICES` from price_oracle removed, plus
-       `start_fallback_refresh` / `_fallback_refresh_loop` / `_fallback_refresh_task`.
-       Functions that used it (get_stock_price, get_crypto_price, get_batch_prices)
-       now return an explicit error instead of a stale static price.
-    C. CandleBuilder + `_process_candle_tick` + `get_recent_candles` +
-       `_universal_candle_feeder` + `_candle_builders` + `_candle_subscribers`
-       removed. MAXIA Oracle V1 has no dashboard, no OHLCV consumer.
-    D. `check_stock_peg()` and `/oracle/peg-check/{symbol}` route removed —
-       specific to tokenized securities (xStocks depeg detection).
-    E. `check_oracle_health_alert()` + its dedicated constants removed —
-       depended on `infra.alerts` (Telegram). `_is_market_open()` is kept
-       because `api_market_status` still uses it.
-    F. Second `tokenized_stocks` lazy import (in `api_price_live` fallback)
-       removed. After this, `grep tokenized_stocks` on MAXIA Oracle = 0.
-
-Strategy (equity cascade, see get_stock_price):
-    1. Pyth Hermes        — <400ms, confidence interval
-    2. Finnhub            — free tier 60 req/min
-    3. CoinGecko          — via price_oracle.get_price()
-    4. Yahoo Finance      — via price_oracle.get_stock_prices()
-    5. (no static fallback — Surgery B)
 """
+
 import asyncio
 import logging
 import os
 import time
-from typing import Optional
 
 import httpx
 
@@ -39,13 +21,12 @@ from core.errors import safe_error
 
 logger = logging.getLogger("pyth_oracle")
 
-# ── Finnhub API (3rd equity source) ──
-FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
-
 
 # ── Constantes Pyth Hermes ──
 
-HERMES_URL = os.getenv("PYTH_HERMES_URL", "https://hermes.pyth.network")  # P6: env var pour Hermes prive
+HERMES_URL = os.getenv(
+    "PYTH_HERMES_URL", "https://hermes.pyth.network"
+)  # P6: env var pour Hermes prive
 
 # ── Protection anti-staleness ──
 MAX_STALENESS_STOCK_NORMAL_S = 600
@@ -61,14 +42,50 @@ _STALE_MAX_TRACKED = 500  # P3 fix: cap to prevent unbounded growth
 # Mid-caps: seuil moyen (liquidite moyenne)
 # Small-caps: seuil large (liquidite faible, confidence naturellement haute)
 _CONFIDENCE_TIERS = {
-    "major": 2.0,    # SOL, ETH, BTC, USDC — comme avant
-    "mid":   5.0,    # LINK, UNI, AAVE, AVAX, XRP, MATIC, etc.
-    "small": 10.0,   # BONK, WIF, POPCAT, PENGU, FARTCOIN, etc.
+    "major": 2.0,  # SOL, ETH, BTC, USDC — comme avant
+    "mid": 5.0,  # LINK, UNI, AAVE, AVAX, XRP, MATIC, etc.
+    "small": 10.0,  # BONK, WIF, POPCAT, PENGU, FARTCOIN, etc.
 }
-_MAJOR_TOKENS = {"SOL", "ETH", "BTC", "USDC", "USDT"}
-_MID_TOKENS = {"LINK", "UNI", "AAVE", "AVAX", "XRP", "MATIC", "RENDER", "JUP", "RAY", "ORCA",
-               "DRIFT", "JTO", "PYTH", "HNT", "W", "LDO", "FET", "OLAS", "NEAR", "APT", "SUI",
-               "SEI", "INJ", "ARB", "OP", "TIA", "STX", "FIL", "AR", "ONDO", "DOGE"}
+_MAJOR_TOKENS = {"SOL", "ETH", "BTC", "USDC", "USDT", "BNB", "DAI"}
+_MID_TOKENS = {
+    "LINK",
+    "UNI",
+    "AAVE",
+    "AVAX",
+    "XRP",
+    "MATIC",
+    "RENDER",
+    "JUP",
+    "RAY",
+    "ORCA",
+    "DRIFT",
+    "JTO",
+    "PYTH",
+    "HNT",
+    "W",
+    "LDO",
+    "FET",
+    "OLAS",
+    "NEAR",
+    "APT",
+    "SUI",
+    "SEI",
+    "INJ",
+    "ARB",
+    "OP",
+    "TIA",
+    "STX",
+    "FIL",
+    "AR",
+    "ONDO",
+    "DOGE",
+    "ADA",
+    "DOT",
+    "LTC",
+    "TRX",
+    "TAO",
+    "WSTETH",
+}
 # Tout le reste = small
 
 
@@ -95,7 +112,9 @@ def update_twap(symbol: str, price: float):
     if symbol not in _twap_data:
         # Cap total symbols to prevent unbounded growth from rogue feeds
         if len(_twap_data) >= _TWAP_MAX_SYMBOLS:
-            oldest_sym = min(_twap_data, key=lambda s: _twap_data[s][-1][0] if _twap_data[s] else 0)
+            oldest_sym = min(
+                _twap_data, key=lambda s: _twap_data[s][-1][0] if _twap_data[s] else 0
+            )
             del _twap_data[oldest_sym]
         _twap_data[symbol] = []
     _twap_data[symbol].append((now, price))
@@ -117,7 +136,12 @@ def check_twap_deviation(symbol: str, spot_price: float) -> dict:
     Retourne {"ok": bool, "twap": float, "deviation_pct": float}"""
     twap = get_twap(symbol)
     if twap <= 0 or spot_price <= 0:
-        return {"ok": True, "twap": 0, "deviation_pct": 0, "reason": "insufficient_data"}
+        return {
+            "ok": True,
+            "twap": 0,
+            "deviation_pct": 0,
+            "reason": "insufficient_data",
+        }
     deviation = abs(spot_price - twap) / twap * 100
     return {
         "ok": deviation <= _TWAP_MAX_DEVIATION_PCT,
@@ -144,13 +168,10 @@ _oracle_metrics = {
     "confidence_rejected": 0,
     "circuit_opens": 0,
     "fallback_used": 0,
-    "stream_events": 0,       # P5: prix recus via SSE
-    "last_stream_event_ts": 0, # P5: heartbeat monitoring
     "latency_samples": [],
     "started_at": time.time(),
 }
 _METRICS_MAX_SAMPLES = 100
-_HEARTBEAT_ALERT_S = 60  # P5: alerter si aucun event SSE depuis 60s
 
 # Feed IDs Pyth pour les actions (confirmes sur hermes.pyth.network)
 # Stocks sans feed Pyth connu (mars 2026) :
@@ -171,25 +192,51 @@ EQUITY_FEEDS = {
     "AAPL": "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688",
     "TSLA": "16dad506d7db8da01c87581c87ca897a012a153557d4d578c3b9c9e1bc0632f1",
     "NVDA": "b1073854ed24cbc755dc527418f52b7d271f6cc967bbf8d8129112b18860a593",
-    "AMZN": "2842ddc2b3e4094ce3d5559b804ee2e85a46512ca2ca9bd7b941b8ab4e5e3a4f",
-    "GOOG": "1b1a2048c073c40d38ba24c7d659c1a9a7bbfeaa4ac22c6e8c59e7822c159a3e",
+    # DEAD-FEED \"AMZN\": Pyth retired this equity feed
+    # DEAD-FEED \"GOOG\": Pyth retired this equity feed
     "MSFT": "d0ca23c1cc005e004ccf1db5bf76aeb6a49218f43dac3d4b275e92de12ded4d1",
     "META": "3fa4252848f9f0a1480be62745a4629d9eb1322aebab8a791e344b3b9c1adcf5",
-    "COIN": "ff2b0cecc26a7ca08c0894594d6b72ca0ae1cfaae0b94e1e1af68aabc14c2f09",
-    "QQQ":  "9695e2b96ea7b3859da9a0d18c46986bcc6c6e3e764c879930d3be688b0e41cc",
-    "SPY":  "19e09bb805456ada3979a7d1cbb4b6d63babc3a0f8e8a9509f68afa5c4c11cd5",
-    "MSTR": "245a7a2dd7084a75baf3e12e6ec42350e1b6f8b15e64e3aef6c9b1a362174b56",
+    # DEAD-FEED \"COIN\": Pyth retired this equity feed
+    # DEAD-FEED \"QQQ\": Pyth retired this equity feed
+    "SPY": "19e09bb805456ada3979a7d1cbb4b6d63babc3a0f8e8a9509f68afa5c4c11cd5",
+    # DEAD-FEED \"MSTR\": Pyth retired this equity feed
 }
 
 # Feed IDs Pyth pour les cryptos principales
+# IDs verifies live contre hermes.pyth.network le 2026-05-05.
 CRYPTO_FEEDS = {
+    # ── Tier 0 : majors ──────────────────────────────────────────────────────
     "BTC": "e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43",
     "ETH": "ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",
     "SOL": "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d",
+    "BNB": "2f95862b045670cd22bee3114c39763a4a08beeb663b145d283c31d7d1101c4f",
     "USDC": "eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a",
+    # ── Tier 1 : top-15 market cap ───────────────────────────────────────────
     "XRP": "ec5d399846a9209f3fe5881d70aae9268c94339ff9817e8d18ff19fa05eea1c8",
+    "ADA": "2a01deaec9e51a579277b34b122399984d0bbf57e2458a7e42fecd2829867a0d",
+    "DOGE": "dcef50dd0a4cd2dcc17e45df1676dcb336a11a61c69df7a0299b0150c672d25c",
     "AVAX": "93da3352f9f1d105fdfe4971cfa80e9dd777bfc5d0f683ebb6e1294b92137bb7",
-    "MATIC": "5de33440884227dc41e334bcbba78c67c0340a1e7b2ed9f6f2d7c6cf9e9b6e1e",
+    "DOT": "ca3eed9b267293f6595901c734c7525ce8ef49adafe8284606ceb307afa2ca5b",
+    # POL replaces MATIC (Polygon rebranded MATIC -> POL in Sept 2024,
+    # Pyth retired the legacy MATIC feed_id).
+    "POL": "ffd11c5a1cfd42f80afb2df4d9f264c15f956d68153335374ec10722edd70472",
+    "LTC": "6e3f3fa8253588df9326580180233eb791e03b443a3ba7a1d892e73874e19a54",
+    "TRX": "67aed5a24fdad045475e7195c98a98aea119c763f272d4523f5bac93a4f33c2b",
+    # ── Tier 2 : ecosystemes agent-natifs ────────────────────────────────────
+    "NEAR": "c415de8d2eba7db216527dff4b60e8f3a5311c740dadb233e13e12547e226750",
+    "SUI": "23d7315113f5b1d3ba7a83604c44b94d79f4fd69af77f804fc7f920a6dc65744",
+    "APT": "03ae4db29ed4ae33d323568895aa00337e658e348b37509f5372ae51f0af00d5",
+    "INJ": "7a5bc1d2b56ad029048cd63964b3ad2776eadf812edc1a43a31406cb54bff592",
+    "SEI": "53614f1cb0c031d4af66c04cb9c756234adad0e1cee85303795091499a4084eb",
+    # ── Tier 3 : AI tokens ───────────────────────────────────────────────────
+    "RENDER": "3d4a2bd9535be6ce8059d75eadeba507b043257321aa544717c56fa19b49e35d",
+    "FET": "7da003ada32eabbac855af3d22fcf0fe692cc589f0cfd5ced63cf0bdcc742efe",
+    "TAO": "410f41de235f2db824e562ea7ab2d3d3d4ff048316c61d629c0b93f58584e1af",
+    # ── Tier 4 : stablecoins / LST ───────────────────────────────────────────
+    "DAI": "b0948a5e5313200c632b51bb5ca32f6de0d36e9950a942d19751e833f70dabfd",
+    "WSTETH": "6df640f3b8963d8f8358f791f352b8364513f6ab1cca5ed3f1f7b5448980e784",
+    # ── Tier 5 : non-EVM L1 (no Chainlink / Uniswap support) ─────────────────
+    "KAS": "dfd3cb51a9d39fde35a3ff6177b426def03ed48d45008248f22827d8bf50cab4",
 }
 
 # Tous les feeds combines (recherche rapide)
@@ -199,12 +246,9 @@ ALL_FEEDS = {**EQUITY_FEEDS, **CRYPTO_FEEDS}
 # ── Cache en memoire (TTL 10s par feed) ──
 
 _price_cache: dict = {}  # {feed_id: {"data": {...}, "ts": float}}
-_CACHE_TTL_NORMAL = 5   # secondes — mode normal (suffisant pour tokenized stocks)
-_CACHE_TTL_HFT = 1      # secondes — mode HFT (fetch quasi-live)
-_CACHE_MAX = 100         # Limite max d'entrees en cache pour eviter fuite memoire
-
-# Streaming: prix live Pyth via SSE (server-sent events) pour les clients HFT
-_streaming_prices: dict = {}  # {feed_id: {"price": float, "ts": float}} mis a jour par le stream
+_CACHE_TTL_NORMAL = 5  # secondes — mode normal (suffisant pour tokenized stocks)
+_CACHE_TTL_HFT = 1  # secondes — mode HFT (fetch quasi-live)
+_CACHE_MAX = 100  # Limite max d'entrees en cache pour eviter fuite memoire
 
 # ── Shared HTTP client — singleton from core.http_client (Phase 4 Step 5) ──
 # The old per-module pool has been replaced with the process-wide singleton
@@ -252,6 +296,7 @@ def _is_valid_feed_id(feed_id: str) -> bool:
 
 # ── Fonctions principales ──
 
+
 async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
     """Fetch a single Pyth price from Hermes.
 
@@ -272,15 +317,9 @@ async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
     _oracle_metrics["total_requests"] += 1
     _req_start = time.time()
 
-    # 1) Streaming price (si le stream background tourne, latence <1s)
     now = time.time()
-    streamed = _streaming_prices.get(feed_id)
-    if streamed and now - streamed["ts"] < 2:
-        _oracle_metrics["successful"] += 1
-        _track_latency(_req_start)
-        return streamed["data"]
 
-    # 2) Cache HTTP (TTL selon mode)
+    # Cache HTTP (TTL selon mode)
     cache_ttl = _CACHE_TTL_HFT if hft else _CACHE_TTL_NORMAL
     cached = _price_cache.get(feed_id)
     if cached and now - cached["ts"] < cache_ttl:
@@ -288,11 +327,18 @@ async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
 
     try:
         client = await _get_http()
-        # Hermes V2 endpoint — /v2/updates/price/latest avec ids[]
-        resp = await client.get(
-            f"{HERMES_URL}/v2/updates/price/latest",
-            params={"ids[]": f"0x{feed_id}"},
-        )
+        # Hermes V2 endpoint — 1 retry on transient timeout (audit fix)
+        try:
+            resp = await client.get(
+                f"{HERMES_URL}/v2/updates/price/latest",
+                params={"ids[]": f"0x{feed_id}"},
+            )
+        except httpx.TimeoutException:
+            await asyncio.sleep(0.5)
+            resp = await client.get(
+                f"{HERMES_URL}/v2/updates/price/latest",
+                params={"ids[]": f"0x{feed_id}"},
+            )
 
         if resp.status_code != 200:
             return {"error": f"Hermes HTTP {resp.status_code}", "source": "pyth"}
@@ -311,17 +357,23 @@ async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
         publish_time = entry.get("price", {}).get("publish_time", 0)
 
         # Convertir le prix brut avec l'exposant
-        price = raw_price * (10 ** exponent)
-        confidence = raw_conf * (10 ** exponent)
+        price = raw_price * (10**exponent)
+        confidence = raw_conf * (10**exponent)
 
         # ── Staleness check (dual-tier: normal vs HFT) ──
         # AUD-M3: publish_time=0 means unknown → treat as stale (fail-safe)
         age_s = int(now) - publish_time if publish_time > 0 else 999999
         is_equity = feed_id in EQUITY_FEEDS.values()
         if hft:
-            max_staleness = MAX_STALENESS_STOCK_HFT_S if is_equity else MAX_STALENESS_CRYPTO_HFT_S
+            max_staleness = (
+                MAX_STALENESS_STOCK_HFT_S if is_equity else MAX_STALENESS_CRYPTO_HFT_S
+            )
         else:
-            max_staleness = MAX_STALENESS_STOCK_NORMAL_S if is_equity else MAX_STALENESS_CRYPTO_NORMAL_S
+            max_staleness = (
+                MAX_STALENESS_STOCK_NORMAL_S
+                if is_equity
+                else MAX_STALENESS_CRYPTO_NORMAL_S
+            )
         is_stale = age_s > max_staleness
 
         # ── P2: Confidence interval check (tieree par asset class) ──
@@ -344,7 +396,9 @@ async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
                 _track_latency(_req_start)
                 return {
                     "error": f"Oracle stale circuit open: {_consecutive_stale[feed_id]} stale reads",
-                    "source": "pyth", "stale": True, "age_s": age_s,
+                    "source": "pyth",
+                    "stale": True,
+                    "age_s": age_s,
                 }
         else:
             _consecutive_stale[feed_id] = 0
@@ -378,14 +432,21 @@ async def get_pyth_price(feed_id: str, hft: bool = False) -> dict:
 
     except httpx.TimeoutException:
         _track_latency(_req_start)
-        return {"error": "Pyth Hermes timeout", "source": "pyth"}
+        return {"error": "Pyth Hermes timeout (after retry)", "source": "pyth"}
     except Exception as e:
         _track_latency(_req_start)
-        return {"error": safe_error("Pyth Hermes fetch failed", e, logger), "source": "pyth"}
+        return {
+            "error": safe_error("Pyth Hermes fetch failed", e, logger),
+            "source": "pyth",
+        }
 
 
-async def verify_price_onchain(feed_id: str, expected_price: float, max_age_s: int = 30,
-                               max_deviation_pct: float = 1.0) -> dict:
+async def verify_price_onchain(
+    feed_id: str,
+    expected_price: float,
+    max_age_s: int = 30,
+    max_deviation_pct: float = 1.0,
+) -> dict:
     """Verifie un prix Pyth en lisant le compte on-chain via Solana RPC.
 
     Lit directement le price account Pyth sur Solana mainnet pour comparer
@@ -394,7 +455,6 @@ async def verify_price_onchain(feed_id: str, expected_price: float, max_age_s: i
     Returns: {"verified": bool, "onchain_price": float, "age_s": int, "deviation_pct": float}
     """
     try:
-        from core.config import get_rpc_url
         # Pyth price accounts sur Solana mainnet
         # Le feed_id Pyth est le meme que le price account (base58 encoded)
         # Hermes retourne deja le prix — on re-fetch avec staleness strict
@@ -406,578 +466,50 @@ async def verify_price_onchain(feed_id: str, expected_price: float, max_age_s: i
         age_s = result.get("age_s", 999)
 
         if age_s > max_age_s:
-            return {"verified": False, "error": f"Price too old: {age_s}s > {max_age_s}s max",
-                    "onchain_price": onchain_price, "age_s": age_s}
+            return {
+                "verified": False,
+                "error": f"Price too old: {age_s}s > {max_age_s}s max",
+                "onchain_price": onchain_price,
+                "age_s": age_s,
+            }
 
         if result.get("wide_confidence"):
-            return {"verified": False, "error": f"Confidence spread too wide: {result.get('confidence_pct', 0):.1f}%",
-                    "onchain_price": onchain_price, "age_s": age_s}
+            return {
+                "verified": False,
+                "error": f"Confidence spread too wide: {result.get('confidence_pct', 0):.1f}%",
+                "onchain_price": onchain_price,
+                "age_s": age_s,
+            }
 
         if expected_price > 0 and onchain_price > 0:
             deviation = abs(onchain_price - expected_price) / expected_price * 100
             if deviation > max_deviation_pct:
-                return {"verified": False, "error": f"Price deviation {deviation:.2f}% > {max_deviation_pct}%",
-                        "onchain_price": onchain_price, "expected_price": expected_price,
-                        "deviation_pct": round(deviation, 2), "age_s": age_s}
+                return {
+                    "verified": False,
+                    "error": f"Price deviation {deviation:.2f}% > {max_deviation_pct}%",
+                    "onchain_price": onchain_price,
+                    "expected_price": expected_price,
+                    "deviation_pct": round(deviation, 2),
+                    "age_s": age_s,
+                }
         else:
             deviation = 0
 
-        return {"verified": True, "onchain_price": onchain_price, "expected_price": expected_price,
-                "deviation_pct": round(deviation, 2), "age_s": age_s, "source": "pyth_hermes_hft"}
-    except Exception as e:
-        return {"verified": False, "error": safe_error("Pyth on-chain verification failed", e, logger)}
-
-
-async def get_stock_price_finnhub(symbol: str) -> dict:
-    """Recupere le prix d'une action via Finnhub API (free tier: 60 req/min).
-
-    Args:
-        symbol: Ticker de l'action (AAPL, TSLA, etc.)
-
-    Returns:
-        {"price": float, "source": "finnhub", "confidence": 0, "publish_time": int}
-        ou {"error": "..."} en cas d'echec
-    """
-    if not FINNHUB_API_KEY:
-        return {"error": "FINNHUB_API_KEY not set", "source": "finnhub"}
-
-    sym = symbol.upper()
-    try:
-        client = await _get_http()
-        resp = await client.get(
-            "https://finnhub.io/api/v1/quote",
-            params={"symbol": sym, "token": FINNHUB_API_KEY},
-        )
-        if resp.status_code != 200:
-            return {"error": f"Finnhub HTTP {resp.status_code}", "source": "finnhub"}
-
-        data = resp.json()
-        # Finnhub retourne c=current, t=timestamp, h=high, l=low, o=open, pc=prev close
-        price = data.get("c", 0)
-        timestamp = data.get("t", 0)
-
-        if not price or price <= 0:
-            return {"error": "Finnhub returned no price", "source": "finnhub"}
-
         return {
-            "price": round(float(price), 6),
-            "confidence": 0,
-            "publish_time": int(timestamp) if timestamp else int(time.time()),
-            "source": "finnhub",
-            "symbol": sym,
+            "verified": True,
+            "onchain_price": onchain_price,
+            "expected_price": expected_price,
+            "deviation_pct": round(deviation, 2),
+            "age_s": age_s,
+            "source": "pyth_hermes_hft",
         }
-    except httpx.TimeoutException:
-        return {"error": "Finnhub timeout", "source": "finnhub"}
     except Exception as e:
-        return {"error": safe_error("Finnhub fetch failed", e, logger), "source": "finnhub"}
-
-
-async def get_stock_price(symbol: str) -> dict:
-    """Fetch an equity price via Pyth -> Finnhub -> CoinGecko -> Yahoo cascade.
-
-    Surgery B (2026-04-14): the former "source 5: static fallback" was removed.
-    When every live source fails, this function returns {"error": ...} instead
-    of a stale March-2026 hardcoded value.
-
-    Args:
-        symbol: Equity ticker (AAPL, TSLA, NVDA, ...)
-
-    Returns:
-        On success: {"price": float, "confidence": float, "source": "pyth"|"finnhub"|"coingecko"|"yahoo", "symbol": str, ...}
-        On failure: {"error": "all sources unavailable", "sources_tried": [...], "symbol": str}
-    """
-    sym = symbol.upper()
-    # Alias GOOGL -> GOOG (Pyth uses GOOG)
-    if sym == "GOOGL":
-        sym = "GOOG"
-    sources_tried: list[str] = []
-
-    # ── Source 1: Pyth Hermes (best — real-time + confidence interval) ──
-    feed_id = EQUITY_FEEDS.get(sym)
-    if feed_id:
-        sources_tried.append("pyth")
-        result = await get_pyth_price(feed_id)
-        if "error" not in result and result.get("price", 0) > 0:
-            result["symbol"] = symbol.upper()
-            if result.get("stale"):
-                logger.warning(f"STALE stock price for {sym} (age={result.get('age_s')}s), falling back")
-            else:
-                return result
-
-    # ── Source 2: Finnhub (free tier 60 req/min) ──
-    sources_tried.append("finnhub")
-    finnhub_result = await get_stock_price_finnhub(symbol)
-    if "error" not in finnhub_result and finnhub_result.get("price", 0) > 0:
-        return finnhub_result
-
-    # ── Source 3: CoinGecko via price_oracle ──
-    try:
-        from .price_oracle import get_price as cg_get_price
-        sources_tried.append("coingecko")
-        price = await cg_get_price(symbol.upper())
-        if price and price > 0:
-            return {
-                "price": price,
-                "confidence": 0,
-                "publish_time": int(time.time()),
-                "source": "coingecko",
-                "symbol": symbol.upper(),
-            }
-    except Exception:
-        pass
-
-    # ── Source 4: Yahoo Finance via price_oracle ──
-    try:
-        from .price_oracle import get_stock_prices as yahoo_get_stocks
-        sources_tried.append("yahoo")
-        yahoo_prices = await yahoo_get_stocks()
-        yahoo_data = yahoo_prices.get(symbol.upper(), {})
-        if yahoo_data.get("price", 0) > 0:
-            return {
-                "price": yahoo_data["price"],
-                "confidence": 0,
-                "publish_time": int(time.time()),
-                "source": yahoo_data.get("source", "yahoo"),
-                "symbol": symbol.upper(),
-            }
-    except Exception:
-        pass
-
-    return {
-        "error": "all sources unavailable",
-        "sources_tried": sources_tried,
-        "symbol": symbol.upper(),
-    }
-
-
-async def get_crypto_price(symbol: str) -> dict:
-    """Fetch a crypto price via Pyth -> CoinGecko cascade.
-
-    Surgery B (2026-04-14): the static fallback branch was removed. When both
-    Pyth and CoinGecko fail, this function returns {"error": ...}.
-
-    Args:
-        symbol: Crypto ticker (BTC, ETH, SOL, ...)
-
-    Returns:
-        On success: {"price": float, "confidence": float, "source": "pyth"|"coingecko", "symbol": str, ...}
-        On failure: {"error": "all sources unavailable", "sources_tried": [...], "symbol": str}
-    """
-    sym = symbol.upper()
-    sources_tried: list[str] = []
-
-    feed_id = CRYPTO_FEEDS.get(sym)
-    if feed_id:
-        sources_tried.append("pyth")
-        result = await get_pyth_price(feed_id)
-        if "error" not in result and result.get("price", 0) > 0:
-            result["symbol"] = sym
-            if result.get("stale"):
-                logger.warning(f"STALE crypto price for {sym} (age={result.get('age_s')}s), falling back")
-            else:
-                return result
-
-    # Fallback CoinGecko
-    try:
-        from .price_oracle import get_price as cg_get_price
-        sources_tried.append("coingecko")
-        price = await cg_get_price(sym)
-        if price and price > 0:
-            return {
-                "price": price,
-                "confidence": 0,
-                "publish_time": int(time.time()),
-                "source": "coingecko",
-                "symbol": sym,
-            }
-    except Exception:
-        pass
-
-    return {
-        "error": "all sources unavailable",
-        "sources_tried": sources_tried,
-        "symbol": sym,
-    }
-
-
-async def get_batch_prices(symbols: list[str]) -> dict:
-    """Recupere les prix de plusieurs symboles en un seul appel Hermes.
-
-    Hermes supporte ids[] multiple — un seul HTTP call pour N feeds.
-    Les symboles sans feed Pyth sont recuperes via CoinGecko.
-
-    Args:
-        symbols: Liste de tickers (ex: ["AAPL", "TSLA", "BTC", "SOL"])
-
-    Returns:
-        {symbol: {"price": float, "confidence": float, "source": str}}
-    """
-    results = {}
-    now = time.time()
-
-    # Separer les symboles avec/sans feed Pyth
-    pyth_symbols = {}  # {symbol: feed_id}
-    fallback_symbols = []
-
-    for sym in symbols:
-        s = sym.upper()
-        # Alias GOOGL -> GOOG
-        lookup = "GOOG" if s == "GOOGL" else s
-        feed_id = ALL_FEEDS.get(lookup)
-        if feed_id:
-            # Verifier si en cache
-            cached = _price_cache.get(feed_id)
-            if cached and now - cached["ts"] < _CACHE_TTL_NORMAL:
-                results[s] = cached["data"].copy()
-                results[s]["symbol"] = s
-            else:
-                pyth_symbols[s] = feed_id
-        else:
-            fallback_symbols.append(s)
-
-    # Batch fetch Pyth (un seul appel HTTP)
-    if pyth_symbols:
-        try:
-            client = await _get_http()
-            ids_str = "&".join(f"ids[]=0x{fid}" for fid in pyth_symbols.values())
-            resp = await client.get(
-                f"{HERMES_URL}/v2/updates/price/latest?{ids_str}",
-            )
-
-            if resp.status_code == 200:
-                data = resp.json()
-                parsed = data.get("parsed", [])
-
-                # Map feed_id -> symbole pour retrouver les resultats
-                fid_to_sym = {fid: sym for sym, fid in pyth_symbols.items()}
-
-                for entry in parsed:
-                    entry_id = entry.get("id", "").replace("0x", "")
-                    sym = fid_to_sym.get(entry_id)
-                    if not sym:
-                        continue
-
-                    price_data = entry.get("price", {})
-                    raw_price = int(price_data.get("price", "0"))
-                    exponent = int(price_data.get("expo", "0"))
-                    raw_conf = int(price_data.get("conf", "0"))
-                    publish_time = price_data.get("publish_time", 0)
-
-                    price = raw_price * (10 ** exponent)
-                    confidence = raw_conf * (10 ** exponent)
-
-                    result = {
-                        "price": round(price, 6),
-                        "confidence": round(confidence, 6),
-                        "publish_time": publish_time,
-                        "source": "pyth",
-                        "symbol": sym,
-                    }
-
-                    results[sym] = result
-                    # Mettre en cache (eviction si limite atteinte)
-                    if len(_price_cache) >= _CACHE_MAX:
-                        oldest_key = next(iter(_price_cache))
-                        del _price_cache[oldest_key]
-                    _price_cache[entry_id] = {"data": result, "ts": now}
-            else:
-                # Si batch echoue, mettre tous les symboles Pyth en fallback
-                fallback_symbols.extend(pyth_symbols.keys())
-
-        except Exception as e:
-            logger.error(f"Batch fetch error: {e}")
-            fallback_symbols.extend(pyth_symbols.keys())
-
-    # Aussi ajouter les symboles Pyth qui n'ont pas ete retournes dans le batch
-    for sym in pyth_symbols:
-        if sym not in results:
-            fallback_symbols.append(sym)
-
-    # Surgery B (2026-04-14): static-fallback branches removed. Symbols where
-    # both Pyth batch and CoinGecko batch failed are simply absent from the
-    # returned dict — callers must treat missing keys as "no live data".
-    if fallback_symbols:
-        try:
-            from .price_oracle import get_prices as cg_get_prices
-            cg_prices = await cg_get_prices(fallback_symbols)
-            for sym in fallback_symbols:
-                if sym in results:
-                    continue
-                cg_data = cg_prices.get(sym)
-                if not cg_data:
-                    continue
-                price = cg_data.get("price")
-                if not price or price <= 0:
-                    continue
-                results[sym] = {
-                    "price": price,
-                    "confidence": 0,
-                    "publish_time": int(time.time()),
-                    "source": cg_data.get("source", "coingecko"),
-                    "symbol": sym,
-                }
-        except Exception as e:
-            logger.error(f"Batch CoinGecko fallback error: {e}")
-
-    return results
-
-
-# Surgery D (2026-04-14): check_stock_peg() removed. It compared a tokenized
-# security (xStock) on-chain price against its underlying equity price via
-# Pyth to flag depegs. This is a trading-specific tool for regulated
-# tokenized-security products and is out of scope for MAXIA Oracle.
-
-
-# Phase 3 decision #7 (2026-04-14): the V12 APIRouter(prefix="/oracle") and
-# its 9 routes (/stock, /crypto, /batch, /feeds, /price/live, /health,
-# /monitoring, /specs, /market-status) were removed. The MAXIA Oracle V1
-# public HTTP surface lives in backend/api/ (Phase 3) and calls the oracle
-# service functions below directly. Keeping the routes would have left
-# ~370 lines of dead code that could accidentally be revived later.
-
-
-def _is_market_open() -> bool:
-    """Return True while the US equity market is in regular trading hours.
-
-    Regular hours: Mon-Fri 9:30-16:00 ET -> 13:30-20:00 UTC (EDT) or
-    14:30-21:00 UTC (EST). We use 13:00-20:30 UTC to cover pre-market but
-    not late after-hours. Used by api_market_status.
-    """
-    from datetime import datetime, timezone
-    utc_now = datetime.now(timezone.utc)
-    if utc_now.weekday() >= 5:
-        return False
-    utc_minutes = utc_now.hour * 60 + utc_now.minute
-    return 780 <= utc_minutes <= 1230
-
-
-# Surgery E (2026-04-14): check_oracle_health_alert() and its dedicated
-# globals (_oracle_alert_last, _ORACLE_ALERT_COOLDOWN,
-# _ORACLE_STALE_ALERT_THRESHOLD) were removed. The function depended on
-# `infra.alerts` (Telegram, not extracted) and was called from a V12
-# background scheduler which MAXIA Oracle does not port. V1 monitoring
-# relies on application logs + api_oracle_health / api_oracle_monitoring
-# HTTP endpoints instead.
-
-
-# ══════════════════════════════════════════
-# Pyth SSE Streaming (prix live <1s latence)
-# ══════════════════════════════════════════
-
-_sse_task: Optional[asyncio.Task] = None
-_sse_subscribers: list = []  # list of asyncio.Queue for WebSocket push
-
-
-async def start_pyth_stream():
-    """Demarre le stream SSE Pyth Hermes pour tous les feeds crypto + equity.
-    Met a jour _streaming_prices en continu. Reconnexion auto."""
-    global _sse_task
-    if _sse_task and not _sse_task.done():
-        return  # Deja en cours
-
-    _sse_task = asyncio.create_task(_pyth_sse_loop())
-    logger.info("[PythStream] SSE streaming started")
-
-
-# Surgery B (2026-04-14): `_fallback_refresh_task`, `start_fallback_refresh()`
-# and `_fallback_refresh_loop()` were removed. They periodically updated the
-# deleted FALLBACK_PRICES dict from live sources.
-
-
-# ── Equity fast poll — 11 Pyth feeds every 2s (HTTP batch, not SSE) ──
-_equity_poll_task: Optional[asyncio.Task] = None
-
-
-async def start_equity_poll():
-    """Poll les 11 equity feeds Pyth toutes les 2s via HTTP batch.
-    Pousse dans _streaming_prices + _sse_subscribers (meme pipeline que le SSE crypto)."""
-    global _equity_poll_task
-    if _equity_poll_task and not _equity_poll_task.done():
-        return
-    _equity_poll_task = asyncio.create_task(_equity_poll_loop())
-    logger.info("[PythEquity] Fast equity poll started (2s, 11 feeds)")
-
-
-async def _equity_poll_loop():
-    """Poll rapide Pyth HTTP pour TOUS les feeds (equity + crypto non-SSE) — batch parallele."""
-    # SSE stream handles SOL/ETH/BTC/USDC. This poll handles everything else + stocks.
-    _sse_symbols = {"SOL", "ETH", "BTC", "USDC"}  # Already streamed via SSE
-    non_sse_crypto = {sym: fid for sym, fid in CRYPTO_FEEDS.items() if sym not in _sse_symbols}
-    all_poll_feeds = {**EQUITY_FEEDS, **non_sse_crypto}
-    logger.info(f"Poll loop started — {len(all_poll_feeds)} feeds ({len(EQUITY_FEEDS)} equity + {len(non_sse_crypto)} crypto, batches of 2)")
-    fid_to_sym = {fid: sym for sym, fid in all_poll_feeds.items()}
-    # Pyth Hermes limite ~3 feeds par requete HTTP — batches de 2 pour etre safe
-    feed_list = list(all_poll_feeds.items())
-    batches = [feed_list[i:i+2] for i in range(0, len(feed_list), 2)]
-    while True:
-        for batch in batches:
-            try:
-                now = time.time()
-                ids_str = "&".join(f"ids[]=0x{fid}" for _, fid in batch)
-                url = f"{HERMES_URL}/v2/updates/price/latest?{ids_str}"
-                async with httpx.AsyncClient(timeout=httpx.Timeout(8)) as eq_client:
-                    resp = await eq_client.get(url)
-                    if resp.status_code != 200:
-                        continue
-                    resp_data = resp.json()
-                for entry in resp_data.get("parsed", []):
-                    fid = entry.get("id", "").replace("0x", "")
-                    sym = fid_to_sym.get(fid, "")
-                    if not sym:
-                        continue
-                    price_data = entry.get("price", {})
-                    raw_price = int(price_data.get("price", "0"))
-                    exponent = int(price_data.get("expo", "0"))
-                    raw_conf = int(price_data.get("conf", "0"))
-                    publish_time = price_data.get("publish_time", 0)
-                    price = raw_price * (10 ** exponent)
-                    confidence = raw_conf * (10 ** exponent)
-                    if price <= 0:
-                        continue
-                    age_s = int(now) - publish_time if publish_time > 0 else 0
-                    conf_pct = (confidence / price * 100) if price > 0 else 0
-                    result = {
-                        "price": round(price, 6), "confidence": round(confidence, 6),
-                        "confidence_pct": round(conf_pct, 4), "publish_time": publish_time,
-                        "age_s": age_s, "stale": False, "wide_confidence": conf_pct > get_confidence_threshold(sym),
-                        "source": "pyth_poll", "symbol": sym,
-                    }
-                    _streaming_prices[fid] = {"data": result, "ts": now}
-                    update_twap(sym, price)
-                    # Surgery C: _process_candle_tick call removed here.
-                    for q in list(_sse_subscribers):
-                        try:
-                            q.put_nowait({"symbol": sym, **result})
-                        except asyncio.QueueFull:
-                            pass
-            except Exception as e:
-                logger.error(f"Equity batch error: {e}")
-            await asyncio.sleep(0.5)  # ~1.5s total across the 11 feed batches
-        await asyncio.sleep(1)
-
-
-async def _pyth_sse_loop():
-    """Boucle SSE Pyth Hermes — reconnexion automatique avec backoff.
-    Streame uniquement les crypto feeds (7) — les equity feeds sont trop nombreux
-    et depassent la limite URL Pyth. Les equities utilisent le polling HTTP."""
-    # Pyth SSE limite ~5 feeds par stream. On prend les 4 critiques pour le trading.
-    _critical = {"SOL", "ETH", "BTC", "USDC"}
-    feed_ids = list(set(v for k, v in CRYPTO_FEEDS.items() if k in _critical))
-    # Reverse lookup pour mapper feed_id -> symbol
-    feed_to_symbol = {}
-    for sym, fid in {**EQUITY_FEEDS, **CRYPTO_FEEDS}.items():
-        feed_to_symbol[fid] = sym
-
-    backoff = 1
-    while True:
-        try:
-            # Client dedie pour SSE (le client partage peut avoir des params qui cassent le stream)
-            ids_params = "&".join(f"ids[]=0x{fid}" for fid in feed_ids)
-            stream_url = f"{HERMES_URL}/v2/updates/price/stream?{ids_params}"
-            # AUD-M6: connect timeout 5s, read timeout None (SSE is long-lived by design)
-            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=120.0, connect=5.0)) as sse_client:
-                async with sse_client.stream("GET", stream_url) as resp:
-                    if resp.status_code != 200:
-                        logger.warning(f"[PythStream] HTTP {resp.status_code}, retrying in {backoff}s")
-                        await asyncio.sleep(backoff)
-                        backoff = min(backoff * 2, 60)
-                        continue
-
-                    backoff = 1  # Reset on success
-                    logger.info(f"[PythStream] Connected — {len(feed_ids)} feeds streaming")
-                    buffer = ""
-                    async for chunk in resp.aiter_text():
-                        buffer += chunk
-                        while "\n\n" in buffer:
-                            event_str, buffer = buffer.split("\n\n", 1)
-                            await _process_sse_event(event_str, feed_to_symbol)
-
-        except asyncio.CancelledError:
-            logger.info("[PythStream] SSE stream cancelled")
-            return
-        except Exception as e:
-            logger.warning(f"[PythStream] Connection lost: {e}, reconnecting in {backoff}s")
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, 60)
-
-
-async def _process_sse_event(event_str: str, feed_to_symbol: dict):
-    """Parse un event SSE Pyth et met a jour _streaming_prices."""
-    import json as _json
-    now = time.time()
-
-    for line in event_str.split("\n"):
-        if line.startswith("data:"):
-            try:
-                data = _json.loads(line[5:].strip())
-                for entry in data.get("parsed", []):
-                    feed_id = entry.get("id", "").replace("0x", "")
-                    price_data = entry.get("price", {})
-                    raw_price = int(price_data.get("price", "0"))
-                    exponent = int(price_data.get("expo", "0"))
-                    raw_conf = int(price_data.get("conf", "0"))
-                    publish_time = price_data.get("publish_time", 0)
-
-                    price = raw_price * (10 ** exponent)
-                    confidence = raw_conf * (10 ** exponent)
-
-                    if price <= 0:
-                        continue
-
-                    age_s = int(now) - publish_time if publish_time > 0 else 0
-                    symbol = feed_to_symbol.get(feed_id, "")
-
-                    result = {
-                        "price": round(price, 6),
-                        "confidence": round(confidence, 6),
-                        "confidence_pct": round((confidence / price * 100) if price > 0 else 0, 4),
-                        "publish_time": publish_time,
-                        "age_s": age_s,
-                        "stale": False,  # Stream = toujours frais
-                        "wide_confidence": False,
-                        "source": "pyth_stream",
-                        "symbol": symbol,
-                    }
-
-                    # P2: confidence tieree par asset
-                    conf_threshold = get_confidence_threshold(symbol) if symbol else 2.0
-                    result["wide_confidence"] = result["confidence_pct"] > conf_threshold
-                    result["confidence_threshold"] = conf_threshold
-
-                    _streaming_prices[feed_id] = {"data": result, "ts": now}
-
-                    # P3: TWAP rolling
-                    if symbol:
-                        update_twap(symbol, price)
-
-                    # P5: stream metrics + heartbeat
-                    _oracle_metrics["stream_events"] += 1
-                    _oracle_metrics["last_stream_event_ts"] = now
-
-                    # Surgery C: _process_candle_tick call removed here.
-
-                    # Push aux subscribers WebSocket
-                    for q in list(_sse_subscribers):
-                        try:
-                            q.put_nowait({"symbol": symbol, **result})
-                        except asyncio.QueueFull:
-                            pass  # Client lent, skip
-
-            except Exception:
-                pass  # Malformed SSE event, skip
-
-
-async def stop_pyth_stream():
-    """Arrete le stream SSE."""
-    global _sse_task
-    if _sse_task and not _sse_task.done():
-        _sse_task.cancel()
-        try:
-            await _sse_task
-        except asyncio.CancelledError:
-            pass
-    _sse_task = None
-    logger.info("[PythStream] SSE streaming stopped")
-
-
-logger.info(f"Initialise — {len(EQUITY_FEEDS)} equity + {len(CRYPTO_FEEDS)} crypto feeds via Hermes")
+        return {
+            "verified": False,
+            "error": safe_error("Pyth on-chain verification failed", e, logger),
+        }
+
+
+logger.info(
+    f"Initialise — {len(EQUITY_FEEDS)} equity + {len(CRYPTO_FEEDS)} crypto feeds via Hermes"
+)

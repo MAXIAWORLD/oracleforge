@@ -10,10 +10,18 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
 from core.auth import require_api_key
+from core.config import CHAIN_RPC_URLS
 from core.db import get_db
 from core.disclaimer import wrap_error, wrap_with_disclaimer
 from core.rate_limit import check_daily
-from services.oracle import chainlink_oracle, price_oracle, pyth_oracle
+from services.oracle import (
+    chainlink_oracle,
+    price_oracle,
+    pyth_oracle,
+    pyth_solana_oracle,
+    redstone_oracle,
+    uniswap_v3_oracle,
+)
 
 router = APIRouter(prefix="/api", tags=["sources"])
 
@@ -30,6 +38,7 @@ def _enforce_rate_limit(key_hash: str):
                 window_seconds=decision.window_s,
                 retry_after_seconds=decision.retry_after,
                 reset_at_unix=decision.reset_at,
+                upgrade_url="https://oracle.maxiaworld.app/#pricing",
             ),
             headers={
                 "Retry-After": str(decision.retry_after),
@@ -54,6 +63,18 @@ async def list_sources(key_hash: str = Depends(require_api_key)):
         "coingecko":   price_oracle._cb_coingecko.get_status(),
         "yahoo":       price_oracle._cb_yahoo.get_status(),
     }
+    chainlink_sources = [
+        {
+            "name": f"chainlink_{chain}",
+            "type": "on_chain_oracle",
+            "chain": chain,
+            "endpoint": CHAIN_RPC_URLS[chain][0],
+            "feeds": chainlink_oracle.symbols_for(chain),
+            "update_frequency": "~1h heartbeat or 0.5% deviation",
+            "circuit_breaker": None,
+        }
+        for chain in chainlink_oracle.SUPPORTED_CHAINS
+    ]
     return wrap_with_disclaimer(
         {
             "sources": [
@@ -68,14 +89,7 @@ async def list_sources(key_hash: str = Depends(require_api_key)):
                     "confidence_interval": True,
                     "circuit_breaker": None,
                 },
-                {
-                    "name": "chainlink_base",
-                    "type": "on_chain_oracle",
-                    "endpoint": chainlink_oracle.BASE_RPC_URL,
-                    "feeds": list(chainlink_oracle.CHAINLINK_FEEDS.keys()),
-                    "update_frequency": "~1h heartbeat or 0.5% deviation",
-                    "circuit_breaker": None,
-                },
+                *chainlink_sources,
                 {
                     "name": "helius_das",
                     "type": "rpc_metadata",
@@ -99,6 +113,50 @@ async def list_sources(key_hash: str = Depends(require_api_key)):
                     "type": "market_data",
                     "endpoint": "https://query1.finance.yahoo.com/v8/finance/spark",
                     "circuit_breaker": cb["yahoo"],
+                },
+                {
+                    "name": "redstone",
+                    "type": "rest_oracle",
+                    "endpoint": redstone_oracle.REDSTONE_URL,
+                    "provider": redstone_oracle.REDSTONE_PROVIDER,
+                    "coverage_note": (
+                        "Dynamic coverage — RedStone publishes 400+ assets "
+                        "(crypto majors + long-tail + forex + equities). "
+                        "Symbols are attempted on demand; unknown symbols "
+                        "return a 404."
+                    ),
+                    "circuit_breaker": redstone_oracle.get_metrics()["circuit"],
+                },
+                {
+                    "name": "pyth_solana",
+                    "type": "on_chain_oracle",
+                    "chain": "solana",
+                    "program": pyth_solana_oracle.PUSH_ORACLE_PROGRAM_ID,
+                    "shard": 0,
+                    "feeds": pyth_solana_oracle.list_supported_symbols(),
+                    "coverage_note": (
+                        "On-chain read of Pyth Price Feed Accounts (shard 0 "
+                        "sponsored by the Pyth Data Association). Verified "
+                        "with full Wormhole guardian signatures. Stale > 60s "
+                        "is flagged."
+                    ),
+                    "circuit_breaker": pyth_solana_oracle.get_metrics()["circuit"],
+                },
+                {
+                    "name": "uniswap_v3",
+                    "type": "on_chain_twap",
+                    "chains": list(uniswap_v3_oracle.SUPPORTED_CHAINS),
+                    "feeds_per_chain": uniswap_v3_oracle.all_supported_symbols(),
+                    "default_window_s": uniswap_v3_oracle.DEFAULT_WINDOW_S,
+                    "min_window_s": uniswap_v3_oracle.MIN_WINDOW_S,
+                    "max_window_s": uniswap_v3_oracle.MAX_WINDOW_S,
+                    "coverage_note": (
+                        "Time-weighted average price (TWAP) read directly "
+                        "from curated Uniswap v3 pools via observe(). "
+                        "Default 30-minute window on high-liquidity pairs "
+                        "(WETH/USDC 0.05%, WBTC/USDC 0.30%)."
+                    ),
+                    "circuit_breaker": uniswap_v3_oracle.get_metrics()["circuit"],
                 },
             ],
         }
@@ -128,14 +186,25 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
 
     pyth_crypto = sorted(pyth_oracle.CRYPTO_FEEDS.keys())
     pyth_equity = sorted(pyth_oracle.EQUITY_FEEDS.keys())
-    chainlink_base = sorted(chainlink_oracle.CHAINLINK_FEEDS.keys())
+    chainlink_by_chain = chainlink_oracle.all_supported_symbols()
     price_oracle_mints = sorted(price_oracle.TOKEN_MINTS.keys())
+    pyth_solana_syms = pyth_solana_oracle.list_supported_symbols()
+    uniswap_by_chain = uniswap_v3_oracle.all_supported_symbols()
+    uniswap_union: set[str] = set()
+    for syms in uniswap_by_chain.values():
+        uniswap_union.update(syms)
+
+    chainlink_union: set[str] = set()
+    for syms in chainlink_by_chain.values():
+        chainlink_union.update(syms)
 
     all_symbols = sorted(
         set(pyth_crypto)
         | set(pyth_equity)
-        | set(chainlink_base)
+        | chainlink_union
         | set(price_oracle_mints)
+        | set(pyth_solana_syms)
+        | uniswap_union
     )
 
     return wrap_with_disclaimer(
@@ -145,8 +214,32 @@ async def list_symbols(key_hash: str = Depends(require_api_key)):
             "by_source": {
                 "pyth_crypto": pyth_crypto,
                 "pyth_equity": pyth_equity,
-                "chainlink_base": chainlink_base,
+                "chainlink_base": chainlink_by_chain.get("base", []),
+                "chainlink_ethereum": chainlink_by_chain.get("ethereum", []),
+                "chainlink_arbitrum": chainlink_by_chain.get("arbitrum", []),
                 "price_oracle": price_oracle_mints,
+                "redstone": [],
+                "pyth_solana": pyth_solana_syms,
+                "uniswap_v3_base": uniswap_by_chain.get("base", []),
+                "uniswap_v3_ethereum": uniswap_by_chain.get("ethereum", []),
+            },
+            "coverage_notes": {
+                "redstone": (
+                    "Dynamic coverage — RedStone supports 400+ assets, "
+                    "attempted on demand. See https://app.redstone.finance "
+                    "for the live list."
+                ),
+                "pyth_solana": (
+                    "On-chain Solana read, shard 0 sponsored feeds only. "
+                    "Coverage is the curated list above -- any other symbol "
+                    "returns 404 on /api/pyth/solana/{symbol}."
+                ),
+                "uniswap_v3": (
+                    "Time-weighted average price (TWAP) from curated "
+                    "high-liquidity Uniswap v3 pools. Default window 30 min. "
+                    "Coverage limited to audited pairs -- any other symbol "
+                    "returns 404 on /api/twap/{symbol}."
+                ),
             },
         }
     )

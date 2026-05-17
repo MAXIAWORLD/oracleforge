@@ -35,6 +35,17 @@ def _client_ip(request: Request) -> str:
     return "unknown"
 
 
+@router.get("/register")
+async def register_info() -> JSONResponse:
+    """Explain how to get a free API key (browser-friendly helper)."""
+    return JSONResponse(content={
+        "hint": "Send a POST request (no body) to this endpoint to get a free API key.",
+        "example": "curl -s -X POST https://oracle.maxiaworld.app/api/register",
+        "tier": "free — 100 requests/day",
+        "usage": "Pass the key as X-API-Key header on every subsequent request.",
+    })
+
+
 @router.post("/register")
 async def register(request: Request) -> JSONResponse:
     """Issue a new free-tier key. Returns the raw key once; never persisted."""

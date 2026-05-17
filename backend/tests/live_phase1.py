@@ -151,7 +151,7 @@ async def test_price_oracle_batch() -> int:
 async def test_pyth_batch() -> int:
     """Exercise pyth_oracle.get_batch_prices() — single HTTP call for 3 feeds."""
     print(f"\n{CYAN}== Pyth batch (BTC+ETH+SOL in one call) =={RESET}")
-    from services.oracle.pyth_oracle import get_batch_prices
+    from services.oracle.price_cascade import get_batch_prices
 
     t0 = time.time()
     results = await get_batch_prices(["BTC", "ETH", "SOL"])

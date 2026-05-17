@@ -41,10 +41,14 @@ from typing import Any, Awaitable, Callable
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from core.config import BASE_CHAIN_ID, X402_PRICE_MAP, X402_TREASURY_ADDRESS_BASE
+from core.config import (
+    X402_CHAIN_CONFIG,
+    X402_PRICE_MAP,
+    X402_SUPPORTED_CHAINS,
+)
 from core.db import get_db, x402_record_tx, x402_tx_already_processed
 from core.disclaimer import DISCLAIMER_TEXT, wrap_error
-from x402.base_verifier import build_x402_challenge_base, x402_verify_payment_base
+from x402.multichain_verifier import build_all_accepts, x402_verify_payment
 
 logger = logging.getLogger("maxia_oracle.x402.middleware")
 
@@ -81,12 +85,14 @@ def _match_price(path: str) -> float | None:
 
 
 def _build_402_response(path: str, price: float) -> JSONResponse:
-    """Return a canonical 402 challenge with a single Base-mainnet accepts entry."""
-    accepts: list[dict[str, Any]] = []
-    if X402_TREASURY_ADDRESS_BASE:
-        accepts.append(
-            build_x402_challenge_base(path, price, X402_TREASURY_ADDRESS_BASE)
-        )
+    """Return a canonical 402 challenge with one accepts entry per configured chain.
+
+    V1.2: the response carries up to 4 `accepts` entries, one per EVM
+    chain that has a treasury configured (Base, Arbitrum, Optimism,
+    Polygon). The client picks the chain it wants to pay on and echoes
+    it back via the `X-Payment-Network` header on the follow-up request.
+    """
+    accepts = build_all_accepts(path, price)
     return JSONResponse(
         status_code=402,
         content={
@@ -101,6 +107,24 @@ def _build_402_response(path: str, price: float) -> JSONResponse:
 
 def _payment_error(status: int, message: str, **extra: Any) -> JSONResponse:
     return JSONResponse(status_code=status, content=wrap_error(message, **extra))
+
+
+def _parse_payment_network(request: Request) -> str:
+    """Extract the caller-declared chain from the X-Payment-Network header.
+
+    Default = "base" so V1.0 clients that only send X-Payment without the
+    network header stay compatible. An unrecognized value silently falls
+    back to "base" — the verifier will still reject the tx if it was
+    actually settled on another chain, so this tolerant parse costs
+    nothing and simplifies the client code path.
+    """
+    raw = (request.headers.get("X-Payment-Network") or "base").strip().lower()
+    if raw not in X402_SUPPORTED_CHAINS:
+        logger.warning(
+            "[x402] Unknown X-Payment-Network=%r, defaulting to base", raw
+        )
+        return "base"
+    return raw
 
 
 # ── Middleware entry point ──────────────────────────────────────────────────
@@ -145,20 +169,24 @@ async def x402_middleware(
 
     # ── Payment verification ────────────────────────────────────────────────
 
+    chain = _parse_payment_network(request)
+
     logger.info(
-        "[x402] Payment attempt: path=%s amount=$%.6f header=%s...",
+        "[x402] Payment attempt: path=%s chain=%s amount=$%.6f header=%s...",
         path,
+        chain,
         price,
         payment_header[:16] if len(payment_header) >= 16 else payment_header,
     )
 
     try:
-        result = await x402_verify_payment_base(payment_header, price)
+        result = await x402_verify_payment(chain, payment_header, price)
     except Exception as exc:
         logger.error(
-            "[x402] Verification raised %s on %s",
+            "[x402] Verification raised %s on %s chain=%s",
             type(exc).__name__,
             path,
+            chain,
             exc_info=True,
         )
         return _payment_error(402, "payment verification error")
@@ -167,6 +195,7 @@ async def x402_middleware(
         return _payment_error(
             402,
             "payment verification failed",
+            chain=chain,
             detail=result.get("error", ""),
         )
 
@@ -181,7 +210,7 @@ async def x402_middleware(
     if x402_tx_already_processed(db, tx_hash):
         return _payment_error(402, "payment already used (replay detected)")
 
-    inserted = x402_record_tx(db, tx_hash, price, path)
+    inserted = x402_record_tx(db, tx_hash, price, path, chain=chain)
     if not inserted:
         # Race condition: another worker recorded the same tx between our
         # check and our insert. Treat this as a replay attempt.
@@ -192,6 +221,7 @@ async def x402_middleware(
     request.state.x402_paid = True
     request.state.x402_tx_hash = tx_hash
     request.state.x402_amount_usdc = price
-    request.state.x402_chain_id = BASE_CHAIN_ID
+    request.state.x402_chain_id = X402_CHAIN_CONFIG[chain]["chain_id"]
+    request.state.x402_chain = chain
 
     return await call_next(request)

@@ -51,11 +51,12 @@ OPTIONAL in every environment:
 OPTIONAL in dev, REQUIRED in staging/prod:
     (same as above API_KEY_PEPPER / DB_PATH / X402_TREASURY_ADDRESS_BASE)
 """
+
 from __future__ import annotations
 
 import os
 import re
-from typing import Final
+from typing import Any, Final
 
 from dotenv import load_dotenv
 
@@ -76,9 +77,7 @@ def _require_env(name: str, reason: str) -> str:
     """
     value = os.getenv(name, "").strip()
     if not value:
-        raise RuntimeError(
-            f"{name} environment variable is required. {reason}"
-        )
+        raise RuntimeError(f"{name} environment variable is required. {reason}")
     return value
 
 
@@ -87,9 +86,7 @@ ENV: Final[str] = _require_env(
     'Set ENV to one of "dev", "staging", "prod" before starting.',
 )
 if ENV not in _VALID_ENVS:
-    raise RuntimeError(
-        f'ENV must be one of {sorted(_VALID_ENVS)}, got "{ENV}".'
-    )
+    raise RuntimeError(f'ENV must be one of {sorted(_VALID_ENVS)}, got "{ENV}".')
 
 IS_DEV: Final[bool] = ENV == "dev"
 IS_STAGING: Final[bool] = ENV == "staging"
@@ -135,7 +132,6 @@ _SOLANA_RPC_CUSTOM: Final[str] = os.getenv("SOLANA_RPC", "")
 
 # Public fallbacks (always appended last, never log URLs that contain api-key=)
 _PUBLIC_RPC_FALLBACKS: Final[tuple[str, ...]] = (
-    "https://rpc.ankr.com/solana",
     "https://api.mainnet-beta.solana.com",
     "https://solana-mainnet.rpc.extrnode.com",
 )
@@ -239,27 +235,78 @@ def _read_base_min_tx_usdc() -> float:
             f"BASE_MIN_TX_USDC must be a valid float, got {raw!r}"
         ) from exc
     if value <= 0:
-        raise RuntimeError(
-            f"BASE_MIN_TX_USDC must be strictly positive, got {value}"
-        )
+        raise RuntimeError(f"BASE_MIN_TX_USDC must be strictly positive, got {value}")
     return value
 
 
 BASE_MIN_TX_USDC: Final[float] = _read_base_min_tx_usdc()
 
 
-# Base RPC fallback chain: the env-configured primary first (or public mainnet
-# default), then two independent public endpoints. The verifier will cycle
-# through them in order and return the first response.
-_BASE_RPC_PRIMARY: Final[str] = os.getenv(
-    "BASE_RPC_URL", "https://mainnet.base.org"
-).strip() or "https://mainnet.base.org"
-
-BASE_RPC_URLS: Final[tuple[str, ...]] = (
-    _BASE_RPC_PRIMARY,
-    "https://base.llamarpc.com",
-    "https://base-mainnet.public.blastapi.io",
+# V1.1 multi-chain RPC fallback pools.
+#
+# For every supported EVM chain we keep an ordered tuple of RPC endpoints:
+# the env-configured primary (or a sensible public default) first, then two
+# independent public fallbacks. The verifier / chainlink reader cycles
+# through them in order and returns the first success. A one-RPC prod
+# config is never acceptable — too many free public RPCs silently rate-
+# limit the second request of a burst, and a cold fallback path is the
+# cheapest resilience money can buy.
+_BASE_RPC_PRIMARY: Final[str] = (
+    os.getenv("BASE_RPC_URL", "https://mainnet.base.org").strip()
+    or "https://mainnet.base.org"
 )
+
+_ETHEREUM_RPC_PRIMARY: Final[str] = (
+    os.getenv("ETHEREUM_RPC_URL", "https://eth.llamarpc.com").strip()
+    or "https://eth.llamarpc.com"
+)
+
+_ARBITRUM_RPC_PRIMARY: Final[str] = (
+    os.getenv("ARBITRUM_RPC_URL", "https://arb1.arbitrum.io/rpc").strip()
+    or "https://arb1.arbitrum.io/rpc"
+)
+
+_OPTIMISM_RPC_PRIMARY: Final[str] = (
+    os.getenv("OPTIMISM_RPC_URL", "https://mainnet.optimism.io").strip()
+    or "https://mainnet.optimism.io"
+)
+
+_POLYGON_RPC_PRIMARY: Final[str] = (
+    os.getenv("POLYGON_RPC_URL", "https://polygon-rpc.com").strip()
+    or "https://polygon-rpc.com"
+)
+
+CHAIN_RPC_URLS: Final[dict[str, tuple[str, ...]]] = {
+    "base": (
+        _BASE_RPC_PRIMARY,
+        "https://base.llamarpc.com",
+        "https://base-mainnet.public.blastapi.io",
+    ),
+    "ethereum": (
+        _ETHEREUM_RPC_PRIMARY,
+        "https://ethereum-rpc.publicnode.com",
+        "https://rpc.ankr.com/eth",
+    ),
+    "arbitrum": (
+        _ARBITRUM_RPC_PRIMARY,
+        "https://arbitrum.llamarpc.com",
+        "https://arbitrum-one-rpc.publicnode.com",
+    ),
+    "optimism": (
+        _OPTIMISM_RPC_PRIMARY,
+        "https://optimism.llamarpc.com",
+        "https://optimism-rpc.publicnode.com",
+    ),
+    "polygon": (
+        _POLYGON_RPC_PRIMARY,
+        "https://polygon.llamarpc.com",
+        "https://polygon-bor-rpc.publicnode.com",
+    ),
+}
+
+# Backward-compatibility alias for x402/base_verifier.py (Phase 4).
+# New callers should prefer CHAIN_RPC_URLS["base"].
+BASE_RPC_URLS: Final[tuple[str, ...]] = CHAIN_RPC_URLS["base"]
 
 
 # Coinbase x402 facilitator endpoint. The facilitator decodes the canonical
@@ -267,9 +314,10 @@ BASE_RPC_URLS: Final[tuple[str, ...]] = (
 # against the on-chain state, and returns valid/invalid. If the facilitator
 # times out or rejects, the verifier falls back to a direct RPC read of the
 # user-supplied transaction hash. Must be HTTPS in non-dev.
-X402_FACILITATOR_URL: Final[str] = os.getenv(
-    "X402_FACILITATOR_URL", "https://x402.org/facilitator"
-).strip() or "https://x402.org/facilitator"
+X402_FACILITATOR_URL: Final[str] = (
+    os.getenv("X402_FACILITATOR_URL", "https://x402.org/facilitator").strip()
+    or "https://x402.org/facilitator"
+)
 
 if IS_NON_DEV and not X402_FACILITATOR_URL.startswith("https://"):
     raise RuntimeError(
@@ -291,6 +339,197 @@ if IS_NON_DEV and not X402_FACILITATOR_URL.startswith("https://"):
 # 6 decimals) when building the 402 challenge and when comparing against the
 # on-chain transfer amount.
 X402_PRICE_MAP: Final[dict[str, float]] = {
-    "/api/price/": 0.001,          # per single-symbol call (prefix match)
-    "/api/prices/batch": 0.005,    # per batch call (exact match, caps at 50 symbols)
+    "/api/price/": 0.001,  # per single-symbol call (prefix match)
+    "/api/prices/batch": 0.005,  # per batch call (exact match, caps at 50 symbols)
 }
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── V1.2 x402 multi-chain EVM configuration ──
+# ══════════════════════════════════════════════════════════════════════════
+#
+# V1.2 extends Phase 4's Base-only x402 verifier to four EVM chains (Base,
+# Arbitrum, Optimism, Polygon) with native USDC on each. The same EVM
+# keypair can receive USDC on all four chains, so the common setup is a
+# single `X402_TREASURY_ADDRESS` that covers every chain. Per-chain
+# overrides exist for audit-friendly setups that prefer segregated wallets.
+#
+# Treasury resolution cascade (first non-empty wins):
+#     X402_TREASURY_ADDRESS_<CHAIN>   (e.g. X402_TREASURY_ADDRESS_ARBITRUM)
+#     X402_TREASURY_ADDRESS           (generic, applies to every chain)
+#     X402_TREASURY_ADDRESS_BASE      (V1.0 compat — applies only to Base)
+#
+# A chain without any resolvable treasury is simply omitted from the 402
+# `accepts` list at runtime. This lets an operator progressively roll out
+# multi-chain support without forcing a big-bang change.
+
+X402_SUPPORTED_CHAINS: Final[tuple[str, ...]] = (
+    "base",
+    "arbitrum",
+    "optimism",
+    "polygon",
+)
+
+_X402_TREASURY_GENERIC: Final[str] = os.getenv("X402_TREASURY_ADDRESS", "").strip()
+
+if _X402_TREASURY_GENERIC and not _EVM_ADDRESS_PATTERN.match(_X402_TREASURY_GENERIC):
+    raise RuntimeError(
+        "X402_TREASURY_ADDRESS must match ^0x[a-fA-F0-9]{40}$ "
+        f"(42 chars total). Got length {len(_X402_TREASURY_GENERIC)}."
+    )
+
+
+def _resolve_treasury(chain: str) -> str:
+    """Resolve the treasury address for `chain` via the cascade.
+
+    Returns '' if no address is configured for this chain (the verifier
+    will omit the chain from the 402 accepts list).
+    """
+    per_chain_raw = os.getenv(f"X402_TREASURY_ADDRESS_{chain.upper()}", "").strip()
+    if per_chain_raw:
+        if not _EVM_ADDRESS_PATTERN.match(per_chain_raw):
+            raise RuntimeError(
+                f"X402_TREASURY_ADDRESS_{chain.upper()} must match "
+                f"^0x[a-fA-F0-9]{{40}}$. Got length {len(per_chain_raw)}."
+            )
+        return per_chain_raw
+    if _X402_TREASURY_GENERIC:
+        return _X402_TREASURY_GENERIC
+    if chain == "base" and X402_TREASURY_ADDRESS_BASE:
+        return X402_TREASURY_ADDRESS_BASE
+    return ""
+
+
+# USDC native contracts on each supported chain. Source: Circle official
+# docs (https://developers.circle.com/stablecoins/usdc-on-main-networks).
+# Pinned canonical values — never user-controlled.
+_USDC_CONTRACTS: Final[dict[str, str]] = {
+    "base": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "arbitrum": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "optimism": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+    "polygon": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+}
+
+# EVM chain IDs (CAIP-2).
+_CHAIN_IDS: Final[dict[str, int]] = {
+    "base": 8453,
+    "arbitrum": 42161,
+    "optimism": 10,
+    "polygon": 137,
+}
+
+# Human-readable network labels used in the x402 accepts entries.
+_NETWORK_LABELS: Final[dict[str, str]] = {
+    "base": "base-mainnet",
+    "arbitrum": "arbitrum-mainnet",
+    "optimism": "optimism-mainnet",
+    "polygon": "polygon-mainnet",
+}
+
+
+def _build_x402_chain_config() -> dict[str, dict[str, Any]]:
+    """Assemble the per-chain x402 configuration dict.
+
+    Each entry carries the chain_id, the USDC contract, the resolved
+    treasury address (may be empty — caller checks), the network label,
+    and the facilitator URL (None for every chain except Base — Coinbase
+    only supports Base in the x402-v2 spec, and the direct on-chain
+    fallback covers the other three).
+    """
+    return {
+        chain: {
+            "chain_id": _CHAIN_IDS[chain],
+            "usdc_contract": _USDC_CONTRACTS[chain],
+            "treasury": _resolve_treasury(chain),
+            "network_label": _NETWORK_LABELS[chain],
+            "facilitator": X402_FACILITATOR_URL if chain == "base" else None,
+        }
+        for chain in X402_SUPPORTED_CHAINS
+    }
+
+
+X402_CHAIN_CONFIG: Final[dict[str, dict[str, Any]]] = _build_x402_chain_config()
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── V1.8 Historical Prices configuration ──
+# ══════════════════════════════════════════════════════════════════════════
+
+HISTORY_SAMPLE_INTERVAL_S: Final[int] = int(
+    os.getenv("HISTORY_SAMPLE_INTERVAL_S", "300")
+)
+HISTORY_RETENTION_DAYS: Final[int] = int(os.getenv("HISTORY_RETENTION_DAYS", "30"))
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── V1.9 Alerts + Streaming configuration ──
+# ══════════════════════════════════════════════════════════════════════════
+
+ALERTS_MAX_PER_KEY: Final[int] = int(os.getenv("ALERTS_MAX_PER_KEY", "10"))
+ALERTS_WEBHOOK_TIMEOUT_S: Final[int] = int(os.getenv("ALERTS_WEBHOOK_TIMEOUT_S", "10"))
+STREAM_MAX_SYMBOLS: Final[int] = int(os.getenv("STREAM_MAX_SYMBOLS", "10"))
+STREAM_POLL_INTERVAL_S: Final[float] = float(os.getenv("STREAM_POLL_INTERVAL_S", "3"))
+STREAM_TIMEOUT_S: Final[int] = int(os.getenv("STREAM_TIMEOUT_S", "3600"))
+
+
+# Fail fast in non-dev if not a single treasury address is configured.
+# Dev can run with zero treasuries (middleware will 402 every request, but
+# the server still boots so tests run without any wallet setup).
+if IS_NON_DEV and not any(c["treasury"] for c in X402_CHAIN_CONFIG.values()):
+    raise RuntimeError(
+        f"At least one x402 treasury must be configured in {ENV}. "
+        "Set X402_TREASURY_ADDRESS (applies to all chains) or at least one "
+        "of X402_TREASURY_ADDRESS_{BASE,ARBITRUM,OPTIMISM,POLYGON}."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── V2.3 Stripe billing configuration ──
+# ══════════════════════════════════════════════════════════════════════════
+#
+# Stripe handles human-paid subscriptions (Dev $9/€9, Pro $49/€49) for tiers
+# defined in core.billing_tiers. Agents continue paying per-call via x402
+# on Base mainnet — Stripe is for humans only.
+#
+# Environment variables (all OPTIONAL in dev so tests boot without secrets):
+#     STRIPE_SECRET_KEY        — sk_test_... or sk_live_...
+#     STRIPE_WEBHOOK_SECRET    — whsec_..., signs the Stripe-Signature header
+#     STRIPE_PRICE_DEV_USD     — price_id for Dev plan in USD
+#     STRIPE_PRICE_DEV_EUR     — price_id for Dev plan in EUR
+#     STRIPE_PRICE_PRO_USD     — price_id for Pro plan in USD
+#     STRIPE_PRICE_PRO_EUR     — price_id for Pro plan in EUR
+#     LANDING_BASE_URL         — base URL for checkout success/cancel redirects
+#                                (default https://oracle.maxiaworld.app)
+
+STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "").strip()
+STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+STRIPE_PRICE_DEV_USD: str = os.getenv("STRIPE_PRICE_DEV_USD", "").strip()
+STRIPE_PRICE_DEV_EUR: str = os.getenv("STRIPE_PRICE_DEV_EUR", "").strip()
+STRIPE_PRICE_PRO_USD: str = os.getenv("STRIPE_PRICE_PRO_USD", "").strip()
+STRIPE_PRICE_PRO_EUR: str = os.getenv("STRIPE_PRICE_PRO_EUR", "").strip()
+LANDING_BASE_URL: str = (
+    os.getenv("LANDING_BASE_URL", "https://oracle.maxiaworld.app").strip()
+    or "https://oracle.maxiaworld.app"
+)
+
+# Convenience map: (tier, currency) → price_id. Empty string means "not
+# configured" — the checkout endpoint returns 503 in that case.
+STRIPE_PRICE_MAP: Final[dict[tuple[str, str], str]] = {
+    ("dev", "usd"): STRIPE_PRICE_DEV_USD,
+    ("dev", "eur"): STRIPE_PRICE_DEV_EUR,
+    ("pro", "usd"): STRIPE_PRICE_PRO_USD,
+    ("pro", "eur"): STRIPE_PRICE_PRO_EUR,
+}
+
+# In prod the Stripe secret + webhook secret MUST be set, otherwise the
+# /api/stripe/* routes 503 every call. We fail fast here so the operator
+# sees the error at boot, not on the first checkout.
+if IS_PROD and (not STRIPE_SECRET_KEY or not STRIPE_WEBHOOK_SECRET):
+    # Soft-warn, do not raise — the rest of the API stays usable even if
+    # Stripe is mis-configured. Operators see the warning in the logs.
+    import warnings
+
+    warnings.warn(
+        "STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET missing in prod — "
+        "/api/stripe/* will 503 until both are set."
+    )

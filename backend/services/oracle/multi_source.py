@@ -22,12 +22,22 @@ Design notes:
       network I/O which is already gated by the shared http_client pool
       and by each service's own caching.
 """
+
 from __future__ import annotations
 
 import asyncio
 from typing import Any
 
-from services.oracle import chainlink_oracle, price_oracle, pyth_oracle
+from services.oracle import (
+    binance_oracle,
+    chainlink_oracle,
+    kraken_oracle,
+    price_oracle,
+    pyth_oracle,
+    pyth_solana_oracle,
+    redstone_oracle,
+    uniswap_v3_oracle,
+)
 
 
 def compute_divergence(prices: list[float]) -> float:
@@ -67,25 +77,59 @@ async def collect_sources(symbol: str) -> list[dict[str, Any]]:
     # Pyth — crypto feed
     if symbol in pyth_oracle.CRYPTO_FEEDS:
         tasks.append(
-            ("pyth_crypto", pyth_oracle.get_pyth_price(pyth_oracle.CRYPTO_FEEDS[symbol]))
+            (
+                "pyth_crypto",
+                pyth_oracle.get_pyth_price(pyth_oracle.CRYPTO_FEEDS[symbol]),
+            )
         )
     # Pyth — equity feed
     lookup_eq = "GOOG" if symbol == "GOOGL" else symbol
     if lookup_eq in pyth_oracle.EQUITY_FEEDS:
         tasks.append(
-            ("pyth_equity", pyth_oracle.get_pyth_price(pyth_oracle.EQUITY_FEEDS[lookup_eq]))
+            (
+                "pyth_equity",
+                pyth_oracle.get_pyth_price(pyth_oracle.EQUITY_FEEDS[lookup_eq]),
+            )
         )
-    # Chainlink — on-chain Base
-    if symbol in chainlink_oracle.CHAINLINK_FEEDS:
+    # Chainlink — on-chain price source.
+    # Base is preferred (lower latency). For symbols absent from Base (e.g. SOL, XRP)
+    # Ethereum mainnet is used as fallback: it adds an independent on-chain data point
+    # without mixing heartbeat timing for the same feed on two chains simultaneously.
+    if chainlink_oracle.has_feed(symbol, "base"):
         tasks.append(
-            ("chainlink_base", chainlink_oracle.get_chainlink_price(symbol))
+            (
+                "chainlink_base",
+                chainlink_oracle.get_chainlink_price(symbol, chain="base"),
+            )
+        )
+    elif chainlink_oracle.has_feed(symbol, "ethereum"):
+        tasks.append(
+            (
+                "chainlink_ethereum",
+                chainlink_oracle.get_chainlink_price(symbol, chain="ethereum"),
+            )
         )
     # price_oracle — Helius/CoinPaprika/CoinGecko aggregator
     tasks.append(("price_oracle", price_oracle.get_prices([symbol])))
+    # V1.3 — RedStone public REST (4th independent upstream). Every symbol
+    # is attempted; `symbol not found` replies are silent-dropped below.
+    tasks.append(("redstone", redstone_oracle.get_redstone_price(symbol)))
+    # V1.4 — Pyth native Solana on-chain shard-0 read.
+    if pyth_solana_oracle.has_feed(symbol):
+        tasks.append(("pyth_solana", pyth_solana_oracle.get_pyth_solana_price(symbol)))
+    # V1.5 — Uniswap v3 TWAP on Ethereum mainnet.
+    if uniswap_v3_oracle.has_pool(symbol, "ethereum"):
+        tasks.append(
+            ("uniswap_v3", uniswap_v3_oracle.get_twap_price(symbol, chain="ethereum"))
+        )
+    # V2.4 — Binance public spot ticker (largest volume CEX).
+    if binance_oracle.has_pair(symbol):
+        tasks.append(("binance", binance_oracle.get_binance_price(symbol)))
+    # V2.4 — Kraken public spot ticker (independent US-friendly CEX).
+    if kraken_oracle.has_pair(symbol):
+        tasks.append(("kraken", kraken_oracle.get_kraken_price(symbol)))
 
-    results = await asyncio.gather(
-        *(coro for _, coro in tasks), return_exceptions=True
-    )
+    results = await asyncio.gather(*(coro for _, coro in tasks), return_exceptions=True)
 
     out: list[dict[str, Any]] = []
     for (name, _), result in zip(tasks, results):

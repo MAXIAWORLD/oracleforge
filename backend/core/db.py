@@ -18,6 +18,7 @@ Schema:
                       (Phase 4): tx_hash is PRIMARY KEY so INSERT OR FAIL
                       detects reuse atomically
 """
+
 from __future__ import annotations
 
 import logging
@@ -34,11 +35,31 @@ _BUSY_TIMEOUT_MS: Final[int] = 5000
 
 _SCHEMA_SQL: Final[str] = """
 CREATE TABLE IF NOT EXISTS api_keys (
-    key_hash    TEXT PRIMARY KEY NOT NULL,
-    created_at  INTEGER NOT NULL,
-    tier        TEXT NOT NULL DEFAULT 'free',
-    active      INTEGER NOT NULL DEFAULT 1
+    key_hash               TEXT PRIMARY KEY NOT NULL,
+    created_at             INTEGER NOT NULL,
+    tier                   TEXT NOT NULL DEFAULT 'free',
+    active                 INTEGER NOT NULL DEFAULT 1,
+    email                  TEXT,
+    stripe_customer_id     TEXT,
+    stripe_subscription_id TEXT
 );
+
+CREATE TABLE IF NOT EXISTS stripe_events (
+    event_id    TEXT PRIMARY KEY NOT NULL,
+    event_type  TEXT NOT NULL,
+    received_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pending_key_delivery (
+    session_id  TEXT PRIMARY KEY NOT NULL,
+    raw_key     TEXT NOT NULL,
+    created_at  INTEGER NOT NULL,
+    expires_at  INTEGER NOT NULL,
+    delivered   INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_key_expires
+    ON pending_key_delivery (expires_at);
 
 CREATE TABLE IF NOT EXISTS rate_limit (
     key_hash     TEXT NOT NULL,
@@ -58,7 +79,8 @@ CREATE TABLE IF NOT EXISTS x402_txs (
     tx_hash      TEXT PRIMARY KEY NOT NULL,
     amount_usdc  REAL NOT NULL,
     path         TEXT NOT NULL,
-    created_at   INTEGER NOT NULL
+    created_at   INTEGER NOT NULL,
+    chain        TEXT NOT NULL DEFAULT 'base'
 );
 
 CREATE INDEX IF NOT EXISTS idx_rate_limit_window
@@ -69,6 +91,35 @@ CREATE INDEX IF NOT EXISTS idx_register_limit_window
 
 CREATE INDEX IF NOT EXISTS idx_x402_txs_created_at
     ON x402_txs (created_at);
+
+CREATE TABLE IF NOT EXISTS price_snapshots (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol      TEXT NOT NULL,
+    price       REAL NOT NULL,
+    source_count INTEGER NOT NULL DEFAULT 1,
+    sampled_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshots_lookup
+    ON price_snapshots (symbol, sampled_at);
+
+CREATE TABLE IF NOT EXISTS price_alerts (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    key_hash        TEXT NOT NULL,
+    symbol          TEXT NOT NULL,
+    condition       TEXT NOT NULL,
+    threshold       REAL NOT NULL,
+    callback_url    TEXT NOT NULL,
+    active          INTEGER NOT NULL DEFAULT 1,
+    created_at      INTEGER NOT NULL,
+    triggered_at    INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_active
+    ON price_alerts (active, symbol);
+
+CREATE INDEX IF NOT EXISTS idx_alerts_key
+    ON price_alerts (key_hash, active);
 """
 
 
@@ -98,12 +149,30 @@ def _connect(db_path: str | Path) -> sqlite3.Connection:
 _shared_connection: sqlite3.Connection | None = None
 
 
+def _ensure_column(
+    conn: sqlite3.Connection, table: str, column: str, ddl_fragment: str
+) -> None:
+    """Idempotent SQLite `ALTER TABLE ADD COLUMN` guard.
+
+    SQLite has no `ADD COLUMN IF NOT EXISTS` so we introspect the table
+    schema via PRAGMA and only execute the ALTER when the column is
+    missing. Safe to call on every `init_db()` — a no-op on schemas that
+    already include the column.
+    """
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column in existing:
+        return
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl_fragment}")
+    logger.info("[db] Added %s.%s via migration", table, column)
+
+
 def init_db() -> sqlite3.Connection:
     """Open the shared DB connection and apply the schema.
 
     Called from the FastAPI lifespan on startup. Idempotent: safe to call
     multiple times; only opens a new connection if the previous one was
-    closed.
+    closed. Non-destructive migrations (like V1.2's `x402_txs.chain`
+    column) are applied here so older DB files upgrade in place.
     """
     global _shared_connection
     if _shared_connection is not None:
@@ -113,6 +182,33 @@ def init_db() -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = _connect(db_path)
     conn.executescript(_SCHEMA_SQL)
+
+    # V1.2 migration: add `chain` column to pre-existing `x402_txs` tables.
+    # The executescript above creates the column for fresh DBs; this guard
+    # upgrades DBs that were initialized against the Phase 4 schema.
+    _ensure_column(conn, "x402_txs", "chain", "chain TEXT NOT NULL DEFAULT 'base'")
+
+    # V2.3 migration: add Stripe billing columns to pre-existing api_keys tables.
+    # The indexes below must run AFTER these column-add migrations so an
+    # old DB upgraded in place doesn't fail on `CREATE INDEX ... ON
+    # missing_column`.
+    _ensure_column(conn, "api_keys", "email", "email TEXT")
+    _ensure_column(conn, "api_keys", "stripe_customer_id", "stripe_customer_id TEXT")
+    _ensure_column(
+        conn, "api_keys", "stripe_subscription_id", "stripe_subscription_id TEXT"
+    )
+
+    conn.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_api_keys_stripe_sub
+            ON api_keys (stripe_subscription_id);
+        CREATE INDEX IF NOT EXISTS idx_api_keys_email
+            ON api_keys (email);
+        CREATE INDEX IF NOT EXISTS idx_api_keys_stripe_cust
+            ON api_keys (stripe_customer_id);
+        """
+    )
+
     logger.info("SQLite initialized at %s", db_path)
     _shared_connection = conn
     return conn
@@ -168,9 +264,7 @@ def now_unix() -> int:
 _TX_HASH_MAX_LENGTH: Final[int] = 128  # safety cap against oversized inputs
 
 
-def x402_tx_already_processed(
-    conn: sqlite3.Connection, tx_hash: str
-) -> bool:
+def x402_tx_already_processed(conn: sqlite3.Connection, tx_hash: str) -> bool:
     """Return True if the given x402 tx_hash has already been recorded.
 
     Used as a pre-check by the middleware before attempting insertion. The
@@ -192,8 +286,14 @@ def x402_record_tx(
     tx_hash: str,
     amount_usdc: float,
     path: str,
+    chain: str = "base",
 ) -> bool:
     """Record a verified x402 transaction. Return True on insert, False on replay.
+
+    V1.2: `chain` is recorded alongside the hash so the audit trail shows
+    which EVM network settled the payment. The primary key stays
+    `tx_hash` alone (cf. v1.2 doc, decision D5) because collision across
+    chains is cryptographically negligible.
 
     Uses INSERT OR IGNORE so that concurrent duplicate inserts resolve
     deterministically: the first writer wins, subsequent writers observe a
@@ -205,10 +305,300 @@ def x402_record_tx(
         raise ValueError(f"amount_usdc must be strictly positive, got {amount_usdc}")
     if not path:
         raise ValueError("path must be a non-empty string")
+    if not chain:
+        raise ValueError("chain must be a non-empty string")
 
     cursor = conn.execute(
-        "INSERT OR IGNORE INTO x402_txs (tx_hash, amount_usdc, path, created_at) "
+        "INSERT OR IGNORE INTO x402_txs (tx_hash, amount_usdc, path, created_at, chain) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (tx_hash, amount_usdc, path, now_unix(), chain),
+    )
+    return cursor.rowcount == 1
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── V1.8 price history helpers ──
+# ══════════════════════════════════════════════════════════════════════════
+
+_MAX_DATAPOINTS: Final[int] = 2000
+
+
+def insert_price_snapshots(
+    conn: sqlite3.Connection,
+    rows: list[tuple[str, float, int]],
+) -> int:
+    """Bulk-insert price snapshots. Each tuple is (symbol, price, source_count).
+
+    Returns the number of rows inserted.
+    """
+    if not rows:
+        return 0
+    ts = now_unix()
+    conn.executemany(
+        "INSERT INTO price_snapshots (symbol, price, source_count, sampled_at) "
         "VALUES (?, ?, ?, ?)",
-        (tx_hash, amount_usdc, path, now_unix()),
+        [(sym, price, sc, ts) for sym, price, sc in rows],
+    )
+    return len(rows)
+
+
+def query_price_history(
+    conn: sqlite3.Connection,
+    symbol: str,
+    since: int,
+    bucket_s: int,
+) -> list[dict[str, float | int]]:
+    """Return downsampled price history as a list of {timestamp, price, samples}.
+
+    Groups raw snapshots into buckets of `bucket_s` seconds and averages.
+    """
+    rows = conn.execute(
+        "SELECT (sampled_at / ?) * ? AS bucket_time, "
+        "       ROUND(AVG(price), 6) AS avg_price, "
+        "       COUNT(*) AS samples "
+        "FROM price_snapshots "
+        "WHERE symbol = ? AND sampled_at >= ? "
+        "GROUP BY bucket_time "
+        "ORDER BY bucket_time "
+        "LIMIT ?",
+        (bucket_s, bucket_s, symbol, since, _MAX_DATAPOINTS),
+    ).fetchall()
+    return [{"timestamp": row[0], "price": row[1], "samples": row[2]} for row in rows]
+
+
+def oldest_snapshot_ts(conn: sqlite3.Connection, symbol: str) -> int | None:
+    """Return the oldest sampled_at for a symbol, or None if no data."""
+    row = conn.execute(
+        "SELECT MIN(sampled_at) FROM price_snapshots WHERE symbol = ?",
+        (symbol,),
+    ).fetchone()
+    return row[0] if row and row[0] is not None else None
+
+
+def purge_old_snapshots(conn: sqlite3.Connection, retention_days: int) -> int:
+    """Delete snapshots older than `retention_days`. Returns rows deleted."""
+    cutoff = now_unix() - retention_days * 86400
+    cursor = conn.execute("DELETE FROM price_snapshots WHERE sampled_at < ?", (cutoff,))
+    return cursor.rowcount
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── V1.9 price alert helpers ──
+# ══════════════════════════════════════════════════════════════════════════
+
+_VALID_CONDITIONS: Final[frozenset[str]] = frozenset({"above", "below"})
+
+
+def create_alert(
+    conn: sqlite3.Connection,
+    key_hash: str,
+    symbol: str,
+    condition: str,
+    threshold: float,
+    callback_url: str,
+) -> int:
+    """Insert a new price alert. Returns the alert id."""
+    cursor = conn.execute(
+        "INSERT INTO price_alerts "
+        "(key_hash, symbol, condition, threshold, callback_url, active, created_at) "
+        "VALUES (?, ?, ?, ?, ?, 1, ?)",
+        (key_hash, symbol, condition, threshold, callback_url, now_unix()),
+    )
+    return cursor.lastrowid or 0
+
+
+def list_alerts(
+    conn: sqlite3.Connection,
+    key_hash: str,
+    active_only: bool = True,
+) -> list[dict]:
+    """Return all alerts for a key_hash."""
+    where = "key_hash = ? AND active = 1" if active_only else "key_hash = ?"
+    rows = conn.execute(
+        f"SELECT id, symbol, condition, threshold, callback_url, active, "
+        f"created_at, triggered_at FROM price_alerts WHERE {where} "
+        f"ORDER BY created_at DESC",
+        (key_hash,),
+    ).fetchall()
+    return [
+        {
+            "id": r[0],
+            "symbol": r[1],
+            "condition": r[2],
+            "threshold": r[3],
+            "callback_url": r[4],
+            "active": bool(r[5]),
+            "created_at": r[6],
+            "triggered_at": r[7],
+        }
+        for r in rows
+    ]
+
+
+def get_alert(
+    conn: sqlite3.Connection,
+    alert_id: int,
+    key_hash: str,
+) -> dict | None:
+    """Return a single alert if it belongs to key_hash, else None."""
+    row = conn.execute(
+        "SELECT id, symbol, condition, threshold, callback_url, active, "
+        "created_at, triggered_at FROM price_alerts "
+        "WHERE id = ? AND key_hash = ?",
+        (alert_id, key_hash),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "symbol": row[1],
+        "condition": row[2],
+        "threshold": row[3],
+        "callback_url": row[4],
+        "active": bool(row[5]),
+        "created_at": row[6],
+        "triggered_at": row[7],
+    }
+
+
+def delete_alert(
+    conn: sqlite3.Connection,
+    alert_id: int,
+    key_hash: str,
+) -> bool:
+    """Delete an alert. Returns True if a row was deleted."""
+    cursor = conn.execute(
+        "DELETE FROM price_alerts WHERE id = ? AND key_hash = ?",
+        (alert_id, key_hash),
+    )
+    return cursor.rowcount > 0
+
+
+def count_active_alerts(conn: sqlite3.Connection, key_hash: str) -> int:
+    """Return the number of active alerts for a key_hash."""
+    row = conn.execute(
+        "SELECT COUNT(*) FROM price_alerts WHERE key_hash = ? AND active = 1",
+        (key_hash,),
+    ).fetchone()
+    return row[0] if row else 0
+
+
+def get_all_active_alerts(conn: sqlite3.Connection) -> list[dict]:
+    """Return ALL active alerts across all keys (for sampler evaluation)."""
+    rows = conn.execute(
+        "SELECT id, key_hash, symbol, condition, threshold, callback_url "
+        "FROM price_alerts WHERE active = 1"
+    ).fetchall()
+    return [
+        {
+            "id": r[0],
+            "key_hash": r[1],
+            "symbol": r[2],
+            "condition": r[3],
+            "threshold": r[4],
+            "callback_url": r[5],
+        }
+        for r in rows
+    ]
+
+
+def trigger_alert(conn: sqlite3.Connection, alert_id: int) -> None:
+    """Mark an alert as triggered (one-shot: deactivate after trigger)."""
+    conn.execute(
+        "UPDATE price_alerts SET active = 0, triggered_at = ? WHERE id = ?",
+        (now_unix(), alert_id),
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ── V2.5 pending key delivery helpers ──
+# ══════════════════════════════════════════════════════════════════════════
+#
+# Stripe Checkout completes on Stripe's side, our webhook fires, we rotate
+# the api_key (generate fresh raw_key + replace hash in api_keys). The
+# success page then needs to display the new raw_key once. We park it in
+# `pending_key_delivery` keyed by Stripe session_id, with a 10-minute TTL.
+# A one-shot GET endpoint reads it, marks delivered=1, and the row is
+# purged at the next startup.
+
+_PENDING_KEY_TTL_S: Final[int] = 600  # 10 minutes
+
+
+def insert_pending_key(
+    conn: sqlite3.Connection,
+    session_id: str,
+    raw_key: str,
+    ttl_s: int = _PENDING_KEY_TTL_S,
+) -> None:
+    """Store a freshly-rotated api key for one-shot retrieval by session_id."""
+    now = now_unix()
+    conn.execute(
+        "INSERT OR REPLACE INTO pending_key_delivery "
+        "(session_id, raw_key, created_at, expires_at, delivered) "
+        "VALUES (?, ?, ?, ?, 0)",
+        (session_id, raw_key, now, now + ttl_s),
+    )
+
+
+def fetch_and_consume_pending_key(
+    conn: sqlite3.Connection, session_id: str
+) -> str | None:
+    """Return the raw_key for `session_id` once. Subsequent calls return None.
+
+    The row is marked delivered=1 atomically with the read so a concurrent
+    second reader cannot re-fetch the key. Expired rows return None.
+    """
+    cursor = conn.execute(
+        "UPDATE pending_key_delivery SET delivered = 1 "
+        "WHERE session_id = ? AND delivered = 0 AND expires_at > ? "
+        "RETURNING raw_key",
+        (session_id, now_unix()),
+    )
+    row = cursor.fetchone()
+    return row[0] if row is not None else None
+
+
+def purge_expired_pending_keys(conn: sqlite3.Connection) -> int:
+    """Delete pending_key_delivery rows past their expiry. Called at startup."""
+    cursor = conn.execute(
+        "DELETE FROM pending_key_delivery "
+        "WHERE expires_at < ? OR delivered = 1",
+        (now_unix(),),
+    )
+    return cursor.rowcount or 0
+
+
+def rotate_api_key(
+    conn: sqlite3.Connection,
+    old_key_hash: str,
+    new_key_hash: str,
+    tier: str,
+    stripe_customer_id: str | None,
+    stripe_subscription_id: str | None,
+    email: str | None,
+) -> bool:
+    """Atomic rotation: replace key_hash on the row identified by old_key_hash,
+    while updating tier + stripe ids + email. Returns True on a single-row
+    update, False otherwise (no row matched the old hash).
+
+    Rate-limit and alerts rows keyed on the old hash become orphans and
+    are cleaned up at the next maintenance pass.
+    """
+    cursor = conn.execute(
+        "UPDATE api_keys SET "
+        "  key_hash = ?, "
+        "  tier = ?, "
+        "  stripe_customer_id = ?, "
+        "  stripe_subscription_id = ?, "
+        "  email = COALESCE(?, email) "
+        "WHERE key_hash = ?",
+        (
+            new_key_hash,
+            tier,
+            stripe_customer_id,
+            stripe_subscription_id,
+            email,
+            old_key_hash,
+        ),
     )
     return cursor.rowcount == 1
