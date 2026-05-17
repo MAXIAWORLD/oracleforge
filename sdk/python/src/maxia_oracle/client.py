@@ -6,13 +6,13 @@ Usage:
 
     with MaxiaOracleClient(api_key="mxo_your_key") as client:
         btc = client.price("BTC")
-        print(btc["data"]["price"])
+        print(btc["price"])          # direct access, no ["data"] wrapper
 
 If you do not yet have a key, call `register()` on a keyless client first:
 
     with MaxiaOracleClient() as client:
         registered = client.register()
-        key = registered["data"]["api_key"]
+        key = registered["api_key"]   # direct access, no ["data"] wrapper
 
 Every successful response is the parsed JSON dict as returned by the
 backend, including the mandatory `disclaimer` field. Errors are raised as
@@ -39,7 +39,7 @@ from .exceptions import (
 
 DEFAULT_BASE_URL: Final[str] = "https://oracle.maxiaworld.app"
 DEFAULT_TIMEOUT_S: Final[float] = 15.0
-USER_AGENT: Final[str] = "maxia-oracle-python/0.1.0"
+USER_AGENT: Final[str] = "maxia-oracle-python/0.2.0"
 
 
 class MaxiaOracleClient:
@@ -209,15 +209,11 @@ class MaxiaOracleClient:
         quotes. Use this when all you need is "do the sources agree?",
         not the full price breakdown.
         """
-        full = self.price(symbol)
-        data = full.get("data", {})
+        data = self.price(symbol)
         return {
-            "data": {
-                "symbol": data.get("symbol", symbol),
-                "source_count": data.get("source_count"),
-                "divergence_pct": data.get("divergence_pct"),
-            },
-            "disclaimer": full.get("disclaimer", ""),
+            "symbol": data.get("symbol", symbol),
+            "source_count": data.get("source_count"),
+            "divergence_pct": data.get("divergence_pct"),
         }
 
     # ── Internals ───────────────────────────────────────────────────────────
@@ -294,7 +290,7 @@ class MaxiaOracleClient:
             )
 
         if status >= 200 and status < 300:
-            return body
+            return body.get("data", body) if isinstance(body, dict) else body
 
         # Error branches
         message = body.get("error") if isinstance(body, dict) else None

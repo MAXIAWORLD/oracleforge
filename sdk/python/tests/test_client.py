@@ -62,8 +62,8 @@ def test_register_returns_api_key() -> None:
 
     with _client_with(handler, api_key=None) as c:
         result = c.register()
-    assert result["data"]["api_key"] == "mxo_new_test_key"
-    assert result["data"]["daily_limit"] == 100
+    assert result["api_key"] == "mxo_new_test_key"
+    assert result["daily_limit"] == 100
 
 
 def test_health_does_not_require_api_key() -> None:
@@ -74,7 +74,7 @@ def test_health_does_not_require_api_key() -> None:
 
     with _client_with(handler, api_key=None) as c:
         result = c.health()
-    assert result["data"]["status"] == "ok"
+    assert result["status"] == "ok"
 
 
 # ── price ───────────────────────────────────────────────────────────────────
@@ -99,8 +99,8 @@ def test_price_sends_api_key_and_parses_response() -> None:
 
     with _client_with(handler) as c:
         result = c.price("btc")  # lowercase normalized
-    assert result["data"]["symbol"] == "BTC"
-    assert result["data"]["price"] == 74000.5
+    assert result["symbol"] == "BTC"
+    assert result["price"] == 74000.5
 
 
 def test_price_rejects_bad_symbol_locally() -> None:
@@ -198,7 +198,7 @@ def test_sources_returns_list() -> None:
 
     with _client_with(handler) as c:
         result = c.sources()
-    assert result["data"]["sources"][0]["name"] == "pyth_hermes"
+    assert result["sources"][0]["name"] == "pyth_hermes"
 
 
 def test_cache_stats_returns_metrics() -> None:
@@ -208,7 +208,7 @@ def test_cache_stats_returns_metrics() -> None:
 
     with _client_with(handler) as c:
         result = c.cache_stats()
-    assert result["data"]["hit_rate"] == 0.8
+    assert result["hit_rate"] == 0.8
 
 
 def test_list_symbols_returns_grouped() -> None:
@@ -227,8 +227,8 @@ def test_list_symbols_returns_grouped() -> None:
 
     with _client_with(handler) as c:
         result = c.list_symbols()
-    assert result["data"]["total_symbols"] == 3
-    assert "BTC" in result["data"]["all_symbols"]
+    assert result["total_symbols"] == 3
+    assert "BTC" in result["all_symbols"]
 
 
 def test_chainlink_onchain_calls_right_path() -> None:
@@ -240,7 +240,7 @@ def test_chainlink_onchain_calls_right_path() -> None:
 
     with _client_with(handler) as c:
         result = c.chainlink_onchain("BTC")
-    assert result["data"]["source"] == "chainlink_base"
+    assert result["source"] == "chainlink_base"
 
 
 def test_confidence_extracts_divergence_from_price_call() -> None:
@@ -261,12 +261,12 @@ def test_confidence_extracts_divergence_from_price_call() -> None:
 
     with _client_with(handler) as c:
         result = c.confidence("eth")
-    assert result["data"]["symbol"] == "ETH"
-    assert result["data"]["source_count"] == 2
-    assert result["data"]["divergence_pct"] == 0.12
+    assert result["symbol"] == "ETH"
+    assert result["source_count"] == 2
+    assert result["divergence_pct"] == 0.12
     # The per-source breakdown is NOT leaked by confidence()
-    assert "sources" not in result["data"]
-    assert "price" not in result["data"]
+    assert "sources" not in result
+    assert "price" not in result
 
 
 # ── transport errors ────────────────────────────────────────────────────────
