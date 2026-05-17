@@ -602,7 +602,7 @@ button.plan-cta{outline:none;}
   </div>
   <div style="max-width:900px;margin:0 auto;" class="reveal">
     <div id="free-key-box" style="background:rgba(94,234,212,0.07);border:1.5px solid rgba(94,234,212,0.25);border-radius:16px;padding:28px 32px;margin-bottom:24px;text-align:center;">
-      <p style="margin:0 0 18px;font-size:15px;color:var(--text);"><span data-fr>Clé gratuite · 100 req/jour · sans email · sans carte</span><span data-en>Free key · 100 req/day · no email · no card</span></p>
+      <p style="margin:0 0 18px;font-size:15px;color:var(--text);"><span data-fr>Clé gratuite · 100 req/jour · email optionnel · sans carte</span><span data-en>Free key · 100 req/day · email optional · no card</span></p>
       <button id="btn-get-key" class="btn-primary" type="button" style="font-size:15px;padding:14px 36px;">
         <span data-fr><i class="fas fa-key"></i> Obtenir ma clé gratuite</span>
         <span data-en><i class="fas fa-key"></i> Get my free key</span>
@@ -650,7 +650,7 @@ curl -s -H "X-API-Key: <span id="step2-key" style="color:var(--teal);">YOUR_KEY<
     </div>
     <details style="max-width:900px;margin:0 auto;">
       <summary style="cursor:pointer;font-size:13px;color:var(--text-muted);padding:8px 0;user-select:none;"><span data-fr>Préfères-tu le terminal ?</span><span data-en>Prefer the terminal?</span></summary>
-      <pre style="font-size:13px;line-height:1.8;margin-top:12px;"># 1. <span data-fr>Clé gratuite (100 req/jour), sans email, sans dashboard</span><span data-en>Free key (100 req/day), no email, no dashboard</span>
+      <pre style="font-size:13px;line-height:1.8;margin-top:12px;"># 1. <span data-fr>Clé gratuite (100 req/jour), email optionnel, sans dashboard</span><span data-en>Free key (100 req/day), email optional, no dashboard</span>
 KEY=$(curl -s -X POST https://oracle.maxiaworld.app/api/register \
   | python -c "import sys,json;print(json.load(sys.stdin)['data']['api_key'])")
 
