@@ -616,6 +616,22 @@ button.plan-cta{outline:none;}
           </button>
         </div>
         <p style="margin:12px 0 0;font-size:13px;color:var(--text-muted);"><span data-fr>Conserve cette clé — elle ne sera pas renvoyée par email.</span><span data-en>Save this key — it won't be sent by email.</span></p>
+        <div id="key-email-block" style="margin-top:20px;padding:16px 20px;background:rgba(94,234,212,0.05);border:1px solid rgba(94,234,212,0.15);border-radius:12px;text-align:left;">
+          <p style="margin:0 0 10px;font-size:13px;font-weight:600;color:var(--text);"><span data-fr><i class="fas fa-envelope" style="color:var(--teal);margin-right:6px;"></i>Reçois ta clé par email · mises à jour produit</span><span data-en><i class="fas fa-envelope" style="color:var(--teal);margin-right:6px;"></i>Get your key by email · product updates</span></p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input id="key-email-input" type="email" autocomplete="email"
+              placeholder="you@example.com"
+              style="flex:1;min-width:180px;padding:10px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:50px;color:var(--white);font-size:13px;font-family:'Inter',sans-serif;outline:none;"
+              onfocus="this.style.borderColor='var(--teal)'" onblur="this.style.borderColor='rgba(255,255,255,0.12)'"
+            >
+            <button id="key-email-btn" type="button"
+              style="padding:10px 20px;background:linear-gradient(135deg,var(--teal),#2dd4bf);color:#060b14;border:none;border-radius:50px;font-weight:700;font-size:13px;font-family:'Montserrat',sans-serif;cursor:pointer;white-space:nowrap;"
+              onclick="sendKeyEmail()">
+              <span data-fr>Envoyer</span><span data-en>Send</span>
+            </button>
+          </div>
+          <p id="key-email-msg" style="margin:8px 0 0;font-size:12px;min-height:16px;"></p>
+        </div>
         <div style="margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.07);text-align:left;">
           <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:var(--text);"><span data-fr>Étape 2 — premier appel :</span><span data-en>Step 2 — first call:</span></p>
           <pre id="step2-snippet" style="font-size:12px;line-height:1.7;background:#060b14;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:12px 16px;overflow-x:auto;margin:0 0 14px;"><span style="color:#6b7280;"># remplace YOUR_KEY par ta clé</span>
@@ -1078,6 +1094,41 @@ function submitWaitlist(e) {
   });
 }
 
+</script>
+<script>
+function sendKeyEmail() {
+  var email = document.getElementById('key-email-input').value.trim();
+  var btn = document.getElementById('key-email-btn');
+  var msg = document.getElementById('key-email-msg');
+  var key = document.getElementById('key-display').textContent.trim();
+  var isEn = document.documentElement.lang === 'en';
+  if (!email) return;
+  btn.disabled = true; btn.style.opacity = '0.6';
+  msg.style.color = 'var(--text-muted)';
+  msg.textContent = isEn ? 'Sending…' : 'Envoi…';
+  fetch('/api/key-email', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({email: email, api_key: key})
+  })
+  .then(function(r){ return r.json().then(function(d){ return {s: r.status, d: d}; }); })
+  .then(function(res){
+    if (res.s === 200 && res.d.data && res.d.data.ok) {
+      document.getElementById('key-email-block').innerHTML =
+        '<p style="font-size:13px;color:var(--teal);margin:0;"><i class="fas fa-check-circle"></i> ' +
+        (isEn ? 'Check your inbox — your key is on its way.' : 'Vérifie ta boîte — ta clé est en route.') + '</p>';
+    } else {
+      btn.disabled = false; btn.style.opacity = '';
+      msg.style.color = '#f87171';
+      msg.textContent = isEn ? 'Something went wrong, try again.' : 'Erreur, réessaie.';
+    }
+  })
+  .catch(function(){
+    btn.disabled = false; btn.style.opacity = '';
+    msg.style.color = '#f87171';
+    msg.textContent = isEn ? 'Network error.' : 'Erreur réseau.';
+  });
+}
 </script>
 </body>
 </html>

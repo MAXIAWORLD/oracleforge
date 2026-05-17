@@ -13,30 +13,79 @@ rate-limit counter is enforced DB-backed (V12 audit H7). Configuration
 secrets are validated at import time, process refuses to start otherwise
 (V12 audit C5).
 """
+
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import AsyncIterator, Final
 
 from fastapi import FastAPI
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from api import routes_health, routes_mcp, routes_price, routes_register, routes_sources
+from api import (
+    routes_admin,
+    routes_alerts,
+    routes_health,
+    routes_mcp,
+    routes_price,
+    routes_register,
+    routes_sources,
+    routes_stripe,
+    routes_waitlist,
+    routes_key_email,
+)
 from core.config import ENV, IS_PROD, LOG_LEVEL
-from core.db import close_db, get_db, init_db
+from core.db import close_db, get_db, init_db, purge_expired_pending_keys
 from core.disclaimer import wrap_error
 from core.http_client import close_http_client
 from core.rate_limit import purge_old_windows
+from core.request_id import RequestIDMiddleware, request_id_var
 from core.security import SecurityHeadersMiddleware
+from services.oracle.history import start_sampler, stop_sampler
 from x402.middleware import x402_middleware
 
-API_VERSION = "0.1.0"
+API_VERSION: Final[str] = "0.2.5"
 
-logging.basicConfig(
-    level=LOG_LEVEL,
-    format="%(asctime)s %(levelname)-5s %(name)s — %(message)s",
-)
+
+class _JSONLogFormatter(logging.Formatter):
+    """Structured JSON log formatter for prod — one JSON object per line."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        entry = {
+            "ts": self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+            "request_id": request_id_var.get("-"),
+        }
+        if record.exc_info and record.exc_info[0]:
+            entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entry, ensure_ascii=False)
+
+
+class _RequestIDFilter(logging.Filter):
+    """Injects request_id into every LogRecord for text-format logs."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = request_id_var.get("-")  # type: ignore[attr-defined]
+        return True
+
+
+_handler = logging.StreamHandler()
+_handler.addFilter(_RequestIDFilter())
+if IS_PROD:
+    _handler.setFormatter(_JSONLogFormatter())
+else:
+    _handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)-5s %(name)s [%(request_id)s] — %(message)s"
+        )
+    )
+logging.basicConfig(level=LOG_LEVEL, handlers=[_handler], force=True)
 logger = logging.getLogger("maxia_oracle.main")
 
 
@@ -46,8 +95,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("Starting MAXIA Oracle %s (env=%s)", API_VERSION, ENV)
     init_db()
     purge_old_windows(get_db())
+    purge_expired_pending_keys(get_db())
+    start_sampler()
     yield
     logger.info("Shutting down MAXIA Oracle")
+    stop_sampler()
     try:
         await close_http_client()
     except Exception:
@@ -73,26 +125,25 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Security headers middleware must be registered BEFORE any other middleware
-# that modifies the response, so its setdefault() calls run last.
+# Middleware registration order: last-added = outermost (runs first).
+# Request flow: RequestID → x402 → SecurityHeaders → routes.
 app.add_middleware(SecurityHeadersMiddleware, api_version=API_VERSION)
-
-
-# x402 Phase 4 middleware — Base mainnet direct-sale payment path.
-# Registered via the function-based middleware decorator so Starlette wraps
-# it AFTER the security-headers ASGI middleware above. The x402 handler
-# reads `request.url.path` and either emits a 402 challenge, verifies a
-# payment, or passes through unchanged for non-priced paths.
 app.middleware("http")(x402_middleware)
+app.add_middleware(RequestIDMiddleware)
 
 
 # ── Routers ─────────────────────────────────────────────────────────────────
 
+app.include_router(routes_admin.router)
 app.include_router(routes_health.router)
 app.include_router(routes_register.router)
 app.include_router(routes_sources.router)
 app.include_router(routes_price.router)
+app.include_router(routes_alerts.router)
+app.include_router(routes_waitlist.router)
+app.include_router(routes_key_email.router)
 app.include_router(routes_mcp.router)
+app.include_router(routes_stripe.router)
 
 # Mount the SSE message receiver as an ASGI sub-application so the MCP SDK
 # handles session routing by `session_id` query parameter. Must use the same
@@ -100,7 +151,187 @@ app.include_router(routes_mcp.router)
 app.mount("/mcp/messages/", app=routes_mcp.sse_transport.handle_post_message)
 
 
+# ── Smithery server-card (skip auto-scan) ───────────────────────────────────
+
+
+@app.get("/.well-known/mcp/server-card.json", include_in_schema=False)
+async def mcp_server_card() -> dict:
+    """Public capability advertisement consumed by MCP discovery clients.
+
+    Mirrors the 17 tools registered in `mcp_server/tools.py` so that
+    Smithery, Claude Desktop, and other MCP clients see every available
+    capability rather than the truncated 8-tool list shipped in V1.
+    """
+    sym_in = {
+        "type": "object",
+        "properties": {"symbol": {"type": "string"}},
+        "required": ["symbol"],
+    }
+    sym_chain_in = {
+        "type": "object",
+        "properties": {
+            "symbol": {"type": "string"},
+            "chain": {"type": "string", "enum": ["base", "ethereum", "arbitrum"]},
+        },
+        "required": ["symbol"],
+    }
+    no_args = {"type": "object", "properties": {}}
+
+    return {
+        "serverInfo": {"name": "maxia-oracle", "version": API_VERSION},
+        "tools": [
+            {
+                "name": "get_price",
+                "description": "Cross-validated median price for a symbol, multi-source.",
+                "inputSchema": sym_in,
+            },
+            {
+                "name": "get_prices_batch",
+                "description": "Prices for up to 50 symbols in a single call.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "symbols": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "maxItems": 50,
+                        }
+                    },
+                    "required": ["symbols"],
+                },
+            },
+            {
+                "name": "get_sources_status",
+                "description": "Liveness of every upstream source using BTC as probe.",
+                "inputSchema": no_args,
+            },
+            {
+                "name": "get_cache_stats",
+                "description": "Per-source cache hit ratio, median age, sample counts.",
+                "inputSchema": no_args,
+            },
+            {
+                "name": "get_confidence",
+                "description": "Inter-source divergence and confidence score for a symbol.",
+                "inputSchema": sym_in,
+            },
+            {
+                "name": "list_supported_symbols",
+                "description": "Full list of supported symbols grouped by source.",
+                "inputSchema": no_args,
+            },
+            {
+                "name": "get_chainlink_onchain",
+                "description": "Direct on-chain Chainlink price on Base/Ethereum/Arbitrum.",
+                "inputSchema": sym_chain_in,
+            },
+            {
+                "name": "get_redstone_price",
+                "description": "RedStone REST source for any of 400+ assets.",
+                "inputSchema": sym_in,
+            },
+            {
+                "name": "get_pyth_solana_onchain",
+                "description": "Pyth shard-0 Solana on-chain price feed.",
+                "inputSchema": sym_in,
+            },
+            {
+                "name": "get_twap_onchain",
+                "description": "Uniswap v3 TWAP from on-chain pools (Base/Ethereum).",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {"type": "string"},
+                        "chain": {"type": "string", "enum": ["base", "ethereum"]},
+                        "window_s": {
+                            "type": "integer",
+                            "minimum": 60,
+                            "maximum": 86400,
+                        },
+                    },
+                    "required": ["symbol"],
+                },
+            },
+            {
+                "name": "get_price_context",
+                "description": "Price + confidence + anomaly + source agreement in one call.",
+                "inputSchema": sym_in,
+            },
+            {
+                "name": "get_asset_metadata",
+                "description": "Market cap, 24h volume, supply, ATH/ATL via CoinGecko.",
+                "inputSchema": sym_in,
+            },
+            {
+                "name": "get_price_history",
+                "description": "OHLC price history. Ranges: 24h/7d/30d. Intervals: 5m/1h/1d.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {"type": "string"},
+                        "range": {"type": "string", "enum": ["24h", "7d", "30d"]},
+                        "interval": {"type": "string", "enum": ["5m", "1h", "1d"]},
+                    },
+                    "required": ["symbol"],
+                },
+            },
+            {
+                "name": "create_price_alert",
+                "description": "One-shot webhook alert when a symbol crosses a threshold.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "symbol": {"type": "string"},
+                        "condition": {"type": "string", "enum": ["above", "below"]},
+                        "threshold": {"type": "number"},
+                        "callback_url": {"type": "string"},
+                    },
+                    "required": ["symbol", "condition", "threshold", "callback_url"],
+                },
+            },
+            {
+                "name": "list_price_alerts",
+                "description": "Active alerts for the authenticated key.",
+                "inputSchema": no_args,
+            },
+            {
+                "name": "delete_price_alert",
+                "description": "Delete an alert by id.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {"alert_id": {"type": "integer"}},
+                    "required": ["alert_id"],
+                },
+            },
+            {
+                "name": "health_check",
+                "description": "Minimal liveness check. Safe to call frequently.",
+                "inputSchema": no_args,
+            },
+        ],
+    }
+
+
 # ── Generic JSON error handler ──────────────────────────────────────────────
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error_handler(request, exc: RequestValidationError):  # type: ignore[no-untyped-def]
+    """Wrap FastAPI 422 Pydantic errors with the disclaimer field.
+
+    FastAPI's default handler emits {"detail": [...]} without disclaimer,
+    inconsistent with every other error response in the API.
+    """
+    from core.disclaimer import DISCLAIMER_TEXT
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": jsonable_encoder(exc.errors()),
+            "disclaimer": DISCLAIMER_TEXT,
+        },
+    )
+
 
 @app.exception_handler(Exception)
 async def _unhandled_exception_handler(request, exc: Exception):  # type: ignore[no-untyped-def]
@@ -110,7 +341,9 @@ async def _unhandled_exception_handler(request, exc: Exception):  # type: ignore
     safe_error(), but this is the last line of defense in case a route raises
     an exception that wasn't caught earlier in the stack.
     """
-    logger.error("Unhandled exception on %s %s", request.method, request.url.path, exc_info=True)
+    logger.error(
+        "Unhandled exception on %s %s", request.method, request.url.path, exc_info=True
+    )
     return JSONResponse(
         status_code=500,
         content=wrap_error("internal error", type=type(exc).__name__),
